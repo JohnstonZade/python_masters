@@ -15,7 +15,8 @@ from matplotlib import rc
 rc('text', usetex=True)  # LaTeX labels
 
 # Path to simulation data
-PATH = '/media/zade/Seagate Expansion Drive/honours_project_2020/'
+PATH = "/home/zade/masters_2021/initial_linearwave_tests/" # for testing, change!
+# PATH = '/media/zade/Seagate Expansion Drive/honours_project_2020/'
 # PATH = '/media/zade/STRONTIUM/honours_project_2020/'
 DEFAULT_PROB = 'shear_alfven'
 
@@ -81,10 +82,10 @@ def make_folder(fname):
         path.mkdir(parents=True, exist_ok=True)
 
 
-def get_maxn(fname):
+def get_maxn(output_dir):
     '''Gets the total number of simulation timesteps.
     '''
-    return len(glob.glob(PATH+fname+'/*.athdf'))
+    return len(glob.glob(PATH+output_dir+'/*.athdf'))
 
 
 # --- VECTOR FUNCTIONS --- #
@@ -146,3 +147,34 @@ def ft_grid(data, k_grid):
         Ks = (Ks, np.arange(0, np.max(np.imag(K[1])), 2*pi/Ls[1]))
 
     return Ks
+
+# --- EXPANDING BOX CODE --- #
+
+def a(expansion_rate, t):
+    """
+    Calculates the perpendicular expansion defined in Squire2020.
+    """
+    return 1 + expansion_rate*t
+
+def expand_variables(a, perp_values):
+    """
+    May be a pain to use due to broadcasting issues. Check Decay Scalings notebook for how I did it there.
+    \TODO #1 change up somehow
+    """
+    return a*perp_values
+
+def load_time_series(output_dir, prob=DEFAULT_PROB):
+    max_n = get_maxn(output_dir)
+
+    t, B, u, rho = [], [], [], []
+
+    for n in range(max_n):
+        data_n = load_data(output_dir, n, prob)
+        t.append(data_n['Time'])
+        B.append((data_n['Bcc1'], data_n['Bcc2'], data_n['Bcc3']))
+        u.append((data_n['vel1'], data_n['vel2'], data_n['vel3']))
+        rho.append(data_n['rho'])
+    
+    # The full-box variables B, u, rho are indexed in the following format:
+    # [timestep, component (if vector quantity, x=0 etc), z_step, y_step, x_step]
+    return np.array(t), np.array(B), np.array(u), np.array(rho)
