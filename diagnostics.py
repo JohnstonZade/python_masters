@@ -88,6 +88,19 @@ def get_maxn(output_dir):
     return len(glob.glob(PATH+output_dir+'/*.athdf'))
 
 
+# --- MATH FUNCTIONS --- #
+
+def rms(x, do_fluc=0, axis=(2,3,4)):
+    '''Returns the RMS of a given quantity.
+    Default axis keyword assumes the format [time, component, x3, x2, x1].
+    '''
+    x_fluc = x
+    if do_fluc:
+        x_mean = x.mean(axis=axis)
+        x_fluc -= x.mean.reshape(*x_mean.shape, 1, 1, 1)
+    return np.sqrt((x_fluc**2).mean(axis=axis))
+
+
 # --- VECTOR FUNCTIONS --- #
 
 
@@ -156,12 +169,17 @@ def a(expansion_rate, t):
     """
     return 1 + expansion_rate*t
 
-def expand_variables(a, perp_values):
+
+def expand_variables(a, vector):
     """
-    May be a pain to use due to broadcasting issues. Check Decay Scalings notebook for how I did it there.
-    \TODO #1 change up somehow
+    Takes in a time series of a vector component over the whole box and
+    scales by a(t).
     """
-    return a*perp_values
+    for i in range(1, 3):
+        vector[:, i, :] *= a.reshape(*a.shape, 1, 1, 1)
+
+    return vector
+
 
 def load_time_series(output_dir, prob=DEFAULT_PROB):
     max_n = get_maxn(output_dir)

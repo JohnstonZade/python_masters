@@ -4,6 +4,7 @@ default_prob = diag.DEFAULT_PROB
 
 def get_energy_data(output_dir,
                     prob=default_prob,
+                    only_perp=1,
                     B0=1.0,
                     Lx=1.0):
     hstData = diag.load_hst(output_dir, prob)
@@ -17,6 +18,7 @@ def get_energy_data(output_dir,
     t_A = Lx  # true when v_A = 1 and B0 along the x axis
     t = hstData['time'] / t_A  # scale by Alfven period
     KE = (hstData['1-KE'] + hstData['2-KE'] + hstData['3-KE']) / vol  # kinetic
-    ME = (hstData['2-ME'] + hstData['3-ME']) / vol  # perp magnetic energy
+    ME = (hstData['2-ME'] + hstData['3-ME']) if only_perp else (hstData['1-ME'] + hstData['2-ME'] + hstData['3-ME']) # assuming perp to x-dir
+    ME /= vol
 
     return t, KE, ME
