@@ -149,6 +149,6 @@ def spect1D(v1, v2, K, kgrid):
     NT2 = np.size(K)**2
     for k in range(nk):
         mask = np.logical_and(K < kgrid[k+1], K > kgrid[k])
-        sum = np.sum(np.real(v1[mask])*np.conj(v2[mask]))
-        out[k] = np.real(sum) / NT2
+        spec_sum = np.sum(np.real(v1[mask])*np.conj(v2[mask]))
+        out[k] = np.real(spec_sum) / NT2
     return out

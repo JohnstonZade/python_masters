@@ -67,8 +67,8 @@ def get_l_perp(L1, L2, l, B):
     structure function to be calculated.
     '''
     # Calculate average B field between point pairs
-    B1_vec = np.array([diag.get_vec(B, p) for p in L1])
-    B2_vec = np.array([diag.get_vec(B, p) for p in L2])
+    B1_vec = diag.get_vec(B, L1)
+    B2_vec = diag.get_vec(B, L2)
     B_mean = 0.5*(B1_vec + B2_vec)
 
     # Dot product of unit vectors to get cos(θ)
@@ -89,8 +89,8 @@ def calc_struct(L1, L2, v, l_mag, L_max, mask=[], use_mask=0):
     # Get vectors v1, v2 at each point
     # Calculate Δv2 = abs(v1 - v2)**2
     # We now have a mapping of l to Δv2 <- structure function
-    v1_vec = np.array([diag.get_vec(v, p) for p in L1])
-    v2_vec = np.array([diag.get_vec(v, p) for p in L2])
+    v1_vec = diag.get_vec(v, L1)
+    v2_vec = diag.get_vec(v, L1)
     Δv_vec = v1_vec - v2_vec
     Δv_mag2 = diag.get_mag(Δv_vec)**2
 
@@ -138,15 +138,17 @@ def plot_struct(l_grid, v_avg, t, fname):
 def structure_function(fname, n, do_mhd=1, N=1e6, do_ldist=0, prob=default_prob):
     '''Calculates and plots structure function.'''
 
-    def get_length():
-        '''Returns the dimensions of the simulation.'''
+    def get_length(do_diff=0):
         names = ['RootGridX3', 'RootGridX2', 'RootGridX1']
-        return np.array([data[name][1]-data[name][0] for name in names])
+        lengths = np.array([data[name][:2] for name in names])
+        if do_diff:
+            return lengths[:, 1] - lengths[:, 0]
+        return lengths
 
-    def get_point(p):
-        '''Returns coordinate of given grid point.'''
-        tp = tuple(p)
-        return np.array([zz[tp], yy[tp], xx[tp]])
+    def get_points(grid_points):
+        Ngrid = data['RootGridSize'][::-1]
+        Lgrid = get_length()
+        return grid_points*(Lgrid[:, 1] - Lgrid[:, 0]) / Ngrid + Lgrid[:, 0]
 
     # Read in data and set up grid
     data = diag.load_data(fname, n, prob)
@@ -154,23 +156,21 @@ def structure_function(fname, n, do_mhd=1, N=1e6, do_ldist=0, prob=default_prob)
     grid = data['RootGridSize'][::-1]
     t = '{:.1f}'.format(data['Time']) + ' s'
 
-    zz, yy, xx = np.meshgrid(data['x3f'], data['x2f'], data['x1f'],
-                             indexing='ij')
-    vel_data = (data['vel1'], data['vel2'], data['vel3'])
+    vel_data = np.array((data['vel1'], data['vel2'], data['vel3']))
     if do_mhd:
-        B_data = (data['Bcc1'], data['Bcc2'], data['Bcc3'])
+        B_data = np.array((data['Bcc1'], data['Bcc2'], data['Bcc3']))
     L1, L2 = generate_points(grid, N)
     print('Generated points')
 
     # Get actual position vector components for each pair of grid points
     # and difference vector between them
-    x1_vec = np.array([get_point(p) for p in L1])
-    x2_vec = np.array([get_point(p) for p in L2])
+    x1_vec = get_points(L1)
+    x2_vec = get_points(L2)
     l_vec = x1_vec - x2_vec
     # Find distance between each pair of points
     l_mag = diag.get_mag(l_vec)
     # Maximum box side length for making l_grid in calc_struct()
-    L = np.max(get_length())
+    L = np.max(get_length(do_diff=1))
     print('Lengths calculated')
 
     # Output distribution of l vector lengths

@@ -15,7 +15,7 @@ from matplotlib import rc
 rc('text', usetex=True)  # LaTeX labels
 
 # Path to simulation data
-PATH = "/home/zade/masters_2021/initial_linearwave_tests/" # for testing, change!
+PATH = "/home/zade/masters_2021/" # for testing, change!
 # PATH = '/media/zade/Seagate Expansion Drive/honours_project_2020/'
 # PATH = '/media/zade/STRONTIUM/honours_project_2020/'
 DEFAULT_PROB = 'shear_alfven'
@@ -104,17 +104,27 @@ def rms(x, do_fluc=0, axis=(2,3,4)):
 # --- VECTOR FUNCTIONS --- #
 
 
-def get_mag(X):
+def get_mag(x):
     '''For an array of vectors with the same number of components,
     returns the magnitude of each vector in an array of the same size.'''
-    x = np.array([X[i,:].dot(X[i,:]) for i in range(len(X[:,0]))])
-    return np.sqrt(x)
+    return np.sqrt((x**2).sum(axis=1))
 
 
-def get_unit(v):
+def get_unit(x):
     '''Calculates unit vector.'''
-    v_mag = get_mag(v)
-    return np.array([v[i]/v_mag[i] for i in range(len(v))])
+    x_mag = get_mag(x)
+    return x / x_mag.reshape(*x_mag.shape, 1)
+
+
+def get_vec(x, ps):
+    '''Returns array of vectors of quantity x at a given array
+    of 3D grid points ps.
+    '''
+    indices = [ps[:, 0], ps[:, 1], ps[:, 2]]
+    x1 = x[0][indices]
+    x2 = x[1][indices]
+    x3 = x[2][indices]
+    return np.array((x1, x2, x3)).T
 
 
 def get_vol(fname, prob=DEFAULT_PROB):
@@ -181,7 +191,7 @@ def expand_variables(a, vector):
     return vector
 
 
-def load_time_series(output_dir, prob=DEFAULT_PROB):
+def load_time_series(output_dir, prob=DEFAULT_PROB, conserved=0):
     max_n = get_maxn(output_dir)
 
     t, B, u, rho = [], [], [], []
@@ -189,9 +199,14 @@ def load_time_series(output_dir, prob=DEFAULT_PROB):
     for n in range(max_n):
         data_n = load_data(output_dir, n, prob)
         t.append(data_n['Time'])
-        B.append((data_n['Bcc1'], data_n['Bcc2'], data_n['Bcc3']))
-        u.append((data_n['vel1'], data_n['vel2'], data_n['vel3']))
-        rho.append(data_n['rho'])
+        if conserved:
+            B.append((data_n['Bcc1'], data_n['Bcc2'], data_n['Bcc3']))
+            u.append((data_n['mom1'], data_n['mom2'], data_n['mom3']))
+            rho.append(data_n['dens'])
+        else:
+            B.append((data_n['Bcc1'], data_n['Bcc2'], data_n['Bcc3']))
+            u.append((data_n['vel1'], data_n['vel2'], data_n['vel3']))
+            rho.append(data_n['rho'])
     
     # The full-box variables B, u, rho are indexed in the following format:
     # [timestep, component (if vector quantity, x=0 etc), z_step, y_step, x_step]
