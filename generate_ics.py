@@ -99,14 +99,7 @@ def reshape_helper(A, component):
 
 # --- GENERATING FUNCTIONS --- #
 
-def start(folder, athinput, h5name, n_X, X_min, X_max, meshblock, run_athena=0, run_visit=0, from_h5=0):
-    if from_h5:
-        create_athena_fromh5(folder, athinput, h5name, n_X, X_min, X_max, meshblock, run_athena, run_visit)
-    else:
-        create_athena_fromics(folder, athinput, h5name, n_X, X_min, X_max, meshblock, run_athena, run_visit)
-
-
-def create_athena_fromics(folder, athinput, h5name, n_X, X_min, X_max, meshblock, run_athena, run_visit):
+def create_athena_fromics(folder, athinput, h5name, n_X, X_min, X_max, meshblock, run_athena=0, run_visit=0, from_h5=0, athdf_input=None):
     # --- INPUTS --- #
 
     # Folder and h5 filename - needed for meshblock structure
@@ -122,49 +115,55 @@ def create_athena_fromics(folder, athinput, h5name, n_X, X_min, X_max, meshblock
     # meshblock = np.array([64, 64, 1])
 
     ath_copy = edit_athinput(folder+athinput, n_X, X_min, X_max, meshblock, h5name)
-    
-    # Variable functions. Only focus on isothermal
     N_HYDRO = 4  # number of hydro variables (e.g. density and momentum)
-    Dnf = lambda X, Y, Z: np.ones(X.shape)  # density
-    UXf = lambda X, Y, Z: np.zeros(X.shape)  # velocity components
-    UYf = lambda X, Y, Z: np.zeros(X.shape)
-    UZf = lambda X, Y, Z: -0.01*np.sin((2*np.pi/X_max[0]) * X + (2*np.pi/X_max[1]) * Y)
-    BXf = lambda X, Y, Z: np.ones(X.shape) # magnetic components
-    BYf = lambda X, Y, Z: np.zeros(X.shape)
-    BZf = lambda X, Y, Z: -0.01*np.sin((2*np.pi/X_max[0]) * X + (2*np.pi/X_max[1]) * Y)
-
     # Dimension setting: 1D if only x has more than one gridpoint
     one_D = 1 if np.all(n_X[1:] == 1) else 0
-
-    # --- GRID CREATION --- #
-
-    # edge (e) and centre (grid=g) coordinates
-    xe = np.linspace(X_min[0], X_max[0], n_X[0]+1)
-    ye = np.linspace(X_min[1], X_max[1], n_X[1]+1)
-    ze = np.linspace(X_min[2], X_max[2], n_X[2]+1)
-    xg = 0.5*(xe[:-1] + xe[1:])
-    yg = 0.5*(ye[:-1] + ye[1:])
-    zg = 0.5*(ze[:-1] + ze[1:])
-
-    dx = xg[1] - xg[0]
-    dy = np.inf if n_X[1] == 1 else yg[1] - yg[0]
-    dz = np.inf if n_X[2] == 1 else zg[1] - zg[0]
-    Zg, Yg, Xg = np.meshgrid(zg, yg, xg, indexing='ij')
-
-    # Place quantites on grid
     Hy_grid = np.zeros(shape=(N_HYDRO, *n_X[::-1])) # expanding n_X tuple
-    Hy_grid[0] = Dnf(Xg, Yg, Zg)
-    Hy_grid[1] = Hy_grid[0] * UXf(Xg, Yg, Zg)  # using momentum for conserved values
-    Hy_grid[2] = Hy_grid[0] * UYf(Xg, Yg, Zg)
-    Hy_grid[3] = Hy_grid[0] * UZf(Xg, Yg, Zg)
-    BXcc = BXf(Xg, Yg, Zg)
-    BYcc = BYf(Xg, Yg, Zg)
-    BZcc = BZf(Xg, Yg, Zg)
+    
+    if from_h5:
+        assert athdf_input is not None, 'Must include path to input HDF5 or .athdf file!'
+        
+        f = h5py.File(athdf_input, 'r')
+        is_cons = 'cons' in list(f.keys())  # conserved variables if 1, primitive if false
+        # TODO: #2 undo meshblock code
+    else:
+        # Variable functions. Only focus on isothermal
+        Dnf = lambda X, Y, Z: np.ones(X.shape)  # density
+        UXf = lambda X, Y, Z: np.zeros(X.shape)  # velocity components
+        UYf = lambda X, Y, Z: np.zeros(X.shape)
+        UZf = lambda X, Y, Z: -0.01*np.sin((2*np.pi/X_max[0]) * X + (2*np.pi/X_max[1]) * Y)
+        BXf = lambda X, Y, Z: np.ones(X.shape) # magnetic components
+        BYf = lambda X, Y, Z: np.zeros(X.shape)
+        BZf = lambda X, Y, Z: -0.01*np.sin((2*np.pi/X_max[0]) * X + (2*np.pi/X_max[1]) * Y)
 
-    # ignoring NHYDRO > 4 for now
-    # if NHYDRO == 5:
+        # --- GRID CREATION --- #
 
-    Xg, Yg, Zg = None, None, None
+        # edge (e) and centre (grid=g) coordinates
+        xe = np.linspace(X_min[0], X_max[0], n_X[0]+1)
+        ye = np.linspace(X_min[1], X_max[1], n_X[1]+1)
+        ze = np.linspace(X_min[2], X_max[2], n_X[2]+1)
+        xg = 0.5*(xe[:-1] + xe[1:])
+        yg = 0.5*(ye[:-1] + ye[1:])
+        zg = 0.5*(ze[:-1] + ze[1:])
+
+        dx = xg[1] - xg[0]
+        dy = np.inf if n_X[1] == 1 else yg[1] - yg[0]
+        dz = np.inf if n_X[2] == 1 else zg[1] - zg[0]
+        Zg, Yg, Xg = np.meshgrid(zg, yg, xg, indexing='ij')
+
+        # Place quantites on grid
+        Hy_grid[0] = Dnf(Xg, Yg, Zg)
+        Hy_grid[1] = Hy_grid[0] * UXf(Xg, Yg, Zg)  # using momentum for conserved values
+        Hy_grid[2] = Hy_grid[0] * UYf(Xg, Yg, Zg)
+        Hy_grid[3] = Hy_grid[0] * UZf(Xg, Yg, Zg)
+        BXcc = BXf(Xg, Yg, Zg)
+        BYcc = BYf(Xg, Yg, Zg)
+        BZcc = BZf(Xg, Yg, Zg)
+
+        # ignoring NHYDRO > 4 for now
+        # if NHYDRO == 5:
+
+        Xg, Yg, Zg = None, None, None
 
     # --- MESHBLOCK STRUCTURE --- #
 
