@@ -2,3 +2,4 @@ __pycache__/athena_read.cpython-37.pyc
 .vscode/settings.json
 __pycache__/diagnostics.cpython-37.pyc
 __pycache__/energy_evo.cpython-37.pyc
+generate_ics.py
