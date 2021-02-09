@@ -134,20 +134,26 @@ def shift_and_extend_A(Ax, Ay, Az):
 # reshape helper - concatenates A differently along different axes to allow
 # for periodicity
 def reshape_helper(A, component):
-    if component == 0:  # x-component
-        A = np.concatenate((A, A[:, :, 0].reshape((*A.shape[:2], 1))), axis=2)
-        A = np.concatenate((A[:, -1, :].reshape((A.shape[0], 1, A.shape[2])), A, A[:, 0, :].reshape((A.shape[0], 1, A.shape[2]))), axis=1)
-        A = np.concatenate((A[-1, :, :].reshape((1, *A.shape[1:])), A, A[0, :, :].reshape((1, *A.shape[1:]))), axis=0)
-    elif component == 1:  # y-component
-        A = np.concatenate((A[:, :, -1].reshape((*A.shape[:2], 1)), A, A[:, :, 0].reshape((*A.shape[:2], 1))), axis=2)
-        A = np.concatenate((A, A[:, 0, :].reshape((A.shape[0], 1, A.shape[2]))), axis=1)
-        A = np.concatenate((A[-1, :, :].reshape((1, *A.shape[1:])), A, A[0, :, :].reshape((1, *A.shape[1:]))), axis=0)
-    elif component == 2:  # z-component
-        A = np.concatenate((A[:, :, -1].reshape((*A.shape[:2], 1)), A, A[:, :, 0].reshape((*A.shape[:2], 1))), axis=2)
-        A = np.concatenate((A[:, -1, :].reshape((A.shape[0], 1, A.shape[2])), A, A[:, 0, :].reshape((A.shape[0], 1, A.shape[2]))), axis=1)
-        A = np.concatenate((A, A[0, :, :].reshape((1, *A.shape[1:]))), axis=0)
-    return A
-
+    # uncomment this if it does not work
+    # appears to work, I'll keep this here out of superstition
+    # if component == 0:  # x-component
+    #     A = np.concatenate((A, A[:, :, 0].reshape((*A.shape[:2], 1))), axis=2)
+    #     A = np.concatenate((A[:, -1, :].reshape((A.shape[0], 1, A.shape[2])), A, A[:, 0, :].reshape((A.shape[0], 1, A.shape[2]))), axis=1)
+    #     A = np.concatenate((A[-1, :, :].reshape((1, *A.shape[1:])), A, A[0, :, :].reshape((1, *A.shape[1:]))), axis=0)
+    # elif component == 1:  # y-component
+    #     A = np.concatenate((A[:, :, -1].reshape((*A.shape[:2], 1)), A, A[:, :, 0].reshape((*A.shape[:2], 1))), axis=2)
+    #     A = np.concatenate((A, A[:, 0, :].reshape((A.shape[0], 1, A.shape[2]))), axis=1)
+    #     A = np.concatenate((A[-1, :, :].reshape((1, *A.shape[1:])), A, A[0, :, :].reshape((1, *A.shape[1:]))), axis=0)
+    # elif component == 2:  # z-component
+    #     A = np.concatenate((A[:, :, -1].reshape((*A.shape[:2], 1)), A, A[:, :, 0].reshape((*A.shape[:2], 1))), axis=2)
+    #     A = np.concatenate((A[:, -1, :].reshape((A.shape[0], 1, A.shape[2])), A, A[:, 0, :].reshape((A.shape[0], 1, A.shape[2]))), axis=1)
+    #     A = np.concatenate((A, A[0, :, :].reshape((1, *A.shape[1:]))), axis=0)
+    # return A
+    if component != 0:
+        pad = ((1, 1), (0, 1), (1, 1)) if component == 1 else ((0, 1), (1, 1), (1, 1))
+    else:
+        pad = ((1, 1), (1, 1), (0, 1))
+    return np.pad(A, pad, 'wrap')
 
 def calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_blocks, blocks, dx, dy, dz):
     # Get mean of B-field (inverting and redoing curl takes this away)
