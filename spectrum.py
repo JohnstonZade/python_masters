@@ -19,11 +19,11 @@ def calc_spectrum(output_dir, save_dir, fname, prob=default_prob,
     nums = range(0, tau_file)  # average over first 2 alfven periods
     # nums = range(tau_file, max_n) # average over last 2 alfven periods
 
-    do_full_calc = not diag.check_dict(save_dir)
+    do_full_calc = not diag.check_dict(save_dir, 'mhd_spec')
     if do_full_calc:
         # create grid of K from first time step
         data = diag.load_data(output_dir, 0, prob=prob)
-        (KX, KY, KZ), kgrid = diag.ft_grid(data, 1)
+        (KX, KY, KZ), kgrid = diag.ft_grid('data', data=data, prob=prob, k_grid=1)
         Kprl = np.abs(KX)
         Kperp = np.sqrt(np.abs(KY)**2 + np.abs(KZ)**2)
         Kmag = np.sqrt(Kprl**2+Kperp**2)
@@ -65,7 +65,7 @@ def calc_spectrum(output_dir, save_dir, fname, prob=default_prob,
                 print('Doing n =', n)
 
             # Take the Fourier transform of the individual components
-            # Find their energy (ia Parseal's theorem)
+            # Find their energy (ie Parseval's theorem)
             # Add to total energy spectrum
             for vel in fields[:3]:
                 ft = fft.fftn(data[vel])
@@ -94,9 +94,9 @@ def calc_spectrum(output_dir, save_dir, fname, prob=default_prob,
             S[var] /= ns
         S['nums'] = nums
 
-        diag.save_dict(S, save_dir)
+        diag.save_dict(S, save_dir, 'mhd_spec')
     else:
-        S = diag.load_dict(save_dir, 'mhd')
+        S = diag.load_dict(save_dir, 'mhd_spec')
 
     plot_spectrum(S, save_dir, fname, plot_title, do_mhd, do_title=do_title)
 
@@ -114,11 +114,12 @@ def plot_spectrum(S, save_dir, fname, plot_title, do_mhd=1, do_title=1,
             plt.loglog(x, S['EK'][1:], x, S['EM'][1:],
                        x_mod, x53, ':', x_mod, x3, ':')
         else:
-            x53 = x**(-5/3) * 10**(2)
-            x3 = x**(-3) * 10**(4.7)
+            x_mod = x[(10**1.4 <= x) & (x < 100)]
+            x53 = 10**(-13.5) * (x_mod / 10**1.4)**(-5/3)
+            x3 = 10**(-13.5) * (x_mod / 10**1.4)**(-1.5)
             plt.loglog(x, S['EK'][1:], x, S['EM'][1:],
-                       x, x53, ':',
-                       x, x3, ':')
+                       x_mod, x53, ':',
+                       x_mod, x3, ':')
         plt.legend([r'$E_K$', r'$E_B$', r'$k^{-5/3}$', r'$k^{-3}$'])
     else:
         plt.loglog(S['kgrid'], S['EK'], S['kgrid'], S['kgrid']**(-5/3), ':')
@@ -148,7 +149,12 @@ def spect1D(v1, v2, K, kgrid):
     out = np.zeros((nk, 1))
     NT2 = np.size(K)**2
     for k in range(nk):
+        # For k between kgrid[k] and kgrid[k+1]
         mask = np.logical_and(K < kgrid[k+1], K > kgrid[k])
+        # Find the total energy within that k range
+        # This is the specturm <v1 v2>(k) ~ integral(v1 v2* dk) with kgrid[k] < k < kgrid[k+1]
+        # which is equivalent to the total energy in that range via Parseval's theorem
+        # essentially the mean of v1 v2* within this frequency range and thus the mean energy
         spec_sum = np.sum(np.real(v1[mask])*np.conj(v2[mask]))
         out[k] = np.real(spec_sum) / NT2
     return out

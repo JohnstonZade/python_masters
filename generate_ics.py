@@ -7,6 +7,7 @@ import numpy as np
 import numpy.fft as fft
 
 import diagnostics as diag
+import generate_spectrum as genspec
 
 # --- SUPPORTING FUNCTIONS --- #
 
@@ -170,7 +171,7 @@ def calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_bl
 
     K_z, K_y, K_x = np.meshgrid(K[2], K[1], K[0], indexing='ij')
     # Need to transpose x and y for it to work for some reason
-    K_x, K_y, K_z = K_x.transpose((0, 2, 1)), K_y.transpose((0, 2, 1)), K_z.transpose((0, 2, 1))
+    # K_x, K_y, K_z = K_x.transpose((0, 2, 1)), K_y.transpose((0, 2, 1)), K_z.transpose((0, 2, 1))
     K_2 = abs(K_x)**2 + abs(K_y)**2 + abs(K_z)**2
     K_2[0, 0, 0] = 1
     K_x /= K_2
@@ -397,6 +398,88 @@ def create_athena_fromh5(save_folder, athinput_in_folder, athinput_in, h5name, a
     BXcc, BYcc, BZcc = B_unpacked
     calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_blocks, blocks, dx, dy, dz)
 
+def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock, athinput='/home/zade/masters_2021/templates_athinput/athinput.from_array'):
+    h5name = folder + h5name  # eg 'ICs_template.h5'
+
+    ath_copy = edit_athinput(athinput, folder, n_X, X_min, X_max, meshblock, h5name)
+    N_HYDRO = 4  # number of hydro variables (e.g. density and momentum); assuming isothermal here
+    
+    # Dimension setting: 1D if only x has more than one gridpoint
+    one_D = 1 if np.all(n_X[1:] == 1) else 0
+    
+    # Athena orders cooridinates (Z, Y, X) while n_X is in the form (X, Y, Z)
+    # It's easier to start from this ordering instead of having to do array
+    # manipulations at the end.
+    Hy_grid = np.zeros(shape=(N_HYDRO, *n_X[::-1]))
+
+    # Generate mean fields
+    # Density
+    Dnf = lambda X, Y, Z: np.ones(X.shape)
+    UXf = lambda X, Y, Z: np.zeros(X.shape)
+    UYf = lambda X, Y, Z: np.zeros(X.shape)
+    UZf = lambda X, Y, Z: np.zeros(X.shape)
+    BXf = lambda X, Y, Z: np.ones(X.shape)
+    BYf = lambda X, Y, Z: np.zeros(X.shape)
+    BZf = lambda X, Y, Z: np.zeros(X.shape)
+
+    (xg, yg, zg), (dx, dy, dz) = generate_grid(X_min, X_max, n_X)
+    Zg, Yg, Xg = np.meshgrid(zg, yg, xg, indexing='ij')
+    rho = Dnf(Xg, Yg, Zg)
+    MX, MY, MZ = rho * UXf(Xg, Yg, Zg), rho * UYf(Xg, Yg, Zg), rho * UZf(Xg, Yg, Zg)
+    BXcc, BYcc, BZcc = BXf(Xg, Yg, Zg), BYf(Xg, Yg, Zg), BZf(Xg, Yg, Zg)
+    B_0 = np.array([BXcc, BYcc, BZcc])
+    Xg, Yg, Zg = None, None, None
+
+    # need n_low, n_high etc
+    dB_x, dB_y, dB_z = genspec.generate_alfven(n_X, X_min, X_max, B_0) # add (n_min, n_max)
+    du_x, du_y, du_z = dB_x / np.sqrt(rho), dB_y / np.sqrt(rho), dB_z / np.sqrt(rho)
+
+    # adding fluctuations
+    BXcc += dB_x
+    BYcc += dB_y
+    BZcc += dB_z
+    MX += rho*du_x
+    MY += rho*du_y
+    MZ += rho*du_z
+
+    Hy_grid[0] = rho
+    Hy_grid[1] = MX  # using momentum for conserved values
+    Hy_grid[2] = MY
+    Hy_grid[3] = MZ
+
+    # --- MESHBLOCK STRUCTURE --- #
+
+    if one_D:
+        n_blocks = n_X[0] / meshblock[0]
+        blocks = np.array([np.arange(n_blocks), np.zeros(n_blocks), np.zeros(n_blocks)])
+    else:
+        n_blocks, blocks = generate_mesh_structure(folder, ath_copy)
+    check_mesh_structure(blocks, n_X, meshblock)
+
+    # --- SAVING VARIABLES --- #
+
+    # - HYDRO
+    Hy_h5 = np.zeros(shape=(N_HYDRO, n_blocks, *meshblock[::-1]))
+    for h in range(N_HYDRO):
+        for m in range(n_blocks):  # save to each meshblock individually
+            off = blocks[:, m]
+            ind_s = (meshblock*off)[::-1]
+            ind_e = (meshblock*off + meshblock)[::-1]
+            Hy_h5[h, m, :, :, :] = Hy_grid[h, ind_s[0]:ind_e[0], ind_s[1]:ind_e[1], ind_s[2]:ind_e[2]]
+
+    Hy_grid = None
+    if os.path.isfile(h5name):  # 'overwrite' old ICs
+        os.remove(h5name)
+    with h5py.File(h5name, 'a') as f:
+        f['cons'] = Hy_h5
+    Hy_h5 = None
+    print('Hydro Saved Succesfully')
+
+    # - MAGNETIC
+    calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_blocks, blocks, dx, dy, dz)
+    print('Magnetic Saved Successfully')
+    print('Done!')
+
 
 
 # save_folder = '/home/zade/masters_2021/generating_ics/'
@@ -407,10 +490,18 @@ def create_athena_fromh5(save_folder, athinput_in_folder, athinput_in, h5name, a
 
 # create_athena_fromh5(save_folder, athinput_in_folder, athinput_in, h5name, athdf_input)
 
-# folder = '/home/zade/masters_2021/generating_ics/'
+# folder = '/home/zade/masters_2021/alfvenspec_test/'
 # h5name = 'ICs_linwave.h5'
 # n_X = np.array([64, 64, 1])
 # X_min = np.array([0., 0., 0.])
 # X_max = np.array([1., 1., 0.125])
 # meshblock = np.array([32, 32, 1])
 # create_athena_fromics(folder, h5name, n_X, X_min, X_max, meshblock)
+
+# folder = '/home/zade/masters_2021/alfvenspec_test/'
+# h5name = 'ICs_alfvenspec.h5'
+# n_X = np.array([128, 64, 64])
+# X_min = np.array([0., 0., 0.])
+# X_max = np.array([1., 0.5, 0.5])
+# meshblock = np.array([64, 32, 32])
+# create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock)

@@ -127,38 +127,67 @@ def get_vec(x, ps):
     return np.array((x1, x2, x3)).T
 
 
-def get_vol(fname, prob=DEFAULT_PROB):
-    '''Returns the volume of the simulation domain.'''
+def get_lengths(fname, prob=DEFAULT_PROB, zyx=0):
     data = load_data(fname, 0, prob)
     X1 = data['RootGridX1'][1] - data['RootGridX1'][0]
     X2 = data['RootGridX2'][1] - data['RootGridX2'][0]
     X3 = data['RootGridX3'][1] - data['RootGridX3'][0]
+    return (X3, X2, X1) if zyx else (X1, X2, X3)
+
+
+def get_rootgrid(fname, prob=DEFAULT_PROB, zyx=0):
+    data = load_data(fname, 0, prob)
+    return data['RootGridSize'][::-1] if zyx else data['RootGridSize']
+
+
+def get_vol(fname, prob=DEFAULT_PROB):
+    '''Returns the volume of the simulation domain.'''
+    X1, X2, X3 = get_lengths(fname, prob)
     return abs(X1*X2*X3)  # just a check to make volume positive
 
 
 # --- FOURIER FUNCTIONS --- #
 
 
-def ft_array(N):
+def ft_array(N, gridtype=1):
     '''
-    For given N, returns an array conforming to FT standard:
-       [0 1 2 3 ... -N/2 -N/2+1 ... -1]
+    For given N, returns an array conforming to FT standard
+       [0 1 2 3 ... -N/2 -N/2+1 ... -1] if gridtype=1
+       [-N/2 -N/2+1 ... -1 0 1 ... N/2-1] if gridtype=0
+       both of length N
     '''
-    return np.concatenate((np.arange(0, N//2, 1), [-N//2],
+    if gridtype:
+        grid = np.concatenate((np.arange(0, N//2, 1), [-N//2],
                            np.arange(-N//2+1, 0, 1)))
+    else:
+        grid = np.arange(-N//2, N//2, 1)
+    return grid
 
 
-def ft_grid(data, k_grid):
+def ft_grid(input_type, data=None, fname=None, Ls=None, Ns=None, prob=DEFAULT_PROB, k_grid=0):
     '''
     Creates a grid in k-space corresponding to the real grid given in data.
     k_grid is a boolean that when True calculates a regularly spaced array
     in k-space.
     '''
 
-    # Z, Y, X
-    p = (data['x3f'], data['x2f'], data['x1f'])
-    Ls = [np.max(p[0]), np.max(p[1]), np.max(p[2])]
-    Ns = [len(p[0])-1, len(p[1])-1, len(p[2])-1]
+    if input_type == 'data':
+        assert (data is not None), 'Must have a valid data file!'
+        X1 = data['RootGridX1'][1] - data['RootGridX1'][0]
+        X2 = data['RootGridX2'][1] - data['RootGridX2'][0]
+        X3 = data['RootGridX3'][1] - data['RootGridX3'][0]
+        
+        Ls = (X3, X2, X1)
+        Ns = data['RootGridSize'][::-1]
+    elif input_type == 'filename':
+        assert (fname is not None), 'Must have valid filename path!'
+        # Z, Y, X
+        Ls = get_lengths(fname, prob, zyx=1)  # box side lengths
+        Ns = get_rootgrid(fname, prob, zyx=1) # number of grid points
+    elif input_type == 'array':
+        assert (Ls is not None and Ns is not None), 'Must have valid lengths and grid information!'
+    else:
+        raise ValueError('Please enter a valid input type')
 
     K = {}
     for k in range(3):
