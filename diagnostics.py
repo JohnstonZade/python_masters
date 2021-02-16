@@ -149,18 +149,17 @@ def get_vol(fname, prob=DEFAULT_PROB):
 # --- FOURIER FUNCTIONS --- #
 
 
-def ft_array(N, gridtype=1):
+def ft_array(N):
     '''
     For given N, returns an array conforming to FT standard
-       [0 1 2 3 ... -N/2 -N/2+1 ... -1] if gridtype=1
-       [-N/2 -N/2+1 ... -1 0 1 ... N/2-1] if gridtype=0
-       both of length N
+       [0 1 2 3 ... -N/2 -N/2+1 ... -1] of length N
+       If N is odd we use N-1 instead of N i.e.:
+       N = 5: [0 1 2 -2 -1]
+       N = 6: [0 1 2 -3 -2 -1]
     '''
-    if gridtype:
-        grid = np.concatenate((np.arange(0, N//2, 1), [-N//2],
-                           np.arange(-N//2+1, 0, 1)))
-    else:
-        grid = np.arange(-N//2, N//2, 1)
+    grid = np.arange(-(N//2), (N+1)//2, 1)
+    grid = np.roll(grid, (N+1)//2)
+
     return grid
 
 

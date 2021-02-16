@@ -398,7 +398,10 @@ def create_athena_fromh5(save_folder, athinput_in_folder, athinput_in, h5name, a
     BXcc, BYcc, BZcc = B_unpacked
     calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_blocks, blocks, dx, dy, dz)
 
-def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock, athinput='/home/zade/masters_2021/templates_athinput/athinput.from_array'):
+def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
+                             athinput='/home/zade/masters_2021/templates_athinput/athinput.from_array',
+                             spectrum=-5/3,
+                             do_mode_test=0):
     h5name = folder + h5name  # eg 'ICs_template.h5'
 
     ath_copy = edit_athinput(athinput, folder, n_X, X_min, X_max, meshblock, h5name)
@@ -430,8 +433,8 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock, athin
     B_0 = np.array([BXcc, BYcc, BZcc])
     Xg, Yg, Zg = None, None, None
 
-    # need n_low, n_high etc
-    dB_x, dB_y, dB_z = genspec.generate_alfven(n_X, X_min, X_max, B_0) # add (n_min, n_max)
+    # Setting z^- waves = 0
+    dB_x, dB_y, dB_z = genspec.generate_alfven(n_X, X_min, X_max, B_0, spectrum)
     du_x, du_y, du_z = dB_x / np.sqrt(rho), dB_y / np.sqrt(rho), dB_z / np.sqrt(rho)
 
     # adding fluctuations
