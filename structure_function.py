@@ -25,7 +25,7 @@ def generate_points(grid, N):
 
 def select_y(x, x_bin, y, i, mask=[], use_mask=0, return_mask=0):
     '''Selects the y vector values with the condition that
-    the corresponding x values satisfy x_bin[i] <= x <= x_bin[i+1].
+    the corresponding x values satisfy x_bin[i] <= x < x_bin[i+1].
 
     If a mask is provided, it is used on both x and y so that the order of
     the elements is unchanged when selecting based on x_bin.
@@ -90,7 +90,7 @@ def calc_struct(L1, L2, v, l_mag, L_max, mask=[], use_mask=0):
     # Calculate Δv2 = abs(v1 - v2)**2
     # We now have a mapping of l to Δv2 <- structure function
     v1_vec = diag.get_vec(v, L1)
-    v2_vec = diag.get_vec(v, L1)
+    v2_vec = diag.get_vec(v, L2)
     Δv_vec = v1_vec - v2_vec
     Δv_mag2 = diag.get_mag(Δv_vec)**2
 
@@ -106,14 +106,22 @@ def calc_struct(L1, L2, v, l_mag, L_max, mask=[], use_mask=0):
     return l_grid, Δv_avg
 
 
-def plot_MHD(l, t, titles, vels, Bs, fname):
+def plot_MHD(l, t, titles, vels, Bs, fname, inertial_range=(10**-1, 2*10**-1)):
     filename = diag.PATH + fname
+
+    l_mask = (inertial_range[0] <= l) & (l < inertial_range[1])
+    l_inertial = l[l_mask]
 
     # for i in range(len(titles)):
     # gets parallel and perp components
     for i in [0, len(titles)-1]:
+
+        fit_start = Bs[i][l_mask][0]
+        l_1 = fit_start * (l_inertial/inertial_range[0])
+        l_23 = fit_start * (l_inertial/inertial_range[0])**(2/3)
+
         plt.loglog(l, vels[i], l, Bs[i])
-        plt.loglog(l, l**(2/3), ':', l, l, ':')
+        plt.loglog(l_inertial, l_23, ':', l_inertial, l_1, ':')
         plt.title(r'$S_2(l)$ with ' + titles[i])
         plt.xlabel(r'log($l$)')
         plt.ylabel(r'log($S_2(l)$))')
@@ -123,14 +131,19 @@ def plot_MHD(l, t, titles, vels, Bs, fname):
         plt.clf()
 
 
-def plot_struct(l_grid, v_avg, t, fname):
+def plot_struct(l_grid, v_avg, t, fname, inertial_range=(10**-1, 2*10**-1)):
     filename = diag.PATH + fname
 
-    plt.loglog(l_grid, v_avg, l_grid, l_grid**(2/3), ':')
+    l_mask = (inertial_range[0] <= l_grid) & (l_grid < inertial_range[1])
+    l_inertial = l_grid[l_mask]
+    fit_start = v_avg[l_mask][0]
+    l_23 = fit_start * (l_inertial/inertial_range[0])**(2/3)
+
+    plt.loglog(l_grid, v_avg, l_inertial, l_23, ':')
     plt.title(r'$S_2(l)$ at $t=$ ' + t)
     plt.xlabel(r'log($l$)')
     plt.ylabel(r'log($S_2(l)$))')
-    plt.legend(['Structure Function', r'$l^{2/3}$'])
+    plt.legend(['Velocity Structure Function', r'$l^{2/3}$'])
     plt.savefig(filename + '/struct_t' + t + '.png')
     plt.clf()
 

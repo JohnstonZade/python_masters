@@ -8,3 +8,5 @@ pymasters.code-workspace
 Generating Spectrum.ipynb
 __pycache__/generate_spectrum.cpython-37.pyc
 __pycache__/spectrum.cpython-37.pyc
+structure_function.py
+.gitignore

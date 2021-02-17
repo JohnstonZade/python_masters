@@ -401,6 +401,8 @@ def create_athena_fromh5(save_folder, athinput_in_folder, athinput_in, h5name, a
 def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
                              athinput='/home/zade/masters_2021/templates_athinput/athinput.from_array',
                              spectrum=-5/3,
+                             gauss_spec=0,
+                             prl_spec=0,
                              do_mode_test=0):
     h5name = folder + h5name  # eg 'ICs_template.h5'
 
@@ -434,7 +436,9 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
     Xg, Yg, Zg = None, None, None
 
     # Setting z^- waves = 0
-    dB_x, dB_y, dB_z = genspec.generate_alfven(n_X, X_min, X_max, B_0, spectrum)
+    dB_x, dB_y, dB_z = genspec.generate_alfven(n_X, X_min, X_max, B_0,
+                                               spectrum, gauss_spec=gauss_spec,
+                                               prl_spec=prl_spec, run_test=do_mode_test)
     du_x, du_y, du_z = dB_x / np.sqrt(rho), dB_y / np.sqrt(rho), dB_z / np.sqrt(rho)
 
     # adding fluctuations

@@ -27,7 +27,7 @@ def calc_timeind_spectrum(output_dir, save_dir, fname, prob=default_prob,
         S['kgrid'] = 0.5*(kgrid[:-1] + kgrid[1:])  # average of neighbours
 
         fields = ['vel1', 'vel2', 'vel3', 'Bcc1', 'Bcc2', 'Bcc3',
-                  'EK', 'EM', 'B', 'rho']
+                  'EK', 'EK_prl', 'EK_prp', 'EM', 'EM_prl', 'EM_prp', 'B', 'rho']
 
         # Initializing variable fields in spectrum dictionary
         for var in fields:
@@ -40,6 +40,8 @@ def calc_timeind_spectrum(output_dir, save_dir, fname, prob=default_prob,
             ft = fft.fftn(data[vel])
             S[vel] += spect1D(ft, ft, Kspec, kgrid)
             S['EK'] += S[vel]  # Total spectrum is sum of each component
+            S['EK_prl'] = spect1D(ft, ft, Kprl, kgrid)
+            S['EK_prp'] += spect1D(ft, ft, Kperp, kgrid)
 
         if do_mhd:
             Bmag = 0
@@ -47,6 +49,8 @@ def calc_timeind_spectrum(output_dir, save_dir, fname, prob=default_prob,
                 ft = fft.fftn(data[Bcc])
                 S[Bcc] += spect1D(ft, ft, Kspec, kgrid)
                 S['EM'] += S[Bcc]
+                S['EM_prl'] = spect1D(ft, ft, Kprl, kgrid)
+                S['EM_prp'] += spect1D(ft, ft, Kperp, kgrid)
                 Bmag += data[Bcc]**2
 
             Bmag = np.sqrt(Bmag)
@@ -97,7 +101,7 @@ def calc_spectrum(output_dir, save_dir, fname, prob=default_prob,
 
         ns = 0  # counter
         fields = ['vel1', 'vel2', 'vel3', 'Bcc1', 'Bcc2', 'Bcc3',
-                  'EK', 'EM', 'B', 'rho']
+                  'EK', 'EK_prl', 'EK_prp', 'EM', 'EM_prl', 'EM_prp', 'B', 'rho']
 
         # Initializing variable fields in spectrum dictionary
         for var in fields:
@@ -120,6 +124,8 @@ def calc_spectrum(output_dir, save_dir, fname, prob=default_prob,
                 ft = fft.fftn(data[vel])
                 S[vel] += spect1D(ft, ft, Kspec, kgrid)
                 S['EK'] += S[vel]  # Total spectrum is sum of each component
+                S['EK_prl'] = spect1D(ft, ft, Kprl, kgrid)
+                S['EK_prp'] += spect1D(ft, ft, Kperp, kgrid)
 
             if do_mhd:
                 Bmag = 0
@@ -127,6 +133,8 @@ def calc_spectrum(output_dir, save_dir, fname, prob=default_prob,
                     ft = fft.fftn(data[Bcc])
                     S[Bcc] += spect1D(ft, ft, Kspec, kgrid)
                     S['EM'] += S[Bcc]
+                    S['EM_prl'] = spect1D(ft, ft, Kprl, kgrid)
+                    S['EM_prp'] += spect1D(ft, ft, Kperp, kgrid)
                     Bmag += data[Bcc]**2
 
                 Bmag = np.sqrt(Bmag)
@@ -151,33 +159,35 @@ def calc_spectrum(output_dir, save_dir, fname, prob=default_prob,
 
 
 def plot_spectrum(S, save_dir, fname, plot_title, do_mhd=1, do_title=1,
-                  plot_show=0, k_line_mod=1, inertial_range=(10**1.5, 10**2)):
+                  plot_show=0, inertial_range=(10**1.5, 10**2)):
     # plot spectrum
     if do_mhd:
         k = S['kgrid'][1:]
-        EK = S['EK'][1:]
-        EM = S['EM'][1:]
+        EK = S['EK_prp'][1:]
+        EM = S['EM_prp'][1:]
         slope = get_spectral_slope(k, EM, inertial_range)
         slope_label = "{:+.2f}".format(slope)
 
         plt.loglog(k, EK, k, EM)
-        legend = [r'$E_K$', r'$E_B$']
-
-        if k_line_mod:
-            # generating fitting line
-            k_mask = np.logical_and(inertial_range[0] < k, k < inertial_range[1])
-            k_inertial = k[k_mask]
-            fit_start = EM[k_mask][0] * 10**0.3
-            x_53 = fit_start * (k_inertial/inertial_range[0])**(-5/3)
-            x_slope = fit_start * (k_inertial/inertial_range[0])**(slope)
-            plt.loglog(k_inertial, x_53, ':', k_inertial, x_slope, ':')
-            legend.extend([r'$k^{-5/3}$', r'$k^{' + slope_label + '}$'])
+        plt.xlabel(r'$k_\perp$')
+        plt.ylabel(r'$E(k_\perp)$')
+        legend = [r'$E_{K,\perp}$', r'$E_{B,\perp}$', r'$k_{\perp}^{-5/3}$', r'$k_{\perp}^{' + slope_label + '}$']
+        
+        # generating fitting line
+        k_mask = np.logical_and(inertial_range[0] <= k, k < inertial_range[1])
+        k_inertial = k[k_mask]
+        fit_start = EM[k_mask][0] * 10**0.3
+        x_53 = fit_start * (k_inertial/inertial_range[0])**(-5/3)
+        x_slope = fit_start * (k_inertial/inertial_range[0])**(slope)
+        plt.loglog(k_inertial, x_53, ':', k_inertial, x_slope, ':')
+        
         plt.legend(legend)
     else:
         plt.loglog(S['kgrid'], S['EK'], S['kgrid'], S['kgrid']**(-5/3), ':')
         plt.legend([r'$E_K$', r'$k^{-5/3}$'])
-    plt.xlabel(r'$k$')
-    plt.ylabel(r'$E(k)$')
+        plt.xlabel(r'$k$')
+        plt.ylabel(r'$E(k)$')
+    
     if do_title:
         plt.title('Energy Spectrum: ' + plot_title)
 

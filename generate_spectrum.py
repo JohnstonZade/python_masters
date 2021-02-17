@@ -11,7 +11,7 @@ import diagnostics as diag
 
 def decompose_k(KX, KY, KZ, B0_x, B0_y, B0_z):
     # want to write k = k_prl * b_0 + k_prp
-    # where b_0 = B_0 / |B_0|, k_prl = k * b_0, k_prp = k - k_prl b_0
+    # where b_0 = B_0 / |B_0|, k_prl = k ⋅ b_0, k_prp = k - k_prl b_0
     B0_mag = np.sqrt(B0_x**2 + B0_y**2 + B0_z**2)
     b0_x = B0_x / B0_mag
     b0_y = B0_y / B0_mag
@@ -80,20 +80,41 @@ def run_tests(Ls, KX, KY, KZ):
         z[mask] = wave
         return z
 
-def generate_alfven(n_X, X_min, X_max, B_0, spec_expo, run_test=0):
+def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=10.0,
+                    gauss_spec=0, prl_spec=0, run_test=0):
     '''[summary]
 
     Parameters
     ----------
-    n_X : [type]
+    n_X : ndarray
         [description]
-    X_min : [type]
+    X_min : ndarray
         [description]
-    X_max : [type]
+    X_max : ndarray
         [description]
-    B_0 : [type]
+    B_0 : ndarray
+        [description]
+    expo : float, optional
+        [description], by default -2.0
+    expo_prl : float, optional
+        k_prl^(expo_prl) spectrum, by default -2.0
+    kpeak : float, optional
+        [description], by default 1.0
+    gauss_spec : bool, optional
+        [description], by default 0
+    prl_spec : bool, optional
+        [description], by default 0
+    run_test : bool, optional
+        [description], by default 0
+
+    Returns
+    -------
+    [type]
         [description]
     '''
+
+    if expo >= 0.0:
+        expo *= -1  # doesn't make sense to have a power spectrum with expo > 0
 
     # want in form Z, Y, X
     n_X = n_X[::-1]
@@ -104,7 +125,7 @@ def generate_alfven(n_X, X_min, X_max, B_0, spec_expo, run_test=0):
     KZ, KY, KX = diag.ft_grid('array', Ls=Ls, Ns=n_X)
     
     # getting wave vector magntiudes parallel and perpendicular to B_0
-    # if B_0 is along x direction then Kprl = KX and Kprp = sqrt(KY^2 + KZ^2)
+    # if B_0 is along x direction then Kprl = KX and Kprp = √(KY^2 + KZ^2)
     # added just in case we change the direction of B_0
     Kprl, Kprp = decompose_k(KX, KY, KZ, B0_x, B0_y, B0_z)
     Kmag = np.sqrt(Kprl**2 + Kprp**2)
@@ -112,16 +133,21 @@ def generate_alfven(n_X, X_min, X_max, B_0, spec_expo, run_test=0):
     if run_test:
         z = run_tests(Ls, KX, KY, KZ)
     else:
-        # This is the same as Jono's reasoning except he puts in 5/3 
-        # if he wants a slope of -5/3 for example
-        # So his would be kpow = (expo + 4) / 2 
-        expo = spec_expo 
-        kpow = expo - 2  # accounting for increase in k modes in shell when integrating spectrum
+        # accounting for how volume in k space
+        # assuming k_prl ∝ k_prp ^ 2/3 for prl_spec, else isotropic (i.e. 2/3 -> 1)
+        kpow = expo - 1 - 2/3 if prl_spec else expo - 2
         kpow /= 2  # initialising B not B^2
         kpow -= 1  # accounting for cross product with k for dB perturbation
-        #  equivalent to kpow = (expo - 4) / 2
 
-        Kspec = Kmag**kpow
+        kprp_exp = (expo + 1) / (expo_prl + 1)
+        kprl_exp = 1.0
+
+        if gauss_spec:
+            Kspec = np.exp(- Kmag**2 / kpeak**2)
+        elif prl_spec:
+            Kspec = 1 / (1 + Kprp**-kpow) * np.exp(-(Kprl**kprl_exp) / (Kprp**kprp_exp))  # TODO: do i need to add L_⟂? 
+        else:
+            Kspec = 1 / (1 + Kmag**-kpow)
 
         # generate random complex numbers on the grid and weight by spectrum
         # these complex numbers represent the amplitude and phase of the corresponding
@@ -133,7 +159,7 @@ def generate_alfven(n_X, X_min, X_max, B_0, spec_expo, run_test=0):
         # don't need to worry about excluding purely parallel waves
         # as cross product below is automatically 0
         # exclude purely perpendicular waves as they don't propagate
-        # remember omega_A = k_prl * v_A
+        # remember ω_A = k_prl * v_A
         prp_mask = (Kprl == 0.)
         z[prp_mask] = 0j
     
@@ -141,6 +167,14 @@ def generate_alfven(n_X, X_min, X_max, B_0, spec_expo, run_test=0):
     ft_dB_x = z*(KY*B0_z - KZ*B0_y)
     ft_dB_y = z*(KZ*B0_x - KX*B0_z)
     ft_dB_z = z*(KX*B0_y - KY*B0_x)
+    
+    # don't know if this is valid but IFT scales down
+    # amplitude by a factor of Nx*Ny*Nz so I'm inverting this
+    N_points = np.prod(n_X)
+    if not gauss_spec:
+        ft_dB_x *= N_points
+        ft_dB_y *= N_points
+        ft_dB_z *= N_points
 
     # this generates a sum of waves of the form r*sin(k*x + theta)
     # for each point k in k-space

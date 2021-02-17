@@ -120,15 +120,19 @@ def get_vec(x, ps):
     '''Returns array of vectors of quantity x at a given array
     of 3D grid points ps.
     '''
-    indices = [ps[:, 0], ps[:, 1], ps[:, 2]]
+    indices = tuple([ps[:, 0], ps[:, 1], ps[:, 2]])
     x1 = x[0][indices]
     x2 = x[1][indices]
     x3 = x[2][indices]
     return np.array((x1, x2, x3)).T
 
 
-def get_lengths(fname, prob=DEFAULT_PROB, zyx=0):
-    data = load_data(fname, 0, prob)
+def get_lengths(load_data=1, data=None, fname=None, prob=DEFAULT_PROB, zyx=0):
+    if load_data:
+        assert fname is not None, 'Must have a valid filename!'
+        data = load_data(fname, 0, prob)
+    else:
+        assert data is not None, 'Must have a valid data file!'
     X1 = data['RootGridX1'][1] - data['RootGridX1'][0]
     X2 = data['RootGridX2'][1] - data['RootGridX2'][0]
     X3 = data['RootGridX3'][1] - data['RootGridX3'][0]
