@@ -49,8 +49,7 @@ def get_mean(x, x_bin, y, i, mask=[], use_mask=0):
     # Stops error for mean of empty slice
     # Might be a better way to handle this
     if len(y_sel) == 0:
-        # y_sel = np.array([0.0])
-        return float('nan')  # nan throws errors
+        return float('nan')
 
     return np.mean(y_sel)
 
@@ -74,10 +73,10 @@ def get_l_perp(L1, L2, l, B):
 
     # Dot product of unit vectors to get cos(θ)
     cθ = abs(np.sum(diag.get_unit(B_mean)*diag.get_unit(l), axis=1))
-    cθ[cθ < 0] = 0.0
+    cθ[cθ < 0] = 0.0  # needs to be in range [0, 1]
     cθ[cθ > 1.0] = 1.0
     θ_data = np.arccos(cθ)
-    θ = np.array([0, 15, 45, 90]) # np.linspace(0, 90, 4, endpoint=True)  # 7 default
+    θ = np.array([0, 15, 45, 90])
     θlen = len(θ) - 1
     θ_rad = (np.pi/180)*θ
 
@@ -170,8 +169,6 @@ def structure_function(fname, n, do_mhd=1, N=1e6, do_ldist=0, prob=default_prob)
     data = diag.load_data(fname, n, prob)
     # Following (z, y, x) convention from athena_read
     grid = data['RootGridSize'][::-1]
-    # N_points = np.prod(grid)
-    # N = 10**(np.round(np.log10(N_points)))
     t = '{:.1f}'.format(data['Time']) + ' s'
 
     vel_data = np.array((data['vel1'], data['vel2'], data['vel3']))
