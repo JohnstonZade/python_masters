@@ -49,7 +49,8 @@ def get_mean(x, x_bin, y, i, mask=[], use_mask=0):
     # Stops error for mean of empty slice
     # Might be a better way to handle this
     if len(y_sel) == 0:
-        return float('nan')
+        # y_sel = np.array([0.0])
+        return float('nan')  # nan throws errors
 
     return np.mean(y_sel)
 
@@ -73,8 +74,10 @@ def get_l_perp(L1, L2, l, B):
 
     # Dot product of unit vectors to get cos(θ)
     cθ = abs(np.sum(diag.get_unit(B_mean)*diag.get_unit(l), axis=1))
+    cθ[cθ < 0] = 0.0
+    cθ[cθ > 1.0] = 1.0
     θ_data = np.arccos(cθ)
-    θ = np.linspace(0, 90, 10, endpoint=True)  # 7 default
+    θ = np.array([0, 15, 45, 90]) # np.linspace(0, 90, 4, endpoint=True)  # 7 default
     θlen = len(θ) - 1
     θ_rad = (np.pi/180)*θ
 
@@ -84,7 +87,7 @@ def get_l_perp(L1, L2, l, B):
     return θ, l_mask
 
 
-def calc_struct(L1, L2, v, l_mag, L_max, mask=[], use_mask=0):
+def calc_struct(L1, L2, v, l_mag, L_min, mask=[], use_mask=0):
     # For each pair of position vectors x1 ∈ L1, x2 ∈ L2
     # Get vectors v1, v2 at each point
     # Calculate Δv2 = abs(v1 - v2)**2
@@ -98,7 +101,7 @@ def calc_struct(L1, L2, v, l_mag, L_max, mask=[], use_mask=0):
     # Plot in the middle of the bin points otherwise the size of arrays
     # won't match up.
     N_l = 30
-    l_bin = np.logspace(np.log10(2*L_max/N_l), np.log10(L_max/2), N_l+1)
+    l_bin = np.logspace(np.log10(2*L_min/N_l), np.log10(L_min), N_l+1)
     l_grid = 0.5*(l_bin[:-1] + l_bin[1:])
     Δv_avg = np.array([get_mean(l_mag, l_bin, Δv_mag2, i, mask, use_mask)
                        for i in range(N_l)])
@@ -106,7 +109,7 @@ def calc_struct(L1, L2, v, l_mag, L_max, mask=[], use_mask=0):
     return l_grid, Δv_avg
 
 
-def plot_MHD(l, t, titles, vels, Bs, fname, inertial_range=(10**-1, 2*10**-1)):
+def plot_MHD(l, t, titles, vels, Bs, fname, inertial_range=(3*10**-2, 6*10**-2)):
     filename = diag.PATH + fname
 
     l_mask = (inertial_range[0] <= l) & (l < inertial_range[1])
@@ -131,7 +134,7 @@ def plot_MHD(l, t, titles, vels, Bs, fname, inertial_range=(10**-1, 2*10**-1)):
         plt.clf()
 
 
-def plot_struct(l_grid, v_avg, t, fname, inertial_range=(10**-1, 2*10**-1)):
+def plot_struct(l_grid, v_avg, t, fname, inertial_range=(3*10**-2, 6*10**-2)):
     filename = diag.PATH + fname
 
     l_mask = (inertial_range[0] <= l_grid) & (l_grid < inertial_range[1])
@@ -167,6 +170,8 @@ def structure_function(fname, n, do_mhd=1, N=1e6, do_ldist=0, prob=default_prob)
     data = diag.load_data(fname, n, prob)
     # Following (z, y, x) convention from athena_read
     grid = data['RootGridSize'][::-1]
+    # N_points = np.prod(grid)
+    # N = 10**(np.round(np.log10(N_points)))
     t = '{:.1f}'.format(data['Time']) + ' s'
 
     vel_data = np.array((data['vel1'], data['vel2'], data['vel3']))
@@ -183,7 +188,7 @@ def structure_function(fname, n, do_mhd=1, N=1e6, do_ldist=0, prob=default_prob)
     # Find distance between each pair of points
     l_mag = diag.get_mag(l_vec)
     # Maximum box side length for making l_grid in calc_struct()
-    L = np.max(get_length(do_diff=1))
+    L_min = np.min(get_length(do_diff=1))
     print('Lengths calculated')
 
     # Output distribution of l vector lengths
@@ -197,15 +202,15 @@ def structure_function(fname, n, do_mhd=1, N=1e6, do_ldist=0, prob=default_prob)
     if do_mhd:
         θ, l_mask = get_l_perp(L1, L2, l_vec, B_data)
         titles, vels, Bs = [], [], []
-        l_grid = calc_struct(L1, L2, vel_data, l_mag, L)[0]
+        l_grid = calc_struct(L1, L2, vel_data, l_mag, L_min)[0]
 
         for i, l_m in enumerate(l_mask):
             titles.append(str(θ[i]) + r'$^\circ$ $\leq \theta <$ '
                           + str(θ[i+1]) + r'$^\circ$' + ' at t = ' + t)
-            vels.append(calc_struct(L1, L2, vel_data, l_mag, L, l_m, 1)[1])
-            Bs.append(calc_struct(L1, L2, B_data, l_mag, L, l_m, 1)[1])
+            vels.append(calc_struct(L1, L2, vel_data, l_mag, L_min, l_m, 1)[1])
+            Bs.append(calc_struct(L1, L2, B_data, l_mag, L_min, l_m, 1)[1])
 
         plot_MHD(l_grid, t, titles, vels, Bs, fname)
 
-    l_grid, Δv_avg = calc_struct(L1, L2, vel_data, l_mag, L)
+    l_grid, Δv_avg = calc_struct(L1, L2, vel_data, l_mag, L_min)
     plot_struct(l_grid, Δv_avg, t, fname)

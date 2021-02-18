@@ -12,7 +12,8 @@ default_prob = diag.DEFAULT_PROB
 
 
 def calc_timeind_spectrum(output_dir, save_dir, fname, prob=default_prob,
-                          plot_title='test', do_mhd=1, do_title=1):
+                          plot_title='test', inertial_range=(10**1.5, 10**2),
+                          do_mhd=1, do_title=1):
     # create grid of K from first time step
         data = diag.load_data(output_dir, 0, prob=prob)
         (KZ, KY, KX), kgrid = diag.ft_grid('data', data=data, prob=prob, k_grid=1)
@@ -60,10 +61,10 @@ def calc_timeind_spectrum(output_dir, save_dir, fname, prob=default_prob,
         ft_rho = fft.fftn(data['rho'] - np.mean(data['rho']))
         S['rho'] += spect1D(ft_rho, ft_rho, Kspec, kgrid)
 
-        plot_spectrum(S, save_dir, fname, plot_title, do_mhd, do_title=do_title)
+        plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd, do_title=do_title)
 
 
-def calc_spectrum(output_dir, save_dir, fname, prob=default_prob,
+def calc_spectrum(output_dir, save_dir, fname, inertial_range=(10**1.5, 10**2), prob=default_prob,
                   plot_title='test', dict_name='mhd_spec', do_mhd=1, do_title=1):
 
     # Getting turnover time and converting to file number
@@ -155,11 +156,11 @@ def calc_spectrum(output_dir, save_dir, fname, prob=default_prob,
     else:
         S = diag.load_dict(save_dir, dict_name)
 
-    plot_spectrum(S, save_dir, fname, plot_title, do_mhd, do_title=do_title)
+    plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd, do_title=do_title)
 
 
-def plot_spectrum(S, save_dir, fname, plot_title, do_mhd=1, do_title=1,
-                  plot_show=0, inertial_range=(10**1.5, 10**2)):
+def plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd=1, do_title=1,
+                  do_pdf=0):
     # plot spectrum
     if do_mhd:
         k = S['kgrid'][1:]
@@ -194,12 +195,10 @@ def plot_spectrum(S, save_dir, fname, plot_title, do_mhd=1, do_title=1,
     if diag.PATH not in save_dir:
         save_dir = diag.PATH + save_dir
 
-    if plot_show:
-        plt.show()
-    else:
+    if do_pdf:
         plt.savefig(save_dir + fname + '_spec.pdf')
-        plt.savefig(save_dir + fname + '_spec.png')
-        plt.close()
+    plt.savefig(save_dir + fname + '_spec.png')
+    plt.close()
 
 
 def spect1D(v1, v2, K, kgrid):
