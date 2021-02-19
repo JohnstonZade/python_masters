@@ -139,7 +139,7 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=10.0,
         kpow /= 2  # initialising B not B^2
         kpow -= 1  # accounting for cross product with k for dB perturbation
 
-        kprp_exp = (expo + 1) / (expo_prl + 1)
+        kprp_exp = (expo + 1) / (expo_prl + 1)  # gives 2/3 for expo, expo_prl = -5/3, -2
         kprl_exp = 1.0
 
         if gauss_spec:

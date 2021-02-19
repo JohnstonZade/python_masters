@@ -401,6 +401,7 @@ def create_athena_fromh5(save_folder, athinput_in_folder, athinput_in, h5name, a
 def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
                              athinput='/home/zade/masters_2021/templates_athinput/athinput.from_array',
                              spectrum=-5/3,
+                             expo_prl=-2.,
                              gauss_spec=0,
                              prl_spec=0,
                              do_mode_test=0):
@@ -437,7 +438,7 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
 
     # Setting z^- waves = 0
     dB_x, dB_y, dB_z = genspec.generate_alfven(n_X, X_min, X_max, B_0,
-                                               spectrum, gauss_spec=gauss_spec,
+                                               spectrum, expo_prl=expo_prl, gauss_spec=gauss_spec,
                                                prl_spec=prl_spec, run_test=do_mode_test)
     du_x, du_y, du_z = dB_x / np.sqrt(rho), dB_y / np.sqrt(rho), dB_z / np.sqrt(rho)
 
@@ -486,29 +487,3 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
     calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_blocks, blocks, dx, dy, dz)
     print('Magnetic Saved Successfully')
     print('Done!')
-
-
-
-# save_folder = '/home/zade/masters_2021/generating_ics/'
-# athinput_in_folder = '/home/zade/masters_2021/initial_linearwave_tests/'
-# athinput_in = athinput_in_folder + 'athinput.linear_wave'
-# h5name = 'ICs_from_linearwavetest.h5'
-# athdf_input = '/home/zade/masters_2021/generating_ics/output_linearwave/linear_wave.out2.00000.athdf'
-
-# create_athena_fromh5(save_folder, athinput_in_folder, athinput_in, h5name, athdf_input)
-
-# folder = '/home/zade/masters_2021/alfvenspec_test/'
-# h5name = 'ICs_linwave.h5'
-# n_X = np.array([64, 64, 1])
-# X_min = np.array([0., 0., 0.])
-# X_max = np.array([1., 1., 0.125])
-# meshblock = np.array([32, 32, 1])
-# create_athena_fromics(folder, h5name, n_X, X_min, X_max, meshblock)
-
-# folder = '/home/zade/masters_2021/alfvenspec_test/'
-# h5name = 'ICs_alfvenspec.h5'
-# n_X = np.array([128, 64, 64])
-# X_min = np.array([0., 0., 0.])
-# X_max = np.array([1., 0.5, 0.5])
-# meshblock = np.array([64, 32, 32])
-# create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock)

@@ -11,3 +11,4 @@ __pycache__/spectrum.cpython-37.pyc
 structure_function.py
 .gitignore
 __pycache__/structure_function.cpython-37.pyc
+.vscode/launch.json

@@ -1,6 +1,7 @@
 '''Code to calculate structure function of a fluid simulation.'''
 import numpy as np
 from numpy.random import randint, random
+from sklearn.linear_model import LinearRegression
 import matplotlib.pyplot as plt
 from matplotlib import rc
 import diagnostics as diag
@@ -107,30 +108,66 @@ def calc_struct(L1, L2, v, l_mag, L_min, mask=[], use_mask=0):
 
     return l_grid, Δv_avg
 
+def get_spectral_slope(kgrid, spectrum, inertial_range):
+    mask = (inertial_range[0] <= kgrid) & (kgrid <= inertial_range[1])
+    kgrid, spectrum = kgrid[mask], spectrum[mask]
+    
+    if len(kgrid.shape) == 1:
+        kgrid = kgrid.reshape((-1,1))  # have to make kgrid 2D
+    
+    log_k, log_spec = np.log(kgrid), np.log(spectrum)
+    model = LinearRegression().fit(log_k, log_spec)
+    slope = model.coef_
+    return slope[0]
 
-def plot_MHD(l, t, titles, vels, Bs, fname, inertial_range=(3*10**-2, 6*10**-2)):
+
+def plot_MHD(l, t, titles, vels, Bs, fname, inertial_range=(2*10**-2, 4*10**-2)):
     filename = diag.PATH + fname
 
     l_mask = (inertial_range[0] <= l) & (l < inertial_range[1])
     l_inertial = l[l_mask]
 
+    B_sf = []
+
     # for i in range(len(titles)):
     # gets parallel and perp components
     for i in [0, len(titles)-1]:
 
+        slope = get_spectral_slope(l, Bs[i], inertial_range)
+        slope_label = "{:+.2f}".format(slope)
+
         fit_start = Bs[i][l_mask][0]
         l_1 = fit_start * (l_inertial/inertial_range[0])
         l_23 = fit_start * (l_inertial/inertial_range[0])**(2/3)
+        l_fit = fit_start * (l_inertial/inertial_range[0])**(slope)
 
+        B_sf.append(Bs[i])  # for comparison of parallel and perp SF
         plt.loglog(l, vels[i], l, Bs[i])
-        plt.loglog(l_inertial, l_23, ':', l_inertial, l_1, ':')
-        plt.title(r'$S_2(l)$ with ' + titles[i])
-        plt.xlabel(r'log($l$)')
-        plt.ylabel(r'log($S_2(l)$))')
-        plt.legend(['Vel Structure Function', 'B-field Structure Function',
-                    r'$l^{2/3}$', r'$l$'])
+        if i == 0:
+            plt.loglog(l_inertial, l_1, ':', l_inertial, l_fit, ':')
+            plt.title(r'$S_2(l_\|)$ with ' + titles[i])
+            plt.xlabel(r'$l_\|$')
+            plt.ylabel(r'$S_2(l_\|)$)')
+            plt.legend(['Velocity', 'Magnetic',
+                        r'$l_\|$', r'$l_{\|}^{' + slope_label + '}$'])
+        else:
+            plt.loglog(l_inertial, l_23, ':', l_inertial, l_fit, ':')
+            plt.title(r'$S_2(l_\perp)$ with ' + titles[i])
+            plt.xlabel(r'$l_\perp$')
+            plt.ylabel(r'$S_2(l_\perp)$)')
+            plt.legend(['Velocity', 'Magnetic',
+                        r'$l_{\perp}^{2/3}$', r'$l_{\perp}^{' + slope_label + '}$'])
         plt.savefig(filename + '/t' + t + '_' + str(i) + '.png')
         plt.clf()
+
+    B_sf_prl, B_sf_prp = B_sf[0], B_sf[1]
+    plt.loglog(l, B_sf_prl, l, B_sf_prp)
+    plt.title('Magnetic Structure Functions Comparisons')
+    plt.xlabel(r'$l_{\|, \perp}$')
+    plt.ylabel(r'$S_2$')
+    plt.legend([r'$S_2(l_\|)$', r'$S_2(l_\perp)$'])
+    plt.savefig(filename + '/magnetic_comparison' + '.png')
+    plt.clf()
 
 
 def plot_struct(l_grid, v_avg, t, fname, inertial_range=(3*10**-2, 6*10**-2)):
@@ -143,8 +180,8 @@ def plot_struct(l_grid, v_avg, t, fname, inertial_range=(3*10**-2, 6*10**-2)):
 
     plt.loglog(l_grid, v_avg, l_inertial, l_23, ':')
     plt.title(r'$S_2(l)$ at $t=$ ' + t)
-    plt.xlabel(r'log($l$)')
-    plt.ylabel(r'log($S_2(l)$))')
+    plt.xlabel(r'$l$')
+    plt.ylabel(r'$S_2(l)$)')
     plt.legend(['Velocity Structure Function', r'$l^{2/3}$'])
     plt.savefig(filename + '/struct_t' + t + '.png')
     plt.clf()
@@ -208,6 +245,6 @@ def structure_function(fname, n, do_mhd=1, N=1e6, do_ldist=0, prob=default_prob)
             Bs.append(calc_struct(L1, L2, B_data, l_mag, L_min, l_m, 1)[1])
 
         plot_MHD(l_grid, t, titles, vels, Bs, fname)
-
-    l_grid, Δv_avg = calc_struct(L1, L2, vel_data, l_mag, L_min)
-    plot_struct(l_grid, Δv_avg, t, fname)
+    else:
+        l_grid, Δv_avg = calc_struct(L1, L2, vel_data, l_mag, L_min)
+        plot_struct(l_grid, Δv_avg, t, fname)
