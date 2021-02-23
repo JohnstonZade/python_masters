@@ -8,6 +8,7 @@ import diagnostics as diag
 rc('text', usetex=True)  # LaTeX labels
 default_prob = diag.DEFAULT_PROB
 
+# --- HELPER FUNCTIONS --- #
 
 def generate_points(grid, N):
     '''Generate N pairs of random points on the grid. Biased towards generating
@@ -60,7 +61,7 @@ def get_l_perp(L1, L2, l, B):
     within a specified range. Essentially does the following:
     For a distribution of points L1, L2
         Gets the magnetic field vectors at L1 and L2
-        Takes the average of the two to get the mean field.
+        Takes the average of the two to get the local mean field.
     Gets l and B unit vectors and then calculates cos(theta) = l dot b
     Bins l vectors with theta = [0, 15, 30, 45, 60, 75, 90]
         0-15 is l_parallel, 45-90 is l_perp
@@ -73,11 +74,15 @@ def get_l_perp(L1, L2, l, B):
     B_mean = 0.5*(B1_vec + B2_vec)
 
     # Dot product of unit vectors to get cos(θ)
-    cθ = abs(np.sum(diag.get_unit(B_mean)*diag.get_unit(l), axis=1))
-    cθ[cθ < 0] = 0.0  # needs to be in range [0, 1]
-    cθ[cθ > 1.0] = 1.0
+    # cθ = np.sum(diag.get_unit(B_mean)*diag.get_unit(l), axis=1).clip(-1., 1.)
+    # θ_data = np.arccos(cθ)
+    # θ_mask = θ_data > np.pi / 2
+    # θ_data[θ_mask] = np.pi - θ_data[θ_mask]
+
+    cθ = abs(np.sum(diag.get_unit(B_mean)*diag.get_unit(l), axis=1)).clip(0., 1.)
     θ_data = np.arccos(cθ)
-    θ = np.array([0, 15, 45, 90])
+
+    θ = np.array([0, 15, 75, 90])
     θlen = len(θ) - 1
     θ_rad = (np.pi/180)*θ
 
@@ -89,18 +94,18 @@ def get_l_perp(L1, L2, l, B):
 
 def calc_struct(L1, L2, v, l_mag, L_min, mask=[], use_mask=0):
     # For each pair of position vectors x1 ∈ L1, x2 ∈ L2
-    # Get vectors v1, v2 at each point
-    # Calculate Δv2 = abs(v1 - v2)**2
+    # Get vectors v2, v1 at each point
+    # Calculate Δv2 = abs(v2 - v1)**2
     # We now have a mapping of l to Δv2 <- structure function
     v1_vec = diag.get_vec(v, L1)
     v2_vec = diag.get_vec(v, L2)
-    Δv_vec = v1_vec - v2_vec
+    Δv_vec = v2_vec - v1_vec
     Δv_mag2 = diag.get_mag(Δv_vec)**2
 
     # Bin and plot structure function
     # Plot in the middle of the bin points otherwise the size of arrays
     # won't match up.
-    N_l = 30
+    N_l = 30 # 15
     l_bin = np.logspace(np.log10(2*L_min/N_l), np.log10(L_min), N_l+1)
     l_grid = 0.5*(l_bin[:-1] + l_bin[1:])
     Δv_avg = np.array([get_mean(l_mag, l_bin, Δv_mag2, i, mask, use_mask)
@@ -109,7 +114,11 @@ def calc_struct(L1, L2, v, l_mag, L_min, mask=[], use_mask=0):
     return l_grid, Δv_avg
 
 def get_spectral_slope(kgrid, spectrum, inertial_range):
+
     mask = (inertial_range[0] <= kgrid) & (kgrid <= inertial_range[1])
+    # while np.all(np.logical_not(mask)):  # if all false, returns true
+    #     inertial_range *= 2
+    #     mask = (inertial_range[0] <= kgrid) & (kgrid <= inertial_range[1])
     kgrid, spectrum = kgrid[mask], spectrum[mask]
     
     if len(kgrid.shape) == 1:
@@ -120,9 +129,14 @@ def get_spectral_slope(kgrid, spectrum, inertial_range):
     slope = model.coef_
     return slope[0]
 
+# --- PLOTTING --- #
 
 def plot_MHD(l, t, titles, vels, Bs, fname, inertial_range=(2*10**-2, 4*10**-2)):
     filename = diag.PATH + fname
+    inertial_range = np.array(inertial_range)
+
+    inertial_range[0] = l[0]
+    inertial_range[1] = inertial_range[0]*2
 
     l_mask = (inertial_range[0] <= l) & (l < inertial_range[1])
     l_inertial = l[l_mask]
@@ -186,9 +200,26 @@ def plot_struct(l_grid, v_avg, t, fname, inertial_range=(3*10**-2, 6*10**-2)):
     plt.savefig(filename + '/struct_t' + t + '.png')
     plt.clf()
 
+# --- CALL FUNCTION --- #
 
-def structure_function(fname, n, do_mhd=1, N=1e6, do_ldist=0, prob=default_prob):
-    '''Calculates and plots structure function.'''
+def structure_function(fname, n, do_mhd=1, N=1e7, do_ldist=0, prob=default_prob):
+    '''Calculates and plots structure function.
+
+    Parameters
+    ----------
+    fname : string
+        name of folder containing data of interest
+    n : int
+        number corresponding to a given time snapshot within the data
+    do_mhd : bool, optional
+        runs computation of anisotropic structure function in MHD turbulence, by default 1
+    N : float, optional
+        the number of points to calculate the structure function over, by default 1e6
+    do_ldist : bool, optional
+        boolean for running a test on the distribution of distances between points, by default 0
+    prob : string, optional
+        name of Athena++ problem, by default default_prob
+    '''
 
     def get_length(do_diff=0):
         names = ['RootGridX3', 'RootGridX2', 'RootGridX1']
@@ -211,17 +242,19 @@ def structure_function(fname, n, do_mhd=1, N=1e6, do_ldist=0, prob=default_prob)
     vel_data = np.array((data['vel1'], data['vel2'], data['vel3']))
     if do_mhd:
         B_data = np.array((data['Bcc1'], data['Bcc2'], data['Bcc3']))
-    L1, L2 = generate_points(grid, N)
+        # B_mean = np.mean(B_data, axis=(1,2,3)).reshape((3, 1, 1, 1))
+        # B_data -= B_mean
+    L1, L2 = generate_points(grid, N)  # L2 = L1 + l
     print('Generated points')
 
     # Get actual position vector components for each pair of grid points
     # and difference vector between them
     x1_vec = get_points(L1)
     x2_vec = get_points(L2)
-    l_vec = x1_vec - x2_vec
+    l_vec = x2_vec - x1_vec
     # Find distance between each pair of points
     l_mag = diag.get_mag(l_vec)
-    # Maximum box side length for making l_grid in calc_struct()
+    # Minimum box side length for making l_grid in calc_struct()
     L_min = np.min(get_length(do_diff=1))
     print('Lengths calculated')
 

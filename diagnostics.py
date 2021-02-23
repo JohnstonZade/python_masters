@@ -15,10 +15,10 @@ from matplotlib import rc
 rc('text', usetex=True)  # LaTeX labels
 
 # Path to simulation data
-PATH = "/home/zade/masters_2021/" # for testing, change!
+PATH = "/home/zade/masters_2021/"
 # PATH = '/media/zade/Seagate Expansion Drive/honours_project_2020/'
 # PATH = '/media/zade/STRONTIUM/honours_project_2020/'
-DEFAULT_PROB = 'shear_alfven'
+DEFAULT_PROB = 'turb'
 
 
 def load_data(output_dir, n, prob=DEFAULT_PROB):

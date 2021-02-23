@@ -11,11 +11,13 @@ rc('text', usetex=True)  # LaTeX labels
 default_prob = diag.DEFAULT_PROB
 
 
-def calc_timeind_spectrum(output_dir, save_dir, fname, prob=default_prob,
-                          plot_title='test', inertial_range=(10**1.5, 10**2),
-                          do_mhd=1, do_title=1):
+def calc_timeind_spectrum(output_dir, save_dir, fname, n=0, prob=default_prob,
+                          plot_title='test', dict_name='mhd_specone', inertial_range=(10**1.5, 10**2),
+                          do_mhd=1, do_prp=1, do_title=1):
+    do_full_calc = not diag.check_dict(save_dir, dict_name)
+    if do_full_calc:
     # create grid of K from first time step
-        data = diag.load_data(output_dir, 0, prob=prob)
+        data = diag.load_data(output_dir, n, prob=prob)
         (KZ, KY, KX), kgrid = diag.ft_grid('data', data=data, prob=prob, k_grid=1)
         Kprl = np.abs(KX)
         Kperp = np.sqrt(np.abs(KY)**2 + np.abs(KZ)**2)
@@ -60,12 +62,15 @@ def calc_timeind_spectrum(output_dir, save_dir, fname, prob=default_prob,
 
         ft_rho = fft.fftn(data['rho'] - np.mean(data['rho']))
         S['rho'] += spect1D(ft_rho, ft_rho, Kspec, kgrid)
+        diag.save_dict(S, save_dir, dict_name)
+    else:
+        S = diag.load_dict(save_dir, dict_name)
 
-        plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd, do_title=do_title)
+    plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd, do_prp=do_prp, do_title=do_title)
 
 
 def calc_spectrum(output_dir, save_dir, fname, inertial_range=(10**1.5, 10**2), prob=default_prob,
-                  plot_title='test', dict_name='mhd_spec', do_mhd=1, do_title=1):
+                  plot_title='test', dict_name='mhd_spec', do_mhd=1, do_prp=1, do_title=1):
 
     # Getting turnover time and converting to file number
     max_n = diag.get_maxn(output_dir)
@@ -156,26 +161,40 @@ def calc_spectrum(output_dir, save_dir, fname, inertial_range=(10**1.5, 10**2), 
     else:
         S = diag.load_dict(save_dir, dict_name)
 
-    plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd, do_title=do_title)
+    plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd, do_prp=do_prp, do_title=do_title)
 
 
-def plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd=1, do_title=1,
+def plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd=1, do_prp=1, do_title=1,
                   do_pdf=0):
     # plot spectrum
     if do_mhd:
+        inertial_range = np.array(inertial_range)
+
         k = S['kgrid'][1:]
-        EK = S['EK_prp'][1:]
-        EM = S['EM_prp'][1:]
+        if do_prp:
+            EK = S['EK_prp'][1:]
+            EM = S['EM_prp'][1:]
+        else:
+            EK = S['EK'][1:]
+            EM = S['EM'][1:]
         slope = get_spectral_slope(k, EM, inertial_range)
         slope_label = "{:+.2f}".format(slope)
 
         plt.loglog(k, EK, k, EM)
-        plt.xlabel(r'$k_\perp$')
-        plt.ylabel(r'$E(k_\perp)$')
-        legend = [r'$E_{K,\perp}$', r'$E_{B,\perp}$', r'$k_{\perp}^{-5/3}$', r'$k_{\perp}^{' + slope_label + '}$']
+        if do_prp:
+            plt.xlabel(r'$k_\perp$')
+            plt.ylabel(r'$E(k_\perp)$')
+            legend = [r'$E_{K,\perp}$', r'$E_{B,\perp}$', r'$k_{\perp}^{-5/3}$', r'$k_{\perp}^{' + slope_label + '}$']
+        else:
+            plt.xlabel(r'$k$')
+            plt.ylabel(r'$E(k)$')
+            legend = [r'$E_{K}$', r'$E_{B}$', r'$k^{-5/3}$', r'$k^{' + slope_label + '}$']
         
         # generating fitting line
         k_mask = np.logical_and(inertial_range[0] <= k, k < inertial_range[1])
+        while np.all(np.logical_not(k_mask)):  # if all false, returns true
+            inertial_range *= 2
+            k_mask = (inertial_range[0] <= k) & (k <= inertial_range[1])
         k_inertial = k[k_mask]
         fit_start = EM[k_mask][0] * 10**0.3
         x_53 = fit_start * (k_inertial/inertial_range[0])**(-5/3)
@@ -195,9 +214,10 @@ def plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd=1, do_t
     if diag.PATH not in save_dir:
         save_dir = diag.PATH + save_dir
 
+    perpsuffix = '_perpspec' if do_prp else '_spec'
     if do_pdf:
-        plt.savefig(save_dir + fname + '_spec.pdf')
-    plt.savefig(save_dir + fname + '_spec.png')
+        plt.savefig(save_dir + fname + perpsuffix + '.pdf')
+    plt.savefig(save_dir + fname + perpsuffix + '.png')
     plt.close()
 
 
@@ -223,6 +243,9 @@ def spect1D(v1, v2, K, kgrid):
 
 def get_spectral_slope(kgrid, spectrum, inertial_range):
     mask = (inertial_range[0] <= kgrid) & (kgrid <= inertial_range[1])
+    while np.all(np.logical_not(mask)):  # if all false, returns true
+        inertial_range *= 2
+        mask = (inertial_range[0] <= kgrid) & (kgrid <= inertial_range[1])
     kgrid, spectrum = kgrid[mask], spectrum[mask]
     
     if len(kgrid.shape) == 1:

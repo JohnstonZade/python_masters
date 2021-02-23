@@ -1,7 +1,3 @@
-# Code to generate a certain spectrum of Alfven waves
-# referenceing alfven_wave_spectrum.cpp in Athena
-# look at MCP noise spectra
-
 import numpy as np
 import numpy.random as random
 import numpy.fft as fft
@@ -13,16 +9,16 @@ def decompose_k(KX, KY, KZ, B0_x, B0_y, B0_z):
     # want to write k = k_prl * b_0 + k_prp
     # where b_0 = B_0 / |B_0|, k_prl = k ⋅ b_0, k_prp = k - k_prl b_0
     B0_mag = np.sqrt(B0_x**2 + B0_y**2 + B0_z**2)
-    b0_x = B0_x / B0_mag
-    b0_y = B0_y / B0_mag
-    b0_z = B0_z / B0_mag
+    b0_x   = B0_x / B0_mag
+    b0_y   = B0_y / B0_mag
+    b0_z   = B0_z / B0_mag
 
-    Kprl = KX*b0_x + KY*b0_y + KZ*b0_z
+    Kprl   = KX*b0_x + KY*b0_y + KZ*b0_z
     Kprp_x = KX - Kprl*b0_x
     Kprp_y = KY - Kprl*b0_y
     Kprp_z = KZ - Kprl*b0_z
-    Kprl = abs(Kprl)
-    Kprp = np.maximum(np.sqrt(abs(Kprp_x)**2 + abs(Kprp_y)**2 + abs(Kprp_z)**2), 0.01)
+    Kprl   = abs(Kprl)
+    Kprp   = np.maximum(np.sqrt(abs(Kprp_x)**2 + abs(Kprp_y)**2 + abs(Kprp_z)**2), 0.01)
 
     return Kprl, Kprp
 
@@ -82,41 +78,68 @@ def run_tests(Ls, KX, KY, KZ):
 
 def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=10.0,
                     gauss_spec=0, prl_spec=0, run_test=0):
-    '''[summary]
+    '''Generate a superposition of random Alfvén waves within a numerical domain
+    that follow a given energy spectrum.
+
+    This function creates a grid in Fourier (k) space corresponding to the allowed wave modes
+    in the numerical grid and generates modes with random amplitudes and phases. The amplitudes
+    are scaled by the corresponding k spectrum. Alfvén wave modes are then calculated, which can then be
+    used by `generate_ics` to setup initial conditons.
+
+    Spectra
+    -------
+    The energy spectra this code can generate includes:
+
+    - Isotropic: generates a spectrum of the form E(k) ~ k^(- |expo|)
+
+    - Anisotropic: for expo = α and expo_prl = β, generates anisotropic
+    1D spectra of the form E(kprp) ~ kprp^(- |α|) and E(kprl) ~ kprl^(- |β|).
+
+           - For critical balance, α = -5/3 and β = -2 satisfying the relationship
+           kprl ∝ kprp^(2/3).
+           
+           - In general, for kprp^(- |α|) and kprl^(- |β|) gives the relationship
+           kprl ∝ kprp^[(|α| - |β|)/(|β| - 1)], which can be derived from
+           the 3D energy spectrum.
+
+    - Gaussian: generates an isotropic spectrum of the form E(k) ~ e^(-k^2 / kpeak^2)
+
+    Note: The exponent for all power laws are always assumed to be negative as a positive power law is unphysical
+    as it would say smaller scales have much more energy than large scales.
+
 
     Parameters
     ----------
     n_X : ndarray
-        [description]
+        array containing the resolution of the grid in the order n_x, n_y, n_z
     X_min : ndarray
-        [description]
+        array containing the minimum coordinate values of x, y, z
     X_max : ndarray
-        [description]
+        array containing the maximum coordinate values of x, y, z
     B_0 : ndarray
-        [description]
-    expo : float, optional
-        [description], by default -2.0
+        ndarray the size of the grid that contains the mean magnetic field
+    expo : float
+        exponent for the power law energy spectrum E(k)~k^(expo) 
+        (or E(kprp)~kprp^(expo) for anisotropic spectrum)
     expo_prl : float, optional
-        k_prl^(expo_prl) spectrum, by default -2.0
+        the exponent to raise kprl by for an anisotropic spectrum, by default -2.0
     kpeak : float, optional
-        [description], by default 1.0
-    gauss_spec : bool, optional
-        [description], by default 0
-    prl_spec : bool, optional
-        [description], by default 0
-    run_test : bool, optional
-        [description], by default 0
+        the peak k magnitude for the Gaussian distribution, by default 10.0
+    gauss_spec : boolean, optional
+        generate a Gaussian spectrum, by default 0
+    prl_spec : boolean, optional
+        generate anisotropic spectrum, by default 0
+    run_test : boolean, optional
+        run tests to check mode generation, by default 0
 
     Returns
     -------
-    [type]
-        [description]
+    ndarray
+        Returns the 3 components of the superposed Alfvén waves dB_x, dB_y, dB_z
+        which have the same size as the original grid.
     '''
 
-    if expo >= 0.0:
-        expo *= -1  # doesn't make sense to have a power spectrum with expo > 0
-
-    # want in form Z, Y, X
+    # want in form Z, Y, X conforming to Athena++
     n_X = n_X[::-1]
     Ls = (X_max - X_min)[::-1]
     B0_x, B0_y, B0_z = B_0
@@ -133,26 +156,32 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=10.0,
     if run_test:
         z = run_tests(Ls, KX, KY, KZ)
     else:
-        # accounting for how volume in k space
-        # assuming k_prl ∝ k_prp ^ 2/3 for prl_spec, else isotropic (i.e. 2/3 -> 1)
-        kpow = expo - 1 - 2/3 if prl_spec else expo - 2
-        kpow /= 2  # initialising B not B^2
-        kpow -= 1  # accounting for cross product with k for dB perturbation
+        # making it easier to compare to Jono's/Athena's code
+        # will always interpret as a spectrum of the form k^(-expo)
+        expo = abs(expo)
+        expo_prl = 5/3 if not prl_spec else abs(expo_prl)
 
-        kprp_exp = (expo + 1) / (expo_prl + 1)  # gives 2/3 for expo, expo_prl = -5/3, -2
-        kprl_exp = 1.0
+        # accounting for how volume in k space changes
+        # for expo_prl = -2 (i.e. k_prl ∝ (k_prp)^(2/3)) second term is equivalent to expo + 1 + 2/3
+        # for isotropic expo_prl = expo (k_prl ∝ k_prp) second term is zero
+        kpow = expo + 2.0 + (expo - expo_prl) / (expo_prl - 1.)
+        kpow /= 2  # initialising B not B^2
+        kpow += 1  # accounting for cross product with k for dB perturbation
 
         if gauss_spec:
             Kspec = np.exp(- Kmag**2 / kpeak**2)
         elif prl_spec:
-            Kspec = 1 / (1 + Kprp**-kpow) * np.exp(-(Kprl**kprl_exp) / (Kprp**kprp_exp))  # TODO: do i need to add L_⟂? 
+            kprp_exp = (expo - 1) / (expo_prl - 1)  # gives 2/3 for expo, expo_prl = -5/3, -2
+            kprl_exp = 1.0
+            # see Cho2002, Maron2001 for explaination
+            Kspec = 1 / (1 + Kprp**kpow) * np.exp(-(Kprl**kprl_exp) / (Kprp**kprp_exp))  # TODO: do i need to add L_⟂? 
         else:
-            Kspec = 1 / (1 + Kmag**-kpow)
+            Kspec = 1 / (1 + Kmag**kpow)
 
         # generate random complex numbers on the grid and weight by spectrum
         # these complex numbers represent the amplitude and phase of the corresponding
         # Fourier mode at that point in k-space
-        r = random.normal(size=n_X)*Kspec  # multiply by number of grid points?
+        r = random.normal(size=n_X)*Kspec
         theta = random.uniform(0, 2*np.pi, size=n_X)
         z = r*np.exp(1j*theta)
 
@@ -163,6 +192,7 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=10.0,
         prp_mask = (Kprl == 0.)
         z[prp_mask] = 0j
     
+    # Alfvén wave definition performed in k-space: δB = amplitude * (k × B)
     # don't need to Fourier transform B0 as it is constant
     ft_dB_x = z*(KY*B0_z - KZ*B0_y)
     ft_dB_y = z*(KZ*B0_x - KX*B0_z)
@@ -170,6 +200,8 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=10.0,
     
     # don't know if this is valid but IFT scales down
     # amplitude by a factor of Nx*Ny*Nz so I'm inverting this
+    # after checking dependence on resolution (i.e. 256^3 has smaller amplitude than 32^3 by a factor of 10^-2)
+    # I think this is ok
     N_points = np.prod(n_X)
     if not gauss_spec:
         ft_dB_x *= N_points
