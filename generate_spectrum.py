@@ -167,7 +167,6 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=10.0,
         kpow = expo + 2.0
         kpow += (expo - expo_prl) / (expo_prl - 1.) if expo_prl != 1. else 0.
         kpow /= 2  # initialising B not B^2
-        kpow += 1  # accounting for cross product with k for dB perturbation
 
         if gauss_spec:
             Kspec = np.exp(- Kmag**2 / kpeak**2)
@@ -175,7 +174,8 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=10.0,
             kprp_exp = (expo - 1) / (expo_prl - 1)  # gives 2/3 for expo, expo_prl = -5/3, -2
             kprl_exp = 1.0
             # see Cho2002, Maron2001 for explaination
-            Kspec = 1 / (1 + Kprp**kpow) * np.exp(-(Kprl**kprl_exp) / (Kprp**kprp_exp))  # TODO: do i need to add L_⟂? 
+            # TODO: do i need to add L_⟂? Would be L_⟂^(kprl_exp - kprp_exp) to make dimensional sense
+            Kspec = 1 / (1 + Kprp**kpow) * np.exp(-(Kprl**kprl_exp) / (Kprp**kprp_exp))
         else:
             Kspec = 1 / (1 + Kmag**kpow)
 
@@ -201,9 +201,10 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=10.0,
 
     # rescaling the amplitude of the Alfvén waves by
     # removing the magnitude of the k vector and replacing
-    # it with the randomly generated amplitude
+    # it with the randomly generated amplitude.
+    # This removes the need to add 1 to kpow above.
     ft_dB_mag = np.sqrt(abs(ft_dB_x)**2 + abs(ft_dB_y)**2 + abs(ft_dB_z)**2)
-    ft_dB_mag[ft_dB_mag == 0.] = 1.
+    ft_dB_mag[ft_dB_mag == 0.] = 1e-15
     ft_dB_x *= z / ft_dB_mag
     ft_dB_y *= z / ft_dB_mag
     ft_dB_z *= z / ft_dB_mag
