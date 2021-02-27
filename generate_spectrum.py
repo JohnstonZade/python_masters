@@ -29,11 +29,11 @@ def run_tests(Ls, KX, KY, KZ):
         # parallel wavenumbers
         kx, ky, kz = 2*np.pi / Ls[2], 2*np.pi / Ls[1], 2*np.pi / Ls[0]  
 
-        # 2D Waves along y=x: works
-        # k_x = k_y = 1, k_z = 0, amp = 2, phase shift = 0
-        nx, ny, nz = 1., 1., 0.
-        kx *= nx; ky *= ny; kz *= nz
-        amp, theta = 2., 0.
+        # # 2D Waves along y=x: works
+        # # k_x = k_y = 1, k_z = 0, amp = 2, phase shift = 0
+        # nx, ny, nz = 1., 1., 0.
+        # kx *= nx; ky *= ny; kz *= nz
+        # amp, theta = 2., 0.
 
         # 2D phase shift: works
         # k_x = 1, k_y = 1, k_z = 0, amp = 2, phase shift = pi/2
@@ -60,9 +60,9 @@ def run_tests(Ls, KX, KY, KZ):
 
         # 2D perpendicular: works
         # k_x = 0, k_y = 1, k_z = 0, amp = 2, phase shift = 0
-        # nx, ny, nz = 0., 1., 0.
-        # kx *= nx; ky *= ny; kz *= nz
-        # amp, theta = 2., 0. 
+        nx, ny, nz = 0., 1., 0.
+        kx *= nx; ky *= ny; kz *= nz
+        amp, theta = 2., 0. 
 
         # 3D Waves: works
         # k_x = 0, k_y = k_z = 1, amp = 2, phase shift = 0
@@ -159,12 +159,13 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=10.0,
         # making it easier to compare to Jono's/Athena's code
         # will always interpret as a spectrum of the form k^(-expo)
         expo = abs(expo)
-        expo_prl = 5/3 if not prl_spec else abs(expo_prl)
+        expo_prl = expo if not prl_spec else abs(expo_prl)
 
         # accounting for how volume in k space changes
         # for expo_prl = -2 (i.e. k_prl ∝ (k_prp)^(2/3)) second term is equivalent to expo + 1 + 2/3
         # for isotropic expo_prl = expo (k_prl ∝ k_prp) second term is zero
-        kpow = expo + 2.0 + (expo - expo_prl) / (expo_prl - 1.)
+        kpow = expo + 2.0
+        kpow += (expo - expo_prl) / (expo_prl - 1.) if expo_prl != 1. else 0.
         kpow /= 2  # initialising B not B^2
         kpow += 1  # accounting for cross product with k for dB perturbation
 
@@ -192,23 +193,32 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=10.0,
         prp_mask = (Kprl == 0.)
         z[prp_mask] = 0j
     
-    # Alfvén wave definition performed in k-space: δB = amplitude * (k × B)
+    # Alfvén wave definition performed in k-space: δB = k × B
     # don't need to Fourier transform B0 as it is constant
-    ft_dB_x = z*(KY*B0_z - KZ*B0_y)
-    ft_dB_y = z*(KZ*B0_x - KX*B0_z)
-    ft_dB_z = z*(KX*B0_y - KY*B0_x)
-    
-    # don't know if this is valid but IFT scales down
-    # amplitude by a factor of Nx*Ny*Nz so I'm inverting this
-    # after checking dependence on resolution (i.e. 256^3 has smaller amplitude than 32^3 by a factor of 10^-2)
-    # I think this is ok
-    N_points = np.prod(n_X)
-    if not gauss_spec:
-        ft_dB_x *= N_points
-        ft_dB_y *= N_points
-        ft_dB_z *= N_points
+    ft_dB_x = (KY*B0_z - KZ*B0_y)
+    ft_dB_y = (KZ*B0_x - KX*B0_z)
+    ft_dB_z = (KX*B0_y - KY*B0_x)
 
-    # this generates a sum of waves of the form r*sin(k*x + theta)
+    # rescaling the amplitude of the Alfvén waves by
+    # removing the magnitude of the k vector and replacing
+    # it with the randomly generated amplitude
+    ft_dB_mag = np.sqrt(abs(ft_dB_x)**2 + abs(ft_dB_y)**2 + abs(ft_dB_z)**2)
+    ft_dB_mag[ft_dB_mag == 0.] = 1.
+    ft_dB_x *= z / ft_dB_mag
+    ft_dB_y *= z / ft_dB_mag
+    ft_dB_z *= z / ft_dB_mag
+
+    # The IFT in Python is normalized by the total number of grid points.
+    # This scales down the amplitude by a factor of Nx*Ny*Nz.
+    # Verified after checking amplitude dependence on resolution for a single mode 
+    # i.e. 256^3 box has smaller amplitude than 32^3 box on the order of 10^-3 (using 2^(3x)~10^x)
+    # Just inverting this process.
+    N_points = np.prod(n_X)
+    ft_dB_x *= N_points
+    ft_dB_y *= N_points
+    ft_dB_z *= N_points
+
+    # this generates a sum of waves of the form r*sin(k⋅x + theta)
     # for each point k in k-space
     dB_x = np.real(fft.ifftn(ft_dB_x))
     dB_y = np.real(fft.ifftn(ft_dB_y))

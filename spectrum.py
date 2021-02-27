@@ -13,7 +13,7 @@ default_prob = diag.DEFAULT_PROB
 
 def calc_timeind_spectrum(output_dir, save_dir, fname, n=0, prob=default_prob,
                           plot_title='test', dict_name='mhd_specone', inertial_range=(10**1.5, 10**2),
-                          do_mhd=1, do_prp=1, do_title=1):
+                          do_mhd=1, do_prp_spec=1, do_prl_spec=0, do_title=1):
     do_full_calc = not diag.check_dict(save_dir, dict_name)
     if do_full_calc:
     # create grid of K from first time step
@@ -66,11 +66,11 @@ def calc_timeind_spectrum(output_dir, save_dir, fname, n=0, prob=default_prob,
     else:
         S = diag.load_dict(save_dir, dict_name)
 
-    plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd, do_prp=do_prp, do_title=do_title)
+    plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd, do_prp_spec=do_prp_spec, do_prl_spec=do_prl_spec, do_title=do_title)
 
 
 def calc_spectrum(output_dir, save_dir, fname, inertial_range=(10**1.5, 10**2), prob=default_prob,
-                  plot_title='test', dict_name='mhd_spec', do_mhd=1, do_prp=1, do_title=1):
+                  plot_title='test', dict_name='mhd_spec', do_mhd=1, do_prp_spec=1, do_prl_spec=0, do_title=1):
 
     # Getting turnover time and converting to file number
     max_n = diag.get_maxn(output_dir)
@@ -161,45 +161,59 @@ def calc_spectrum(output_dir, save_dir, fname, inertial_range=(10**1.5, 10**2), 
     else:
         S = diag.load_dict(save_dir, dict_name)
 
-    plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd, do_prp=do_prp, do_title=do_title)
+    plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd, do_prp_spec=do_prp_spec, do_prl_spec=do_prl_spec, do_title=do_title)
 
 
-def plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd=1, do_prp=1, do_title=1,
+def plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd=1, do_prp_spec=1, do_prl_spec=0, do_title=1,
                   do_pdf=0):
     # plot spectrum
     if do_mhd:
         inertial_range = np.array(inertial_range)
 
         k = S['kgrid'][1:]
-        if do_prp:
+        if do_prp_spec:
             EK = S['EK_prp'][1:]
             EM = S['EM_prp'][1:]
+        elif do_prl_spec:
+            EK = S['EK_prl'][1:]
+            EM = S['EM_prl'][1:]
         else:
             EK = S['EK'][1:]
             EM = S['EM'][1:]
-        slope = get_spectral_slope(k, EM, inertial_range)
+        plt.loglog(k, EK, k, EM)
+        
+        
+        # generating fitting line
+        # get closest k values to desired inertial range
+        inertial_range[0] = k[np.abs(k - inertial_range[0]).argmin()]
+        inertial_range[1] = k[np.abs(k - inertial_range[1]).argmin()]
+        slope = get_spectral_slope(k, EK, inertial_range)
         slope_label = "{:+.2f}".format(slope)
 
-        plt.loglog(k, EK, k, EM)
-        if do_prp:
+        if do_prp_spec:
             plt.xlabel(r'$k_\perp$')
             plt.ylabel(r'$E(k_\perp)$')
             legend = [r'$E_{K,\perp}$', r'$E_{B,\perp}$', r'$k_{\perp}^{-5/3}$', r'$k_{\perp}^{' + slope_label + '}$']
+        elif do_prl_spec:
+            plt.xlabel(r'$k_\|$')
+            plt.ylabel(r'$E(k_\|)$')
+            legend = [r'$E_{K,\|}$', r'$E_{B,\|}$', r'$k_{\|}^{-2}$', r'$k_{\|}^{' + slope_label + '}$']
         else:
             plt.xlabel(r'$k$')
             plt.ylabel(r'$E(k)$')
             legend = [r'$E_{K}$', r'$E_{B}$', r'$k^{-5/3}$', r'$k^{' + slope_label + '}$']
-        
-        # generating fitting line
-        k_mask = np.logical_and(inertial_range[0] <= k, k < inertial_range[1])
-        while np.all(np.logical_not(k_mask)):  # if all false, returns true
-            inertial_range *= 2
-            k_mask = (inertial_range[0] <= k) & (k <= inertial_range[1])
+
+        k_mask = np.logical_and(inertial_range[0] <= k, k <= inertial_range[1])
+        # while np.all(np.logical_not(k_mask)):  # if all false, returns true
+        #     inertial_range *= 2
+        #     k_mask = (inertial_range[0] <= k) & (k <= inertial_range[1])
         k_inertial = k[k_mask]
-        fit_start = EM[k_mask][0] * 10**0.3
-        x_53 = fit_start * (k_inertial/inertial_range[0])**(-5/3)
+        fit_start = EK[k_mask][0]
+
+        x_theory_slope = -2 if do_prl_spec else -5/3
+        x_theory = fit_start * (k_inertial/inertial_range[0])**(x_theory_slope)
         x_slope = fit_start * (k_inertial/inertial_range[0])**(slope)
-        plt.loglog(k_inertial, x_53, ':', k_inertial, x_slope, ':')
+        plt.loglog(k_inertial, x_theory, ':', k_inertial, x_slope, ':')
         
         plt.legend(legend)
     else:
@@ -214,10 +228,13 @@ def plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd=1, do_p
     if diag.PATH not in save_dir:
         save_dir = diag.PATH + save_dir
 
-    perpsuffix = '_perpspec' if do_prp else '_spec'
+    if do_prl_spec:
+        fig_suffix = '_prlspec'
+    else:
+        fig_suffix = '_perpspec' if do_prp_spec else '_spec'
     if do_pdf:
-        plt.savefig(save_dir + fname + perpsuffix + '.pdf')
-    plt.savefig(save_dir + fname + perpsuffix + '.png')
+        plt.savefig(save_dir + fname + fig_suffix + '.pdf')
+    plt.savefig(save_dir + fname + fig_suffix + '.png')
     plt.close()
 
 
@@ -231,7 +248,7 @@ def spect1D(v1, v2, K, kgrid):
     NT2 = np.size(K)**2
     for k in range(nk):
         # For k between kgrid[k] and kgrid[k+1]
-        mask = np.logical_and(K < kgrid[k+1], K > kgrid[k])
+        mask = np.logical_and(K <= kgrid[k+1], K > kgrid[k])
         # Find the total energy within that k range
         # This is the specturm <v1 v2>(k) ~ integral(v1 v2* dk) with kgrid[k] < k < kgrid[k+1]
         # which is equivalent to the total energy in that range via Parseval's theorem
