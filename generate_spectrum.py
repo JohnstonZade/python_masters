@@ -105,7 +105,7 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=10.0,
     - Gaussian: generates an isotropic spectrum of the form E(k) ~ e^(-k^2 / kpeak^2)
 
     Note: The exponent for all power laws are always assumed to be negative as a positive power law is unphysical
-    as it would say smaller scales have much more energy than large scales.
+    as it would mean that smaller scales have much more energy than large scales.
 
 
     Parameters
@@ -187,7 +187,7 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=10.0,
         z = r*np.exp(1j*theta)
 
         # don't need to worry about excluding purely parallel waves
-        # as cross product below is automatically 0
+        # as cross product below is automatically 0 for those
         # exclude purely perpendicular waves as they don't propagate
         # remember ω_A = k_prl * v_A
         prp_mask = (Kprl == 0.)

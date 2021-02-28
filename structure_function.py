@@ -132,7 +132,7 @@ def get_spectral_slope(kgrid, spectrum, inertial_range):
 # --- PLOTTING --- #
 
 def plot_MHD(l, t, titles, vels, Bs, fname, inertial_range=(2*10**-2, 4*10**-2)):
-    filename = diag.PATH + fname
+    filename = diag.format_path(fname)
     inertial_range = np.array(inertial_range)
 
     inertial_range[0] = l[0]
@@ -185,7 +185,7 @@ def plot_MHD(l, t, titles, vels, Bs, fname, inertial_range=(2*10**-2, 4*10**-2))
 
 
 def plot_struct(l_grid, v_avg, t, fname, inertial_range=(3*10**-2, 6*10**-2)):
-    filename = diag.PATH + fname
+    filename = diag.format_path(fname)
 
     l_mask = (inertial_range[0] <= l_grid) & (l_grid < inertial_range[1])
     l_inertial = l_grid[l_mask]

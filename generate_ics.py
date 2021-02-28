@@ -11,8 +11,8 @@ import generate_spectrum as genspec
 
 # --- SUPPORTING FUNCTIONS --- #
 
-# edit_athinput - edits the corresponding athinput file with quantites 
-# input below
+# edit_athinput - edits the corresponding athinput file with quantites input below
+# ONLY WORKS FOR athinput.from_array layout
 def edit_athinput(athinput, save_folder, n_X, X_min, X_max, meshblock, h5name):
     ath_path = save_folder + athinput.split('/')[-1] + '_' + h5name.split('/')[-1].split('.')[0]
     copy(athinput, ath_path)
@@ -70,13 +70,16 @@ def read_athinput(athinput):
     return n_X, X_min, X_max, meshblock 
 
 def generate_grid(X_min, X_max, n_X):
+    # cell-edge grid
     xe = np.linspace(X_min[0], X_max[0], n_X[0]+1)
     ye = np.linspace(X_min[1], X_max[1], n_X[1]+1)
     ze = np.linspace(X_min[2], X_max[2], n_X[2]+1)
+    # cell-centered grid
     xg = 0.5*(xe[:-1] + xe[1:])
     yg = 0.5*(ye[:-1] + ye[1:])
     zg = 0.5*(ze[:-1] + ze[1:])
     
+    # grid spacings
     dx = xg[1] - xg[0]
     dy = np.inf if n_X[1] == 1 else yg[1] - yg[0]
     dz = np.inf if n_X[2] == 1 else zg[1] - zg[0]
@@ -94,9 +97,9 @@ def generate_mesh_structure(folder, athinput):
     return n_blocks, blocks
 
 # read meshblock - gets structure from mesh_structure.dat
-def read_mesh_structure(dat_fname):
+def read_mesh_structure(data_fname):
     blocks = []
-    with open(dat_fname) as f:
+    with open(data_fname) as f:
         s = f.readline()
         while len(s) > 0:
             s = f.readline()
@@ -114,6 +117,16 @@ def check_mesh_structure(blocks, n_X, meshblock):
         raise AssertionError('Number of meshblocks doesnt match: must have input wrong in athinput or script')
     if np.any(blocks.max(axis=1) + 1 != n_blocks):
         raise AssertionError('Meshblock structure doesnt match: must have input wrong in athinput or script')
+
+
+def make_meshblocks(folder, athinput, n_X, meshblock, one_D):
+    if one_D:
+        n_blocks = n_X[0] / meshblock[0]
+        blocks = np.array([np.arange(n_blocks), np.zeros(n_blocks), np.zeros(n_blocks)])
+    else:
+        n_blocks, blocks = generate_mesh_structure(folder, athinput)
+    check_mesh_structure(blocks, n_X, meshblock)
+    return n_blocks, blocks
 
 # shift and extend A - moves A from cell-centre to cell-faces
 # and makes it periodic allowing for numerical derivatives to be computed at
@@ -135,26 +148,54 @@ def shift_and_extend_A(Ax, Ay, Az):
 # reshape helper - concatenates A differently along different axes to allow
 # for periodicity
 def reshape_helper(A, component):
-    # uncomment this if it does not work
-    # appears to work, I'll keep this here out of superstition
-    # if component == 0:  # x-component
-    #     A = np.concatenate((A, A[:, :, 0].reshape((*A.shape[:2], 1))), axis=2)
-    #     A = np.concatenate((A[:, -1, :].reshape((A.shape[0], 1, A.shape[2])), A, A[:, 0, :].reshape((A.shape[0], 1, A.shape[2]))), axis=1)
-    #     A = np.concatenate((A[-1, :, :].reshape((1, *A.shape[1:])), A, A[0, :, :].reshape((1, *A.shape[1:]))), axis=0)
-    # elif component == 1:  # y-component
-    #     A = np.concatenate((A[:, :, -1].reshape((*A.shape[:2], 1)), A, A[:, :, 0].reshape((*A.shape[:2], 1))), axis=2)
-    #     A = np.concatenate((A, A[:, 0, :].reshape((A.shape[0], 1, A.shape[2]))), axis=1)
-    #     A = np.concatenate((A[-1, :, :].reshape((1, *A.shape[1:])), A, A[0, :, :].reshape((1, *A.shape[1:]))), axis=0)
-    # elif component == 2:  # z-component
-    #     A = np.concatenate((A[:, :, -1].reshape((*A.shape[:2], 1)), A, A[:, :, 0].reshape((*A.shape[:2], 1))), axis=2)
-    #     A = np.concatenate((A[:, -1, :].reshape((A.shape[0], 1, A.shape[2])), A, A[:, 0, :].reshape((A.shape[0], 1, A.shape[2]))), axis=1)
-    #     A = np.concatenate((A, A[0, :, :].reshape((1, *A.shape[1:]))), axis=0)
-    # return A
+    # component = 0 ⟺ x, 1 ⟺ y, 2 ⟺ z
     if component != 0:
         pad = ((1, 1), (0, 1), (1, 1)) if component == 1 else ((0, 1), (1, 1), (1, 1))
     else:
         pad = ((1, 1), (1, 1), (0, 1))
     return np.pad(A, pad, 'wrap')
+
+def setup_hydro_grid(n_X, X_grid, N_HYDRO, Dnf, UXf, UYf, UZf, BXf, BYf, BZf):
+    # Athena orders cooridinates (Z, Y, X) while n_X is in the form (X, Y, Z)
+    # It's easier to start from this ordering instead of having to do array
+    # manipulations at the end.
+    Hy_grid = np.zeros(shape=(N_HYDRO, *n_X[::-1]))
+
+    # --- GRID CREATION --- #
+
+    zg, yg, xg = X_grid
+    Zg, Yg, Xg = np.meshgrid(zg, yg, xg, indexing='ij')
+
+    # Place quantites on grid
+    Hy_grid[0] = Dnf(Xg, Yg, Zg)
+    Hy_grid[1] = Hy_grid[0] * UXf(Xg, Yg, Zg)  # using momentum for conserved values
+    Hy_grid[2] = Hy_grid[0] * UYf(Xg, Yg, Zg)
+    Hy_grid[3] = Hy_grid[0] * UZf(Xg, Yg, Zg)
+    BXcc = BXf(Xg, Yg, Zg)
+    BYcc = BYf(Xg, Yg, Zg)
+    BZcc = BZf(Xg, Yg, Zg)
+
+    # ignoring NHYDRO > 4 for now
+    # if NHYDRO == 5: etc for adiabatic or CGL
+
+    Xg, Yg, Zg = None, None, None  # I think this clears memory?
+    return Hy_grid, BXcc, BYcc, BZcc
+
+def save_hydro_grid(h5name, Hy_grid, N_HYDRO, n_blocks, blocks, meshblock):
+    Hy_h5 = np.zeros(shape=(N_HYDRO, n_blocks, *meshblock[::-1]))
+    for h in range(N_HYDRO):
+        for m in range(n_blocks):  # save to each meshblock individually
+            off = blocks[:, m]
+            ind_s = (meshblock*off)[::-1]
+            ind_e = (meshblock*off + meshblock)[::-1]
+            Hy_h5[h, m, :, :, :] = Hy_grid[h, ind_s[0]:ind_e[0], ind_s[1]:ind_e[1], ind_s[2]:ind_e[2]]
+
+    Hy_grid = None
+    if os.path.isfile(h5name):  # 'overwrite' old ICs
+        os.remove(h5name)
+    with h5py.File(h5name, 'a') as f:
+        f['cons'] = Hy_h5
+    Hy_h5 = None
 
 def calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_blocks, blocks, dx, dy, dz):
     # Get mean of B-field (inverting and redoing curl takes this away)
@@ -170,8 +211,6 @@ def calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_bl
 
 
     K_z, K_y, K_x = np.meshgrid(K[2], K[1], K[0], indexing='ij')
-    # Need to transpose x and y for it to work for some reason
-    # K_x, K_y, K_z = K_x.transpose((0, 2, 1)), K_y.transpose((0, 2, 1)), K_z.transpose((0, 2, 1))
     K_2 = abs(K_x)**2 + abs(K_y)**2 + abs(K_z)**2
     K_2[0, 0, 0] = 1
     K_x /= K_2
@@ -200,7 +239,8 @@ def calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_bl
     # A is cell-centred; shift to edges and make periodic
     A_x, A_y, A_z = shift_and_extend_A(A_x, A_y, A_z) 
 
-    # Calculate B from A using finite-difference curl (MATLAB script is how Athena does it)
+    # Calculate B from A using finite-difference curl (this is how Athena++ calculates B from A)
+    # Copied from Jono's MATLAB script
     # Bx
     B_mesh = meshblock + [1, 0, 0]
     B_h5 = np.zeros(shape=(n_blocks, *B_mesh[::-1]))
@@ -248,34 +288,35 @@ def calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_bl
 
 # --- GENERATING FUNCTIONS --- #
 
-def create_athena_fromics(folder, h5name, n_X, X_min, X_max, meshblock, athinput='/home/zade/masters_2021/templates_athinput/athinput.from_array'):
+def create_athena_fromics(folder, h5name, n_X, X_min, X_max, meshblock,
+                          athinput='/home/zade/masters_2021/templates_athinput/athinput.from_array'):
     '''Function to generate an h5 file containing user set initial conditions 
        for the Athena++ from_array problem generator to start from. Generates a grid the same size as specified in the
        athinput file and calculates the quantities at each grid point, then writes to h5 file.
 
-    Arguments:
-        folder {string} -- path to base folder that contains the athena binary, athinput file, and where h5 file is to be output
-        athinput {string} -- name of athinput file, of the form athinput.<***>
-        h5name {string} -- name of h5 file for data to be output to
-        n_X {numpy array} -- array containing the number of grid points in the 3 coordinate directions x1,x2,x3
-        X_min {numpy array} -- array containing the minimum x_n coordinate in each direction
-        X_max {numpy array} -- array containing the maximum x_n coordinate in each direction
-        meshblock {numpy array} -- array containing the meshblock dimensions in each direction
+    Parameters
+    ----------
+    folder : string
+        path to base folder that contains the athena binary, athinput file, and where h5 file is to be output
+    h5name : string
+        name of h5 file for data to be output to
+    n_X : ndarray
+        array containing the number of grid points in the 3 coordinate directions x1,x2,x3
+    X_min : ndarray
+        array containing the minimum x_n coordinate in each direction
+    X_max : ndarray
+        array containing the maximum x_n coordinate in each direction
+    meshblock : ndarray
+        array containing the meshblock dimensions in each direction
+    athinput : str, optional
+        name of athinput file, of the form athinput.xxx, by default '/home/zade/masters_2021/templates_athinput/athinput.from_array'
     '''
     # --- INPUTS --- #
-
     h5name = folder + h5name  # eg 'ICs_template.h5'
-
     ath_copy = edit_athinput(athinput, folder, n_X, X_min, X_max, meshblock, h5name)
     N_HYDRO = 4  # number of hydro variables (e.g. density and momentum); assuming isothermal here
-    
     # Dimension setting: 1D if only x has more than one gridpoint
     one_D = 1 if np.all(n_X[1:] == 1) else 0
-    
-    # Athena orders cooridinates (Z, Y, X) while n_X is in the form (X, Y, Z)
-    # It's easier to start from this ordering instead of having to do array
-    # manipulations at the end.
-    Hy_grid = np.zeros(shape=(N_HYDRO, *n_X[::-1]))
 
     # User set initial conditions
     # Density
@@ -291,50 +332,17 @@ def create_athena_fromics(folder, h5name, n_X, X_min, X_max, meshblock, athinput
 
     # --- GRID CREATION --- #
 
-    (xg, yg, zg), (dx, dy, dz) = generate_grid(X_min, X_max, n_X)
-
-    Zg, Yg, Xg = np.meshgrid(zg, yg, xg, indexing='ij')
-
-    # Place quantites on grid
-    Hy_grid[0] = Dnf(Xg, Yg, Zg)
-    Hy_grid[1] = Hy_grid[0] * UXf(Xg, Yg, Zg)  # using momentum for conserved values
-    Hy_grid[2] = Hy_grid[0] * UYf(Xg, Yg, Zg)
-    Hy_grid[3] = Hy_grid[0] * UZf(Xg, Yg, Zg)
-    BXcc = BXf(Xg, Yg, Zg)
-    BYcc = BYf(Xg, Yg, Zg)
-    BZcc = BZf(Xg, Yg, Zg)
-
-    # ignoring NHYDRO > 4 for now
-    # if NHYDRO == 5: etc for adiabatic or CGL
-
-    Xg, Yg, Zg = None, None, None  # I think this clears memory?
+    X_grid, (dx, dy, dz) = generate_grid(X_min, X_max, n_X)
+    Hy_grid, BXcc, BYcc, BZcc = setup_hydro_grid(n_X, X_grid, N_HYDRO, Dnf, UXf, UYf, UZf, BXf, BYf, BZf)
 
     # --- MESHBLOCK STRUCTURE --- #
 
-    if one_D:
-        n_blocks = n_X[0] / meshblock[0]
-        blocks = np.array([np.arange(n_blocks), np.zeros(n_blocks), np.zeros(n_blocks)])
-    else:
-        n_blocks, blocks = generate_mesh_structure(folder, ath_copy)
-    check_mesh_structure(blocks, n_X, meshblock)
+    n_blocks, blocks = make_meshblocks(folder, ath_copy, n_X, meshblock, one_D)
 
     # --- SAVING VARIABLES --- #
 
     # - HYDRO
-    Hy_h5 = np.zeros(shape=(N_HYDRO, n_blocks, *meshblock[::-1]))
-    for h in range(N_HYDRO):
-        for m in range(n_blocks):  # save to each meshblock individually
-            off = blocks[:, m]
-            ind_s = (meshblock*off)[::-1]
-            ind_e = (meshblock*off + meshblock)[::-1]
-            Hy_h5[h, m, :, :, :] = Hy_grid[h, ind_s[0]:ind_e[0], ind_s[1]:ind_e[1], ind_s[2]:ind_e[2]]
-
-    Hy_grid = None
-    if os.path.isfile(h5name):  # 'overwrite' old ICs
-        os.remove(h5name)
-    with h5py.File(h5name, 'a') as f:
-        f['cons'] = Hy_h5
-    Hy_h5 = None
+    save_hydro_grid(h5name, Hy_grid, N_HYDRO, n_blocks, blocks, meshblock)
     print('Hydro Saved Succesfully')
 
     # - MAGNETIC
@@ -344,20 +352,21 @@ def create_athena_fromics(folder, h5name, n_X, X_min, X_max, meshblock, athinput
 
 def create_athena_fromh5(save_folder, athinput_in_folder, athinput_in, h5name, athdf_input,
                          athinput_out='/home/zade/masters_2021/templates_athinput/athinput.from_array'):
-    '''[summary]
+    '''Similar function to `create_athena_fromics` but instead of user-set ICs,
+    reads in an initial .athdf file and obtains the initial conditions from there.
 
     Parameters
     ----------
     save_folder : string
-        Base folder where h5 file is to be saved.\n
+        Base folder where h5 file is to be saved.
     athinput_in_folder : string
-        Base folder containing original athinput file that generated athdf.\n
+        Base folder containing original athinput file that generated athdf.
     athinput_in : string
-        Name of athinput file that generated initial athdf file.\n
+        Name of athinput file that generated initial athdf file.
     h5name : string
-        Name of h5 file to be saved.\n
+        Name of h5 file to be saved.
     athdf_input : string
-        Path to initial athdf to be read.\n
+        Path to initial athdf to be read.
     athinput_out : string
         Path to from_array athinput to be copied and editied.
     '''
@@ -388,6 +397,8 @@ def create_athena_fromh5(save_folder, athinput_in_folder, athinput_in, h5name, a
     dx, dy, dz = generate_grid(X_min, X_max, n_X)[1]
     
     n_blocks, blocks = generate_mesh_structure(athinput_in_folder, athinput_in)
+    # Inverting meshblock saving method to obtain the magnetic field over the whole box
+    # instead of over a meshblock
     B_unpacked = np.zeros(shape=(3, *n_X[::-1]))
     for b in range(3):
         for m in range(n_blocks):  # save to each meshblock individually
@@ -406,18 +417,44 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
                              gauss_spec=0,
                              prl_spec=0,
                              do_mode_test=0):
-    h5name = folder + h5name  # eg 'ICs_template.h5'
+    '''Similar to `create_athena_fromics` but adds on random Alfvénic fluctations with a given 
+    energy spectrum and adds on to user-defined initial mean quantities. See `generate_spectrum`
+    for more details on how the spectrum is generated.
 
+    Parameters
+    ----------
+    folder : string
+        path to base folder that contains the athena binary, athinput file, and where h5 file is to be output
+    h5name : string
+        name of h5 file for data to be output to
+    n_X : ndarray
+        array containing the number of grid points in the 3 coordinate directions x1,x2,x3
+    X_min : ndarray
+        array containing the minimum x_n coordinate in each direction
+    X_max : ndarray
+        array containing the maximum x_n coordinate in each direction
+    meshblock : ndarray
+        array containing the meshblock dimensions in each direction
+    athinput : str, optional
+        name of athinput file, of the form athinput.xxx, by default '/home/zade/masters_2021/templates_athinput/athinput.from_array'
+    expo : float, optional
+        isotropic/perpendicular spectrum power, by default -5/3
+    expo_prl : float, optional
+        parallel spectrum power, by default -2.
+    kpeak : float, optional
+        peak of Gaussian spectrum, by default 10.
+    gauss_spec : bool, optional
+        generate Gaussian spectrum, by default 0
+    prl_spec : bool, optional
+        generate anisotropic spectrum, by default 0
+    do_mode_test : bool, optional
+        run tests in `generate_spectrum`, by default 0
+    '''
+    h5name = folder + h5name  # eg 'ICs_template.h5'
     ath_copy = edit_athinput(athinput, folder, n_X, X_min, X_max, meshblock, h5name)
     N_HYDRO = 4  # number of hydro variables (e.g. density and momentum); assuming isothermal here
-    
     # Dimension setting: 1D if only x has more than one gridpoint
     one_D = 1 if np.all(n_X[1:] == 1) else 0
-    
-    # Athena orders cooridinates (Z, Y, X) while n_X is in the form (X, Y, Z)
-    # It's easier to start from this ordering instead of having to do array
-    # manipulations at the end.
-    Hy_grid = np.zeros(shape=(N_HYDRO, *n_X[::-1]))
 
     # Generate mean fields
     # Density
@@ -429,13 +466,11 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
     BYf = lambda X, Y, Z: np.zeros(X.shape)
     BZf = lambda X, Y, Z: np.zeros(X.shape)
 
-    (xg, yg, zg), (dx, dy, dz) = generate_grid(X_min, X_max, n_X)
-    Zg, Yg, Xg = np.meshgrid(zg, yg, xg, indexing='ij')
-    rho = Dnf(Xg, Yg, Zg)
-    MX, MY, MZ = rho * UXf(Xg, Yg, Zg), rho * UYf(Xg, Yg, Zg), rho * UZf(Xg, Yg, Zg)
-    BXcc, BYcc, BZcc = BXf(Xg, Yg, Zg), BYf(Xg, Yg, Zg), BZf(Xg, Yg, Zg)
+    X_grid, (dx, dy, dz) = generate_grid(X_min, X_max, n_X)
+    Hy_grid, BXcc, BYcc, BZcc = setup_hydro_grid(n_X, X_grid, N_HYDRO, Dnf, UXf, UYf, UZf, BXf, BYf, BZf)
+
     B_0 = np.array([BXcc, BYcc, BZcc])
-    Xg, Yg, Zg = None, None, None
+    rho = Hy_grid[0]
 
     # Setting z^- waves = 0
     dB_x, dB_y, dB_z = genspec.generate_alfven(n_X, X_min, X_max, B_0,
@@ -447,44 +482,22 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
     BXcc += dB_x
     BYcc += dB_y
     BZcc += dB_z
-    MX += rho*du_x
-    MY += rho*du_y
-    MZ += rho*du_z
-
-    Hy_grid[0] = rho
-    Hy_grid[1] = MX  # using momentum for conserved values
-    Hy_grid[2] = MY
-    Hy_grid[3] = MZ
+    Hy_grid[1] += rho*du_x
+    Hy_grid[2] += rho*du_y
+    Hy_grid[3] += rho*du_z
 
     # --- MESHBLOCK STRUCTURE --- #
 
-    if one_D:
-        n_blocks = n_X[0] / meshblock[0]
-        blocks = np.array([np.arange(n_blocks), np.zeros(n_blocks), np.zeros(n_blocks)])
-    else:
-        n_blocks, blocks = generate_mesh_structure(folder, ath_copy)
-    check_mesh_structure(blocks, n_X, meshblock)
+    n_blocks, blocks = make_meshblocks(folder, ath_copy, n_X, meshblock, one_D)
 
     # --- SAVING VARIABLES --- #
 
     # - HYDRO
-    Hy_h5 = np.zeros(shape=(N_HYDRO, n_blocks, *meshblock[::-1]))
-    for h in range(N_HYDRO):
-        for m in range(n_blocks):  # save to each meshblock individually
-            off = blocks[:, m]
-            ind_s = (meshblock*off)[::-1]
-            ind_e = (meshblock*off + meshblock)[::-1]
-            Hy_h5[h, m, :, :, :] = Hy_grid[h, ind_s[0]:ind_e[0], ind_s[1]:ind_e[1], ind_s[2]:ind_e[2]]
-
-    Hy_grid = None
-    if os.path.isfile(h5name):  # 'overwrite' old ICs
-        os.remove(h5name)
-    with h5py.File(h5name, 'a') as f:
-        f['cons'] = Hy_h5
-    Hy_h5 = None
+    save_hydro_grid(h5name, Hy_grid, N_HYDRO, n_blocks, blocks, meshblock)
     print('Hydro Saved Succesfully')
 
     # - MAGNETIC
     calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_blocks, blocks, dx, dy, dz)
     print('Magnetic Saved Successfully')
     print('Done!')
+

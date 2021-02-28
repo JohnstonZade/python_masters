@@ -21,15 +21,24 @@ PATH = "/home/zade/masters_2021/"
 DEFAULT_PROB = 'turb'
 
 
+def format_path(output_dir):
+    if PATH not in output_dir:
+        output_dir = PATH + output_dir
+    if output_dir[-1] != '/':
+        output_dir += '/'
+    return output_dir
+
+
 def load_data(output_dir, n, prob=DEFAULT_PROB):
     '''Loads data from .athdf files output from Athena++.
     '''
 
+    # '$folder.out$output_id.xxxxx.athdf'
     def f(n):
         return folder + '.out' + output_id + '.%05d' % n + '.athdf'
 
     # Input
-    folder = PATH + output_dir + '/' + prob  # Name of output
+    folder = format_path(output_dir) + prob  # Name of output
     output_id = '2'  # Output ID (set in input file)
     filename = f(n)
     return athdf(filename)
@@ -38,54 +47,55 @@ def load_data(output_dir, n, prob=DEFAULT_PROB):
 def load_hst(output_dir, prob=DEFAULT_PROB):
     '''Loads data from .hst files output from Athena++.
     '''
-    hstLoc = PATH + output_dir + '/' + prob + '.hst'
+    hstLoc = format_path(output_dir) + prob + '.hst'
     return hst(hstLoc)
 
 
 def load_athinput(athinput_path):
     '''Loads data from athinput files.
     '''
-    return athinput(PATH + athinput_path)
+    return athinput(format_path(athinput_path))
 
 
-def load_dict(output, fname=''):
+def load_dict(output_dir, fname=''):
     file = 'dict.pkl'
     if fname != '':
         file = fname + '_' + file
 
-    pkl_file = open(PATH+output+file, 'rb')
+    pkl_file = open(format_path(output_dir)+file, 'rb')
     dict = pickle.load(pkl_file)
     pkl_file.close()
     return dict
 
 
-def save_dict(dict, output, fname=''):
+def save_dict(dict, output_dir, fname=''):
     file = 'dict.pkl'
     if fname != '':
         file = fname + '_' + file
 
-    output = open(PATH+output+file, 'wb')
+    output_dir = format_path(output_dir)
+    output = open(output_dir+file, 'wb')
     pickle.dump(dict, output)
     output.close()
 
 
-def check_dict(output, fname=''):
+def check_dict(output_dir, fname=''):
     file = 'dict.pkl'
     if fname != '':
         file = fname + '_' + file
-    return os.path.isfile(PATH+output+file)
+    return os.path.isfile(format_path(output_dir)+file)
 
 
-def make_folder(fname):
-    if not os.path.exists(fname):
-        path = Path(fname)
+def make_folder(dir_name):
+    if not os.path.exists(dir_name):
+        path = Path(dir_name)
         path.mkdir(parents=True, exist_ok=True)
 
 
 def get_maxn(output_dir):
     '''Gets the total number of simulation timesteps.
     '''
-    return len(glob.glob(PATH+output_dir+'/*.athdf'))
+    return len(glob.glob(format_path(output_dir)+'*.athdf'))
 
 
 # --- MATH FUNCTIONS --- #
@@ -127,26 +137,26 @@ def get_vec(x, ps):
     return np.array((x1, x2, x3)).T
 
 
-def get_lengths(load_data=1, data=None, fname=None, prob=DEFAULT_PROB, zyx=0):
+def get_lengths(load_data=1, data=None, output_dir=None, prob=DEFAULT_PROB, zyx=0):
     if load_data:
-        assert fname is not None, 'Must have a valid filename!'
-        data = load_data(fname, 0, prob)
+        assert (output_dir is not None), 'Must have a valid directory path!'
+        data = load_data(output_dir, 0, prob)
     else:
-        assert data is not None, 'Must have a valid data file!'
+        assert (data is not None), 'Must have a valid data file!'
     X1 = data['RootGridX1'][1] - data['RootGridX1'][0]
     X2 = data['RootGridX2'][1] - data['RootGridX2'][0]
     X3 = data['RootGridX3'][1] - data['RootGridX3'][0]
     return (X3, X2, X1) if zyx else (X1, X2, X3)
 
 
-def get_rootgrid(fname, prob=DEFAULT_PROB, zyx=0):
-    data = load_data(fname, 0, prob)
+def get_rootgrid(output_dir, prob=DEFAULT_PROB, zyx=0):
+    data = load_data(output_dir, 0, prob)
     return data['RootGridSize'][::-1] if zyx else data['RootGridSize']
 
 
-def get_vol(fname, prob=DEFAULT_PROB):
+def get_vol(output_dir, prob=DEFAULT_PROB):
     '''Returns the volume of the simulation domain.'''
-    X1, X2, X3 = get_lengths(fname, prob)
+    X1, X2, X3 = get_lengths(output_dir, prob)
     return abs(X1*X2*X3)  # just a check to make volume positive
 
 
@@ -167,7 +177,7 @@ def ft_array(N):
     return grid
 
 
-def ft_grid(input_type, data=None, fname=None, Ls=None, Ns=None, prob=DEFAULT_PROB, k_grid=0):
+def ft_grid(input_type, data=None, output_dir=None, Ls=None, Ns=None, prob=DEFAULT_PROB, k_grid=0):
     '''
     Creates a grid in k-space corresponding to the real grid given in data.
     k_grid is a boolean that when True calculates a regularly spaced array
@@ -182,21 +192,23 @@ def ft_grid(input_type, data=None, fname=None, Ls=None, Ns=None, prob=DEFAULT_PR
         
         Ls = (X3, X2, X1)
         Ns = data['RootGridSize'][::-1]
-    elif input_type == 'filename':
-        assert (fname is not None), 'Must have valid filename path!'
-        # Z, Y, X
-        Ls = get_lengths(fname, prob, zyx=1)  # box side lengths
-        Ns = get_rootgrid(fname, prob, zyx=1) # number of grid points
+    
+    elif input_type == 'output':
+        assert (output_dir is not None), 'Must have a valid directory path!'
+        Ls = get_lengths(output_dir, prob, zyx=1)  # box side lengths
+        Ns = get_rootgrid(output_dir, prob, zyx=1) # number of grid points
+    
     elif input_type == 'array':
         assert (Ls is not None and Ns is not None), 'Must have valid lengths and grid information!'
+    
     else:
         raise ValueError('Please enter a valid input type')
 
+    # Corresponds to Athena++ standard k=0 ⟺ Z, 1 ⟺ Y, 2 ⟺ X
     K = {}
     for k in range(3):
         K[k] = 2j*pi/Ls[k]*ft_array(Ns[k])
 
-    # Outputs Z, Y, X
     Ks = np.meshgrid(K[0], K[1], K[2], indexing='ij')
     if k_grid:
         Ks = (Ks, np.arange(0, np.max(np.imag(K[1])), 2*pi/Ls[1]))

@@ -10,72 +10,16 @@ from matplotlib import rc
 rc('text', usetex=True)  # LaTeX labels
 default_prob = diag.DEFAULT_PROB
 
-
-def calc_timeind_spectrum(output_dir, save_dir, fname, n=0, prob=default_prob,
-                          plot_title='test', dict_name='mhd_specone', inertial_range=(10**1.5, 10**2),
-                          do_mhd=1, do_prp_spec=1, do_prl_spec=0, do_title=1):
-    do_full_calc = not diag.check_dict(save_dir, dict_name)
-    if do_full_calc:
-    # create grid of K from first time step
-        data = diag.load_data(output_dir, n, prob=prob)
-        (KZ, KY, KX), kgrid = diag.ft_grid('data', data=data, prob=prob, k_grid=1)
-        Kprl = np.abs(KX)
-        Kperp = np.sqrt(np.abs(KY)**2 + np.abs(KZ)**2)
-        Kmag = np.sqrt(Kprl**2+Kperp**2)
-        Kspec = Kmag
-
-        # Dictionary to hold spectrum information
-        S = {}
-        S['Nk'] = len(kgrid) - 1  # number of elements in kgrid
-        S['kgrid'] = 0.5*(kgrid[:-1] + kgrid[1:])  # average of neighbours
-
-        fields = ['vel1', 'vel2', 'vel3', 'Bcc1', 'Bcc2', 'Bcc3',
-                  'EK', 'EK_prl', 'EK_prp', 'EM', 'EM_prl', 'EM_prp', 'B', 'rho']
-
-        # Initializing variable fields in spectrum dictionary
-        for var in fields:
-            S[var] = 0
-
-        # Take the Fourier transform of the individual components
-        # Find their energy (ie Parseval's theorem)
-        # Add to total energy spectrum
-        for vel in fields[:3]:
-            ft = fft.fftn(data[vel])
-            S[vel] += spect1D(ft, ft, Kspec, kgrid)
-            S['EK'] += S[vel]  # Total spectrum is sum of each component
-            S['EK_prl'] = spect1D(ft, ft, Kprl, kgrid)
-            S['EK_prp'] += spect1D(ft, ft, Kperp, kgrid)
-
-        if do_mhd:
-            Bmag = 0
-            for Bcc in fields[3:6]:
-                ft = fft.fftn(data[Bcc])
-                S[Bcc] += spect1D(ft, ft, Kspec, kgrid)
-                S['EM'] += S[Bcc]
-                S['EM_prl'] = spect1D(ft, ft, Kprl, kgrid)
-                S['EM_prp'] += spect1D(ft, ft, Kperp, kgrid)
-                Bmag += data[Bcc]**2
-
-            Bmag = np.sqrt(Bmag)
-            ft_Bmag = fft.fftn(Bmag)
-            S['B'] += spect1D(ft_Bmag, ft_Bmag, Kspec, kgrid)
-
-        ft_rho = fft.fftn(data['rho'] - np.mean(data['rho']))
-        S['rho'] += spect1D(ft_rho, ft_rho, Kspec, kgrid)
-        diag.save_dict(S, save_dir, dict_name)
-    else:
-        S = diag.load_dict(save_dir, dict_name)
-
-    plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd, do_prp_spec=do_prp_spec, do_prl_spec=do_prl_spec, do_title=do_title)
-
-
 def calc_spectrum(output_dir, save_dir, fname, inertial_range=(10**1.5, 10**2), prob=default_prob,
-                  plot_title='test', dict_name='mhd_spec', do_mhd=1, do_prp_spec=1, do_prl_spec=0, do_title=1):
+                  plot_title='test', dict_name='mhd_spec', do_single_file=0, n=0, do_mhd=1,
+                  do_prp_spec=1, do_prl_spec=0, do_title=1):
 
     # Getting turnover time and converting to file number
-    max_n = diag.get_maxn(output_dir)
-    tau_file = int(max_n/2)
-    nums = range(0, tau_file)  # average over first 2 alfven periods
+    if do_single_file:
+        nums = range(n, n+1)
+    else:
+        max_n = diag.get_maxn(output_dir) // 2
+        nums = range(0, max_n)  # average over first 2 alfven periods
     # nums = range(tau_file, max_n) # average over last 2 alfven periods
 
     do_full_calc = not diag.check_dict(save_dir, dict_name)
@@ -120,9 +64,6 @@ def calc_spectrum(output_dir, save_dir, fname, inertial_range=(10**1.5, 10**2), 
                 print('Could not load file', n)
                 break
 
-            if ns % 10 == 0:
-                print('Doing n =', n)
-
             # Take the Fourier transform of the individual components
             # Find their energy (ie Parseval's theorem)
             # Add to total energy spectrum
@@ -152,10 +93,11 @@ def calc_spectrum(output_dir, save_dir, fname, inertial_range=(10**1.5, 10**2), 
 
             ns += 1
 
-        # Average over number of times done
-        for var in fields:
-            S[var] /= ns
-        S['nums'] = nums
+        if not do_single_file:
+            # Average over number of times done
+            for var in fields:
+                S[var] /= ns
+            S['nums'] = nums
 
         diag.save_dict(S, save_dir, dict_name)
     else:
@@ -225,8 +167,7 @@ def plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd=1, do_p
     if do_title:
         plt.title('Energy Spectrum: ' + plot_title)
 
-    if diag.PATH not in save_dir:
-        save_dir = diag.PATH + save_dir
+    save_dir = diag.format_path(save_dir)
 
     if do_prl_spec:
         fig_suffix = '_prlspec'
