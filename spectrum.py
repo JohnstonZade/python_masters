@@ -12,7 +12,7 @@ default_prob = diag.DEFAULT_PROB
 
 def calc_spectrum(output_dir, save_dir, fname, inertial_range=(10**1.5, 10**2), prob=default_prob,
                   plot_title='test', dict_name='mhd_spec', do_single_file=0, n=0, do_mhd=1,
-                  do_prp_spec=1, do_prl_spec=0, do_title=1):
+                  do_prp_spec=1, do_title=1):
 
     # Getting turnover time and converting to file number
     if do_single_file:
@@ -103,10 +103,10 @@ def calc_spectrum(output_dir, save_dir, fname, inertial_range=(10**1.5, 10**2), 
     else:
         S = diag.load_dict(save_dir, dict_name)
 
-    plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd, do_prp_spec=do_prp_spec, do_prl_spec=do_prl_spec, do_title=do_title)
+    plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd, do_prp_spec=do_prp_spec, do_title=do_title)
 
 
-def plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd=1, do_prp_spec=1, do_prl_spec=0, do_title=1,
+def plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd=1, do_prp_spec=1, do_title=1,
                   do_pdf=0):
     # plot spectrum
     if do_mhd:
@@ -116,9 +116,6 @@ def plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd=1, do_p
         if do_prp_spec:
             EK = S['EK_prp'][1:]
             EM = S['EM_prp'][1:]
-        elif do_prl_spec:
-            EK = S['EK_prl'][1:]
-            EM = S['EM_prl'][1:]
         else:
             EK = S['EK'][1:]
             EM = S['EM'][1:]
@@ -136,14 +133,9 @@ def plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd=1, do_p
             plt.xlabel(r'$k_\perp$')
             plt.ylabel(r'$E(k_\perp)$')
             legend = [r'$E_{K,\perp}$', r'$E_{B,\perp}$', r'$k_{\perp}^{-5/3}$', r'$k_{\perp}^{' + slope_label + '}$']
-        elif do_prl_spec:
-            plt.xlabel(r'$k_\|$')
-            plt.ylabel(r'$E(k_\|)$')
-            legend = [r'$E_{K,\|}$', r'$E_{B,\|}$', r'$k_{\|}^{-2}$', r'$k_{\|}^{' + slope_label + '}$']
-        else:
-            plt.xlabel(r'$k$')
-            plt.ylabel(r'$E(k)$')
-            legend = [r'$E_{K}$', r'$E_{B}$', r'$k^{-5/3}$', r'$k^{' + slope_label + '}$']
+        plt.xlabel(r'$k$')
+        plt.ylabel(r'$E(k)$')
+        legend = [r'$E_{K}$', r'$E_{B}$', r'$k^{-5/3}$', r'$k^{' + slope_label + '}$']
 
         k_mask = np.logical_and(inertial_range[0] <= k, k <= inertial_range[1])
         # while np.all(np.logical_not(k_mask)):  # if all false, returns true
@@ -152,7 +144,7 @@ def plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd=1, do_p
         k_inertial = k[k_mask]
         fit_start = EK[k_mask][0]
 
-        x_theory_slope = -2 if do_prl_spec else -5/3
+        x_theory_slope = -5/3
         x_theory = fit_start * (k_inertial/inertial_range[0])**(x_theory_slope)
         x_slope = fit_start * (k_inertial/inertial_range[0])**(slope)
         plt.loglog(k_inertial, x_theory, ':', k_inertial, x_slope, ':')
@@ -169,10 +161,7 @@ def plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd=1, do_p
 
     save_dir = diag.format_path(save_dir)
 
-    if do_prl_spec:
-        fig_suffix = '_prlspec'
-    else:
-        fig_suffix = '_perpspec' if do_prp_spec else '_spec'
+    fig_suffix = '_perpspec' if do_prp_spec else '_spec'
     if do_pdf:
         plt.savefig(save_dir + fname + fig_suffix + '.pdf')
     plt.savefig(save_dir + fname + fig_suffix + '.png')

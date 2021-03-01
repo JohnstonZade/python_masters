@@ -29,11 +29,11 @@ def run_tests(Ls, KX, KY, KZ):
         # parallel wavenumbers
         kx, ky, kz = 2*np.pi / Ls[2], 2*np.pi / Ls[1], 2*np.pi / Ls[0]  
 
-        # # 2D Waves along y=x: works
-        # # k_x = k_y = 1, k_z = 0, amp = 2, phase shift = 0
-        # nx, ny, nz = 1., 1., 0.
-        # kx *= nx; ky *= ny; kz *= nz
-        # amp, theta = 2., 0.
+        # 2D Waves along y=x: works
+        # k_x = k_y = 1, k_z = 0, amp = 2, phase shift = 0
+        nx, ny, nz = 1., 1., 0.
+        kx *= nx; ky *= ny; kz *= nz
+        amp, theta = 1., 0.
 
         # 2D phase shift: works
         # k_x = 1, k_y = 1, k_z = 0, amp = 2, phase shift = pi/2
@@ -59,10 +59,10 @@ def run_tests(Ls, KX, KY, KZ):
         # return dB_x, dB_y, dB_z
 
         # 2D perpendicular: works
-        # k_x = 0, k_y = 1, k_z = 0, amp = 2, phase shift = 0
-        nx, ny, nz = 0., 1., 0.
-        kx *= nx; ky *= ny; kz *= nz
-        amp, theta = 2., 0. 
+        # # k_x = 0, k_y = 1, k_z = 0, amp = 2, phase shift = 0
+        # nx, ny, nz = 0., 1., 0.
+        # kx *= nx; ky *= ny; kz *= nz
+        # amp, theta = 2., 0. 
 
         # 3D Waves: works
         # k_x = 0, k_y = k_z = 1, amp = 2, phase shift = 0
