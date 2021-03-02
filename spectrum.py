@@ -51,7 +51,7 @@ def calc_spectrum(output_dir, save_dir, fname, inertial_range=(10**1.5, 10**2), 
 
         ns = 0  # counter
         fields = ['vel1', 'vel2', 'vel3', 'Bcc1', 'Bcc2', 'Bcc3',
-                  'EK', 'EK_prl', 'EK_prp', 'EM', 'EM_prl', 'EM_prp', 'B', 'rho']
+                  'EK', 'EK_prp', 'EM', 'EM_prp', 'B', 'rho']
 
         # Initializing variable fields in spectrum dictionary
         for var in fields:
@@ -65,13 +65,12 @@ def calc_spectrum(output_dir, save_dir, fname, inertial_range=(10**1.5, 10**2), 
                 break
 
             # Take the Fourier transform of the individual components
-            # Find their energy (ie Parseval's theorem)
+            # Find their energy (i.e. Parseval's theorem)
             # Add to total energy spectrum
             for vel in fields[:3]:
                 ft = fft.fftn(data[vel])
                 S[vel] += spect1D(ft, ft, Kspec, kgrid)
                 S['EK'] += S[vel]  # Total spectrum is sum of each component
-                S['EK_prl'] = spect1D(ft, ft, Kprl, kgrid)
                 S['EK_prp'] += spect1D(ft, ft, Kperp, kgrid)
 
             if do_mhd:
@@ -80,7 +79,6 @@ def calc_spectrum(output_dir, save_dir, fname, inertial_range=(10**1.5, 10**2), 
                     ft = fft.fftn(data[Bcc])
                     S[Bcc] += spect1D(ft, ft, Kspec, kgrid)
                     S['EM'] += S[Bcc]
-                    S['EM_prl'] = spect1D(ft, ft, Kprl, kgrid)
                     S['EM_prp'] += spect1D(ft, ft, Kperp, kgrid)
                     Bmag += data[Bcc]**2
 

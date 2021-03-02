@@ -197,7 +197,7 @@ def save_hydro_grid(h5name, Hy_grid, N_HYDRO, n_blocks, blocks, meshblock):
         f['cons'] = Hy_h5
     Hy_h5 = None
 
-def calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_blocks, blocks, dx, dy, dz, norm_energy=1.):
+def calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_blocks, blocks, dx, dy, dz):
     # Get mean of B-field (inverting and redoing curl takes this away)
     B_mean = np.array([BXcc.mean(), BYcc.mean(), BZcc.mean()])
 
@@ -252,7 +252,7 @@ def calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_bl
                         ((A_z[ind_s[0]:ind_e[0], ind_s[1]+1:ind_e[1]+1, ind_s[2]:ind_e[2]+1] - \
                             A_z[ind_s[0]:ind_e[0], ind_s[1]:ind_e[1], ind_s[2]:ind_e[2]+1]) / dy - \
                         (A_y[ind_s[0]+1:ind_e[0]+1, ind_s[1]:ind_e[1], ind_s[2]:ind_e[2]+1] - \
-                            A_y[ind_s[0]:ind_e[0], ind_s[1]:ind_e[1], ind_s[2]:ind_e[2]+1]) / dz)*norm_energy
+                            A_y[ind_s[0]:ind_e[0], ind_s[1]:ind_e[1], ind_s[2]:ind_e[2]+1]) / dz)
     with h5py.File(h5name, 'a') as f:
         f['bf1'] = B_h5
 
@@ -267,7 +267,7 @@ def calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_bl
                         ((A_x[ind_s[0]+1:ind_e[0]+1, ind_s[1]:ind_e[1]+1, ind_s[2]:ind_e[2]] - \
                             A_x[ind_s[0]:ind_e[0], ind_s[1]:ind_e[1]+1, ind_s[2]:ind_e[2]]) / dz - \
                         (A_z[ind_s[0]:ind_e[0], ind_s[1]:ind_e[1]+1, ind_s[2]+1:ind_e[2]+1] - \
-                            A_z[ind_s[0]:ind_e[0], ind_s[1]:ind_e[1]+1, ind_s[2]:ind_e[2]]) / dx)*norm_energy
+                            A_z[ind_s[0]:ind_e[0], ind_s[1]:ind_e[1]+1, ind_s[2]:ind_e[2]]) / dx)
     with h5py.File(h5name, 'a') as f:
         f['bf2'] = B_h5
 
@@ -282,7 +282,7 @@ def calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_bl
                         ((A_y[ind_s[0]:ind_e[0]+1, ind_s[1]:ind_e[1], ind_s[2]+1:ind_e[2]+1] - \
                             A_y[ind_s[0]:ind_e[0]+1, ind_s[1]:ind_e[1], ind_s[2]:ind_e[2]]) / dx - \
                         (A_x[ind_s[0]:ind_e[0]+1, ind_s[1]+1:ind_e[1]+1, ind_s[2]:ind_e[2]] - \
-                            A_x[ind_s[0]:ind_e[0]+1, ind_s[1]:ind_e[1], ind_s[2]:ind_e[2]]) / dy)*norm_energy
+                            A_x[ind_s[0]:ind_e[0]+1, ind_s[1]:ind_e[1], ind_s[2]:ind_e[2]]) / dy)
     with h5py.File(h5name, 'a') as f:
         f['bf3'] = B_h5
 
@@ -337,8 +337,9 @@ def create_athena_fromics(folder, h5name, n_X, X_min, X_max, meshblock,
 
     # initializing Alfvén wave fluctuations perpendicular to B_0 (assumed along x-axis)
     # to have same initial energy in velocity and magnetic fields.
-    Uy, Uz = Hy_grid[1] / Hy_grid[0], Hy_grid[2] / Hy_grid[0]  # velocity from momentum
-    total_energy = 0.5*dx*dy*dz*np.sum(Uy**2 + Uz**2)
+    # dV = V / resolution = (Lx*Ly*Lz) / (Nx*Ny*Nz) = dx*dy*dz
+    dV = np.prod(X_max - X_min) / np.prod(n_X)
+    total_energy = 0.5*dV*np.sum(BYcc**2 + BZcc**2)
     norm_energy = np.sqrt(energy / total_energy)
     Hy_grid[1] *= norm_energy
     Hy_grid[2] *= norm_energy
@@ -356,7 +357,7 @@ def create_athena_fromics(folder, h5name, n_X, X_min, X_max, meshblock,
     print('Hydro Saved Succesfully')
 
     # - MAGNETIC
-    calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_blocks, blocks, dx, dy, dz, norm_energy=norm_energy)
+    calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_blocks, blocks, dx, dy, dz)
     print('Magnetic Saved Successfully')
     print('Done!')
 
@@ -489,16 +490,18 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
                                                prl_spec=prl_spec, run_test=do_mode_test)
     du_x, du_y, du_z = dB_x / np.sqrt(rho), dB_y / np.sqrt(rho), dB_z / np.sqrt(rho)
 
+    # dV = V / resolution = (Lx*Ly*Lz) / (Nx*Ny*Nz) = dx*dy*dz
+    dV = np.prod(X_max - X_min) / np.prod(n_X)
     # give magnetic and velocity fluctuations same initial energy
-    total_energy = 0.5*dx*dy*dz*np.sum(du_x**2 + du_y**2 + du_z**2)  # this will only work in 3D!
+    total_energy = 0.5*dV*np.sum(du_x**2 + du_y**2 + du_z**2)
     norm_energy = np.sqrt(energy / total_energy)
 
     du_x *= norm_energy
     du_y *= norm_energy
     du_z *= norm_energy
-    # dB_x *= norm_energy
-    # dB_y *= norm_energy
-    # dB_z *= norm_energy
+    dB_x *= norm_energy
+    dB_y *= norm_energy
+    dB_z *= norm_energy
 
     # adding fluctuations
     BXcc += dB_x
@@ -519,7 +522,7 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
     print('Hydro Saved Succesfully')
 
     # - MAGNETIC
-    calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_blocks, blocks, dx, dy, dz, norm_energy=norm_energy)
+    calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_blocks, blocks, dx, dy, dz)
     print('Magnetic Saved Successfully')
     print('Done!')
 

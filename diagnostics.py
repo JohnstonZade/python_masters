@@ -14,10 +14,17 @@ from math import pi
 from matplotlib import rc
 rc('text', usetex=True)  # LaTeX labels
 
-# Path to simulation data
-PATH = "/home/zade/masters_2021/"
-# PATH = '/media/zade/Seagate Expansion Drive/honours_project_2020/'
-# PATH = '/media/zade/STRONTIUM/honours_project_2020/'
+computer = 'local'
+# computer = 'nesi'
+
+if computer == 'local':
+    # Path to simulation data
+    PATH = "/home/zade/masters_2021/"
+    # PATH = '/media/zade/Seagate Expansion Drive/honours_project_2020/'
+    # PATH = '/media/zade/STRONTIUM/honours_project_2020/'
+elif computer == 'nesi':
+    # add NeSI paths here
+    PATH = ''
 DEFAULT_PROB = 'turb'
 
 
@@ -31,7 +38,25 @@ def format_path(output_dir):
 
 def load_data(output_dir, n, prob=DEFAULT_PROB):
     '''Loads data from .athdf files output from Athena++.
+
+    Parameters
+    ----------
+    output_dir : string
+        path to directory containing .athdf file(s)
+    n : int
+        integer describing which snapshot to choose
+    prob : string, optional
+        the Athena++ problem generator name, by default DEFAULT_PROB
+
+    Returns
+    -------
+    dict
+        a dictionary containing information on all data in the simulation. Using 
+        the `read_python.py` script in `/athena/vis/python/`.
     '''
+    
+    max_n = get_maxn(output_dir)
+    assert n in range(0, max_n), 'n must be between 0 and ' + str(max_n)
 
     # '$folder.out$output_id.xxxxx.athdf'
     def f(n):
@@ -116,7 +141,13 @@ def rms(x, do_fluc=0, axis=(2,3,4)):
 
 def get_mag(x):
     '''For an array of vectors with the same number of components,
-    returns the magnitude of each vector in an array of the same size.'''
+    returns the magnitude of each vector in an array of the same size.
+    
+    E.g. x = [[1, 0, 1],\n
+              [3, 4, 0],\n
+              [1, 1, 1]]
+         get_mag(x) = [√2, 5, √3]
+    '''
     return np.sqrt((x**2).sum(axis=1))
 
 
@@ -171,10 +202,10 @@ def ft_array(N):
        N = 5: [0 1 2 -2 -1]
        N = 6: [0 1 2 -3 -2 -1]
     '''
-    grid = np.arange(-(N//2), (N+1)//2, 1)
-    grid = np.roll(grid, (N+1)//2)
+    array = np.arange(-(N//2), (N+1)//2, 1)
+    array = np.roll(array, (N+1)//2)
 
-    return grid
+    return array
 
 
 def ft_grid(input_type, data=None, output_dir=None, Ls=None, Ns=None, prob=DEFAULT_PROB, k_grid=0):
