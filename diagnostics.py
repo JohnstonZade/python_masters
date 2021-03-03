@@ -24,7 +24,8 @@ if computer == 'local':
     # PATH = '/media/zade/STRONTIUM/honours_project_2020/'
 elif computer == 'nesi':
     # add NeSI paths here
-    PATH = ''
+    PATH = '/nesi/nobackup/uoo02637/zade/masters_2021/' # scratch
+    # PATH = '/nesi/project/uoo02637/zade/masters_2021/' # project
 DEFAULT_PROB = 'turb'
 
 
