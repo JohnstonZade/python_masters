@@ -77,7 +77,7 @@ def run_tests(Ls, KX, KY, KZ):
         return z
 
 def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=10.0,
-                    gauss_spec=0, prl_spec=0, run_test=0):
+                    gauss_spec=0, prl_spec=0, do_truncation=0, kmag_cutoff=100., run_test=0):
     '''Generate a superposition of random Alfvén waves within a numerical domain
     that follow a given energy spectrum.
 
@@ -150,7 +150,11 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=10.0,
     # getting wave vector magntiudes parallel and perpendicular to B_0
     # if B_0 is along x direction then Kprl = KX and Kprp = √(KY^2 + KZ^2)
     # added just in case we change the direction of B_0
-    Kprl, Kprp = decompose_k(KX, KY, KZ, B0_x, B0_y, B0_z)
+    # Kprl, Kprp = decompose_k(KX, KY, KZ, B0_x, B0_y, B0_z)
+
+    # Assuming that B_0 is just along x-axis
+    Kprl = abs(KX)
+    Kprp = np.maximum(np.sqrt(abs(KY)**2 + abs(KZ)**2), 0.01)
     Kmag = np.sqrt(Kprl**2 + Kprp**2)
 
     if run_test:
@@ -183,11 +187,14 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=10.0,
         # these complex numbers represent the amplitude and phase of the corresponding
         # Fourier mode at that point in k-space
         r = random.normal(size=n_X)*Kspec
+        if do_truncation:
+            r[Kmag >= kmag_cutoff] = 0.0  # cut off wave vectors
         theta = random.uniform(0, 2*np.pi, size=n_X)
         z = r*np.exp(1j*theta)
 
-        # don't need to worry about excluding purely parallel waves
-        # as cross product below is automatically 0 for those
+        # excluding purely parallel waves
+        prl_mask = (Kprp == 0.)
+        z[prl_mask] = 0j
         # exclude purely perpendicular waves as they don't propagate
         # remember ω_A = k_prl * v_A
         prp_mask = (Kprl == 0.)
@@ -195,7 +202,7 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=10.0,
     
     # Alfvén wave definition performed in k-space: δB = k × B
     # don't need to Fourier transform B0 as it is constant
-    ft_dB_x = (KY*B0_z - KZ*B0_y)
+    # ft_dB_x = (KY*B0_z - KZ*B0_y)
     ft_dB_y = (KZ*B0_x - KX*B0_z)
     ft_dB_z = (KX*B0_y - KY*B0_x)
 
@@ -203,9 +210,10 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=10.0,
     # removing the magnitude of the k vector and replacing
     # it with the randomly generated amplitude.
     # This removes the need to add 1 to kpow above.
-    ft_dB_mag = np.sqrt(abs(ft_dB_x)**2 + abs(ft_dB_y)**2 + abs(ft_dB_z)**2)
+    # ft_dB_mag = np.sqrt(abs(ft_dB_x)**2 + abs(ft_dB_y)**2 + abs(ft_dB_z)**2)
+    ft_dB_mag = np.sqrt(abs(ft_dB_y)**2 + abs(ft_dB_z)**2)
     ft_dB_mag[ft_dB_mag == 0.] = 1e-15
-    ft_dB_x *= z / ft_dB_mag
+    # ft_dB_x *= z / ft_dB_mag
     ft_dB_y *= z / ft_dB_mag
     ft_dB_z *= z / ft_dB_mag
 
@@ -215,14 +223,15 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=10.0,
     # i.e. 256^3 box has smaller amplitude than 32^3 box on the order of 10^-3 (using 2^(3x)~10^x)
     # Just inverting this process.
     N_points = np.prod(n_X)
-    ft_dB_x *= N_points
+    # ft_dB_x *= N_points
     ft_dB_y *= N_points
     ft_dB_z *= N_points
 
     # this generates a sum of waves of the form r*sin(k⋅x + theta)
     # for each point k in k-space
-    dB_x = np.real(fft.ifftn(ft_dB_x))
+    # dB_x = np.real(fft.ifftn(ft_dB_x))
     dB_y = np.real(fft.ifftn(ft_dB_y))
     dB_z = np.real(fft.ifftn(ft_dB_z))
 
-    return dB_x, dB_y, dB_z
+    # return dB_x, dB_y, dB_z
+    return dB_y, dB_z

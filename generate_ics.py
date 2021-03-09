@@ -9,16 +9,25 @@ import numpy.fft as fft
 import diagnostics as diag
 import generate_spectrum as genspec
 
+if diag.COMPUTER == 'local':
+    from_array_path = '/home/zade/masters_2021/templates_athinput/athinput.from_array'
+else:
+    from_array_path = '/home/johza721/masters_2021/templates/athinput.from_array'
+
 # --- SUPPORTING FUNCTIONS --- #
 
 # edit_athinput - edits the corresponding athinput file with quantites input below
 # ONLY WORKS FOR athinput.from_array layout
-def edit_athinput(athinput, save_folder, n_X, X_min, X_max, meshblock, h5name):
+def edit_athinput(athinput, save_folder, n_X, X_min, X_max, meshblock, h5name,
+                  time_lim, dt, iso_sound_speed, expand, exp_rate):
     ath_path = save_folder + athinput.split('/')[-1] + '_' + h5name.split('/')[-1].split('.')[0]
     copy(athinput, ath_path)
     ath = open(ath_path, 'r')
     list_of_lines = ath.readlines()
 
+    # time limit
+    list_of_lines[10] = 'tlim       = ' + str(time_lim) + ' # time limit\n'
+    list_of_lines[22] = 'dt        = ' + str(dt) + '   # time increment between outputs\n'
     # X1
     list_of_lines[25] = 'nx1     = ' + str(n_X[0]) + '        # number of zones in x1-direction\n'
     list_of_lines[26] = 'x1min   = ' + str(X_min[0]) + '     # minimum value of x1\n'
@@ -35,8 +44,14 @@ def edit_athinput(athinput, save_folder, n_X, X_min, X_max, meshblock, h5name):
     list_of_lines[47] = 'nx1 = ' + str(meshblock[0]) + '  # block size in x1-direction\n'
     list_of_lines[48] = 'nx2 = ' + str(meshblock[1]) + '  # block size in x2-direction\n'
     list_of_lines[49] = 'nx3 = ' + str(meshblock[2]) + '  # block size in x3-direction\n'
+    # sound speed
+    list_of_lines[53] = 'iso_sound_speed = ' + str(iso_sound_speed) + '  # isothermal sound speed (for barotropic EOS)\n'
     # hdf5 file name
     list_of_lines[56] = 'input_filename = ' + h5name + '  # name of HDF5 file containing initial conditions\n'
+    # expansion
+    expanding = 'true' if expand else 'false'
+    list_of_lines[66] = 'expanding = ' + expanding + '\n'
+    list_of_lines[67] = 'expand_rate = ' + str(exp_rate) + '\n'
 
     ath = open(ath_path, 'w')
     ath.writelines(list_of_lines)
@@ -155,6 +170,10 @@ def reshape_helper(A, component):
         pad = ((1, 1), (1, 1), (0, 1))
     return np.pad(A, pad, 'wrap')
 
+def remove_prev_h5file(h5name):
+    if os.path.isfile(h5name):  # 'overwrite' old ICs
+        os.remove(h5name)
+
 def setup_hydro_grid(n_X, X_grid, N_HYDRO, Dnf, UXf, UYf, UZf, BXf, BYf, BZf):
     # Athena orders cooridinates (Z, Y, X) while n_X is in the form (X, Y, Z)
     # It's easier to start from this ordering instead of having to do array
@@ -163,7 +182,7 @@ def setup_hydro_grid(n_X, X_grid, N_HYDRO, Dnf, UXf, UYf, UZf, BXf, BYf, BZf):
 
     # --- GRID CREATION --- #
 
-    zg, yg, xg = X_grid
+    xg, yg, zg = X_grid
     Zg, Yg, Xg = np.meshgrid(zg, yg, xg, indexing='ij')
 
     # Place quantites on grid
@@ -181,7 +200,7 @@ def setup_hydro_grid(n_X, X_grid, N_HYDRO, Dnf, UXf, UYf, UZf, BXf, BYf, BZf):
     Xg, Yg, Zg = None, None, None  # I think this clears memory?
     return Hy_grid, BXcc, BYcc, BZcc
 
-def save_hydro_grid(h5name, Hy_grid, N_HYDRO, n_blocks, blocks, meshblock):
+def save_hydro_grid(h5name, Hy_grid, N_HYDRO, n_blocks, blocks, meshblock, remove_h5=1):
     Hy_h5 = np.zeros(shape=(N_HYDRO, n_blocks, *meshblock[::-1]))
     for h in range(N_HYDRO):
         for m in range(n_blocks):  # save to each meshblock individually
@@ -191,8 +210,6 @@ def save_hydro_grid(h5name, Hy_grid, N_HYDRO, n_blocks, blocks, meshblock):
             Hy_h5[h, m, :, :, :] = Hy_grid[h, ind_s[0]:ind_e[0], ind_s[1]:ind_e[1], ind_s[2]:ind_e[2]]
 
     Hy_grid = None
-    if os.path.isfile(h5name):  # 'overwrite' old ICs
-        os.remove(h5name)
     with h5py.File(h5name, 'a') as f:
         f['cons'] = Hy_h5
     Hy_h5 = None
@@ -289,7 +306,8 @@ def calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_bl
 # --- GENERATING FUNCTIONS --- #
 
 def create_athena_fromics(folder, h5name, n_X, X_min, X_max, meshblock,
-                          energy=1., athinput='/home/zade/masters_2021/templates_athinput/athinput.from_array'):
+                          energy=1., time_lim=1, dt=0.2, iso_sound_speed=1.0, expand=0, exp_rate=0., 
+                          athinput=from_array_path):
     '''Function to generate an h5 file containing user set initial conditions 
        for the Athena++ from_array problem generator to start from. Generates a grid the same size as specified in the
        athinput file and calculates the quantities at each grid point, then writes to h5 file.
@@ -312,8 +330,10 @@ def create_athena_fromics(folder, h5name, n_X, X_min, X_max, meshblock,
         name of athinput file, of the form athinput.xxx, by default '/home/zade/masters_2021/templates_athinput/athinput.from_array'
     '''
     # --- INPUTS --- #
+    
+    ath_copy = edit_athinput(athinput, folder, n_X, X_min, X_max, meshblock,
+                             h5name, time_lim, dt, iso_sound_speed, expand, exp_rate)
     h5name = folder + h5name  # eg 'ICs_template.h5'
-    ath_copy = edit_athinput(athinput, folder, n_X, X_min, X_max, meshblock, h5name)
     N_HYDRO = 4  # number of hydro variables (e.g. density and momentum); assuming isothermal here
     # Dimension setting: 1D if only x has more than one gridpoint
     one_D = 1 if np.all(n_X[1:] == 1) else 0
@@ -352,17 +372,23 @@ def create_athena_fromics(folder, h5name, n_X, X_min, X_max, meshblock,
 
     # --- SAVING VARIABLES --- #
 
+    remove_prev_h5file(h5name)
+
     # - HYDRO
     save_hydro_grid(h5name, Hy_grid, N_HYDRO, n_blocks, blocks, meshblock)
     print('Hydro Saved Succesfully')
 
     # - MAGNETIC
+    # TODO: the numerical errors that arise from performing the B_cc→A→B_fc calculation
+    # will cause the final cell centered B field to differ slightly in magnitude from the 
+    # initial one set above. This will cause Alfvénic velocity and magnetic perturbations 
+    # to not be exactly correlated, for example. Not sure how to fix.
     calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_blocks, blocks, dx, dy, dz)
     print('Magnetic Saved Successfully')
     print('Done!')
 
 def create_athena_fromh5(save_folder, athinput_in_folder, athinput_in, h5name, athdf_input,
-                         athinput_out='/home/zade/masters_2021/templates_athinput/athinput.from_array'):
+                         athinput_out=from_array_path):
     '''Similar function to `create_athena_fromics` but instead of user-set ICs,
     reads in an initial .athdf file and obtains the initial conditions from there.
 
@@ -421,49 +447,13 @@ def create_athena_fromh5(save_folder, athinput_in_folder, athinput_in, h5name, a
     calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_blocks, blocks, dx, dy, dz)
 
 def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
-                             athinput='/home/zade/masters_2021/templates_athinput/athinput.from_array',
-                             energy=1.,
-                             expo=-5/3,
-                             expo_prl=-2.,
-                             kpeak=10.,
-                             gauss_spec=0,
-                             prl_spec=0,
-                             do_mode_test=0):
-    '''Similar to `create_athena_fromics` but adds on random Alfvénic fluctations with a given 
-    energy spectrum and adds on to user-defined initial mean quantities. See `generate_spectrum`
-    for more details on how the spectrum is generated.
-
-    Parameters
-    ----------
-    folder : string
-        path to base folder that contains the athena binary, athinput file, and where h5 file is to be output
-    h5name : string
-        name of h5 file for data to be output to
-    n_X : ndarray
-        array containing the number of grid points in the 3 coordinate directions x1,x2,x3
-    X_min : ndarray
-        array containing the minimum x_n coordinate in each direction
-    X_max : ndarray
-        array containing the maximum x_n coordinate in each direction
-    meshblock : ndarray
-        array containing the meshblock dimensions in each direction
-    athinput : str, optional
-        name of athinput file, of the form athinput.xxx, by default '/home/zade/masters_2021/templates_athinput/athinput.from_array'
-    expo : float, optional
-        isotropic/perpendicular spectrum power, by default -5/3
-    expo_prl : float, optional
-        parallel spectrum power, by default -2.
-    kpeak : float, optional
-        peak of Gaussian spectrum, by default 10.
-    gauss_spec : bool, optional
-        generate Gaussian spectrum, by default 0
-    prl_spec : bool, optional
-        generate anisotropic spectrum, by default 0
-    do_mode_test : bool, optional
-        run tests in `generate_spectrum`, by default 0
-    '''
-    h5name = folder + h5name  # eg 'ICs_template.h5'
-    ath_copy = edit_athinput(athinput, folder, n_X, X_min, X_max, meshblock, h5name)
+                             time_lim=1, dt=0.2, iso_sound_speed=1.0, expand=0, exp_rate=0.,
+                             do_truncation=0, kmag_cuttoff=100., athinput=from_array_path,
+                             energy=0.5, expo=-5/3, expo_prl=-2., kpeak=10., gauss_spec=0, prl_spec=0, do_mode_test=0):
+    
+    ath_copy = edit_athinput(athinput, folder, n_X, X_min, X_max, meshblock,
+                             h5name, time_lim, dt, iso_sound_speed, expand, exp_rate)
+    h5name = folder + h5name  # eg 'ICs_template.h5'                             
     N_HYDRO = 4  # number of hydro variables (e.g. density and momentum); assuming isothermal here
     # Dimension setting: 1D if only x has more than one gridpoint
     one_D = 1 if np.all(n_X[1:] == 1) else 0
@@ -482,32 +472,131 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
     Hy_grid, BXcc, BYcc, BZcc = setup_hydro_grid(n_X, X_grid, N_HYDRO, Dnf, UXf, UYf, UZf, BXf, BYf, BZf)
 
     B_0 = np.array([BXcc, BYcc, BZcc])
-    rho = Hy_grid[0]
+
+    dB_y, dB_z = genspec.generate_alfven(n_X, X_min, X_max, B_0, expo,
+                                         do_truncation=do_truncation, kmag_cuttoff=kmag_cuttoff,
+                                         expo_prl=expo_prl, kpeak=kpeak, gauss_spec=gauss_spec,
+                                         prl_spec=prl_spec, run_test=do_mode_test)
+
+    BYcc += dB_y
+    BZcc += dB_z
+    dB_y, dB_z = None, None
+
+    # --- MESHBLOCK STRUCTURE --- #
+
+    n_blocks, blocks = make_meshblocks(folder, ath_copy, n_X, meshblock, one_D)
+
+    # --- SAVING VARIABLES --- #
+    
+    remove_prev_h5file(h5name)
+
+    # - MAGNETIC
+    
+    calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_blocks, blocks, dx, dy, dz)
+    print('Magnetic Saved Successfully')
+
+    # Only looking at perturbations perpendicular to B_0, assumed to be along x-axis initially.
+    # Will add perturation after t=0 corresponding to Parker spiral?
+    Bcc_unpacked = np.zeros(shape=(2, *n_X[::-1]))
+    with h5py.File(h5name, 'a') as f:
+        for idx, b in enumerate(['bf2', 'bf3']):
+            for m in range(n_blocks):  # save from each meshblock individually
+                    off = blocks[:, m]
+                    ind_s = (meshblock*off)[::-1]
+                    ind_e = (meshblock*off + meshblock)[::-1]
+                    B_fc = f[b][ m, :, :, :]
+
+                    # linearly interpolate face centered fields to get cell-centered fields
+                    # assumes evenly spaced grid points
+                    # idx = 0 ⟺ y-component; idx = 1 ⟺ z-component
+                    B_cc = 0.5*(B_fc[:, 1:, :] + B_fc[:, :-1, :]) if idx == 0 else 0.5*(B_fc[1:, :, :] + B_fc[:-1, :, :])
+
+                    Bcc_unpacked[idx, ind_s[0]:ind_e[0], ind_s[1]:ind_e[1], ind_s[2]:ind_e[2]] = B_cc
 
     # Setting z^- waves = 0
-    dB_x, dB_y, dB_z = genspec.generate_alfven(n_X, X_min, X_max, B_0,
-                                               expo, expo_prl=expo_prl, kpeak=kpeak, gauss_spec=gauss_spec,
-                                               prl_spec=prl_spec, run_test=do_mode_test)
-    du_x, du_y, du_z = dB_x / np.sqrt(rho), dB_y / np.sqrt(rho), dB_z / np.sqrt(rho)
+    rho = Hy_grid[0]
+    dB_y, dB_z = Bcc_unpacked  # no mean field along y and z axes
+    du_y, du_z = dB_y / np.sqrt(rho), dB_z / np.sqrt(rho)
 
     # dV = V / resolution = (Lx*Ly*Lz) / (Nx*Ny*Nz) = dx*dy*dz
     dV = np.prod(X_max - X_min) / np.prod(n_X)
     # give magnetic and velocity fluctuations same initial energy
-    total_energy = 0.5*dV*np.sum(du_x**2 + du_y**2 + du_z**2)
+    total_energy = 0.5*dV*np.sum(dB_y**2 + dB_z**2)
     norm_energy = np.sqrt(energy / total_energy)
 
-    du_x *= norm_energy
+    Hy_grid[2] += rho*norm_energy*du_y
+    Hy_grid[3] += rho*norm_energy*du_z
+
+    dB_y, dB_z, du_y, du_z = None, None, None, None
+
+    with h5py.File(h5name, 'a') as f:
+        B_x = f['bf1'][...]
+        B_y = f['bf2'][...]
+        B_z = f['bf3'][...]
+        # assuming B_0 is spatially homogenous ⟹ B_0 = mean(B)
+        dB_x = B_x - np.mean(B_x)*np.ones_like(B_x)
+        dB_y = B_y - np.mean(B_y)*np.ones_like(B_y)
+        dB_z = B_z - np.mean(B_z)*np.ones_like(B_z)
+
+        # remove all fluctuations parallel to B_0: these are not Alfvénic and are a result of numerical errors
+        # otherwise rescale Alfvénic fluctations to desiered energy
+        # B_y,z = B0_y,z + dB_y,z + (norm_energy - 1)*dB_y,z = B0_y,z + norm_energy*dB_y,z
+        f['bf1'][...] += -dB_x
+        f['bf2'][...] += dB_y*(norm_energy-1)
+        f['bf3'][...] += dB_z*(norm_energy-1)
+
+
+    # - HYDRO
+    save_hydro_grid(h5name, Hy_grid, N_HYDRO, n_blocks, blocks, meshblock, remove_h5=0)
+    print('Hydro Saved Succesfully')
+
+
+def test(folder, h5name, n_X, X_min, X_max, meshblock,
+                             time_lim=1, dt=0.2, iso_sound_speed=1., expand=0, exp_rate=0.,
+                             athinput='/home/zade/masters_2021/templates_athinput/athinput.from_array',
+                             energy=0.5, expo=-5/3, expo_prl=-2., kpeak=10., gauss_spec=0, prl_spec=0, do_mode_test=0):
+
+    h5name = folder + h5name  # eg 'ICs_template.h5'
+    ath_copy = edit_athinput(athinput, folder, n_X, X_min, X_max, meshblock, h5name, time_lim, dt, iso_sound_speed, expand, exp_rate)
+    N_HYDRO = 4  # number of hydro variables (e.g. density and momentum); assuming isothermal here
+    # Dimension setting: 1D if only x has more than one gridpoint
+    one_D = 1 if np.all(n_X[1:] == 1) else 0
+
+    # Generate mean fields
+    Dnf = lambda X, Y, Z: np.ones(X.shape)
+    UXf = lambda X, Y, Z: np.zeros(X.shape)
+    UYf = lambda X, Y, Z: np.zeros(X.shape)
+    UZf = lambda X, Y, Z: np.zeros(X.shape)
+    BXf = lambda X, Y, Z: np.ones(X.shape)
+    BYf = lambda X, Y, Z: np.zeros(X.shape)
+    BZf = lambda X, Y, Z: np.zeros(X.shape)
+
+    X_grid, (dx, dy, dz) = generate_grid(X_min, X_max, n_X)
+    Hy_grid, BXcc, BYcc, BZcc = setup_hydro_grid(n_X, X_grid, N_HYDRO, Dnf, UXf, UYf, UZf, BXf, BYf, BZf)
+
+    B_0 = np.array([BXcc, BYcc, BZcc])
+    rho = Hy_grid[0]
+
+    # Setting z^- waves = 0
+    dB_y, dB_z = genspec.generate_alfven(n_X, X_min, X_max, B_0,
+                                               expo, expo_prl=expo_prl, kpeak=kpeak, gauss_spec=gauss_spec,
+                                               prl_spec=prl_spec, run_test=do_mode_test)
+    du_y, du_z = dB_y / np.sqrt(rho), dB_z / np.sqrt(rho)
+
+    # dV = V / resolution = (Lx*Ly*Lz) / (Nx*Ny*Nz) = dx*dy*dz
+    dV = np.prod(X_max - X_min) / np.prod(n_X)
+    # give magnetic and velocity fluctuations same initial energy
+    total_energy = 0.5*dV*np.sum(dB_y**2 + dB_z**2)
+    norm_energy = np.sqrt(energy / total_energy)
+
     du_y *= norm_energy
     du_z *= norm_energy
-    dB_x *= norm_energy
     dB_y *= norm_energy
     dB_z *= norm_energy
 
     # adding fluctuations
-    BXcc += dB_x
     BYcc += dB_y
     BZcc += dB_z
-    Hy_grid[1] += rho*du_x
     Hy_grid[2] += rho*du_y
     Hy_grid[3] += rho*du_z
 
@@ -525,4 +614,3 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
     calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_blocks, blocks, dx, dy, dz)
     print('Magnetic Saved Successfully')
     print('Done!')
-

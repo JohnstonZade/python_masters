@@ -131,9 +131,10 @@ def plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd=1, do_p
             plt.xlabel(r'$k_\perp$')
             plt.ylabel(r'$E(k_\perp)$')
             legend = [r'$E_{K,\perp}$', r'$E_{B,\perp}$', r'$k_{\perp}^{-5/3}$', r'$k_{\perp}^{' + slope_label + '}$']
-        plt.xlabel(r'$k$')
-        plt.ylabel(r'$E(k)$')
-        legend = [r'$E_{K}$', r'$E_{B}$', r'$k^{-5/3}$', r'$k^{' + slope_label + '}$']
+        else:
+            plt.xlabel(r'$k$')
+            plt.ylabel(r'$E(k)$')
+            legend = [r'$E_{K}$', r'$E_{B}$', r'$k^{-5/3}$', r'$k^{' + slope_label + '}$']
 
         k_mask = np.logical_and(inertial_range[0] <= k, k <= inertial_range[1])
         # while np.all(np.logical_not(k_mask)):  # if all false, returns true

@@ -14,15 +14,15 @@ from math import pi
 from matplotlib import rc
 rc('text', usetex=True)  # LaTeX labels
 
-computer = 'local'
-# computer = 'nesi'
+COMPUTER = 'local'
+# COMPUTER = 'nesi'
 
-if computer == 'local':
+if COMPUTER == 'local':
     # Path to simulation data
     PATH = "/home/zade/masters_2021/"
     # PATH = '/media/zade/Seagate Expansion Drive/honours_project_2020/'
     # PATH = '/media/zade/STRONTIUM/honours_project_2020/'
-elif computer == 'nesi':
+elif COMPUTER == 'nesi':
     # add NeSI paths here
     PATH = '/nesi/nobackup/uoo02637/zade/masters_2021/' # scratch
     # PATH = '/nesi/project/uoo02637/zade/masters_2021/' # project
@@ -246,6 +246,13 @@ def ft_grid(input_type, data=None, output_dir=None, Ls=None, Ns=None, prob=DEFAU
         Ks = (Ks, np.arange(0, np.max(np.imag(K[1])), 2*pi/Ls[1]))
 
     return Ks
+
+
+# --- MHD TURBULENCE DIAGNOSTICS --- #
+
+def cross_helicity(rho, u_perp, B_perp): 
+    return 2 * np.mean(np.sqrt(rho) * u_perp * B_perp) / np.mean(rho*u_perp**2 + B_perp**2)
+
 
 # --- EXPANDING BOX CODE --- #
 
