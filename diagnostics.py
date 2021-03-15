@@ -6,13 +6,10 @@ import glob
 import os
 import pickle
 import numpy as np
-import numpy.fft as fft
-import matplotlib.pyplot as plt
 from pathlib import Path
 from athena_read import athdf, athinput, hst
-from math import pi
-from matplotlib import rc
-rc('text', usetex=True)  # LaTeX labels
+# from matplotlib import rc
+# rc('text', usetex=True)  # LaTeX labels
 
 COMPUTER = 'local'
 # COMPUTER = 'nesi'
@@ -24,9 +21,9 @@ if COMPUTER == 'local':
     # PATH = '/media/zade/STRONTIUM/honours_project_2020/'
 elif COMPUTER == 'nesi':
     # add NeSI paths here
-    PATH = '/nesi/nobackup/uoo02637/zade/masters_2021/' # scratch
-    # PATH = '/nesi/project/uoo02637/zade/masters_2021/' # project
-DEFAULT_PROB = 'turb'
+    # PATH = '/nesi/nobackup/uoo02637/zade/masters_2021/' # scratch
+    PATH = '/nesi/project/uoo02637/zade/masters_2021/' # project
+DEFAULT_PROB = 'from_array'
 
 
 def format_path(output_dir):
@@ -126,15 +123,27 @@ def get_maxn(output_dir):
 
 # --- MATH FUNCTIONS --- #
 
-def rms(x, do_fluc=0, axis=(2,3,4)):
-    '''Returns the RMS of a given quantity.
-    Default axis keyword assumes the format [time, component, x3, x2, x1].
+def box_avg(x):
+    # box indicies are always the last 3
+    len_shape = len(x.shape)
+    axes = tuple(np.arange(len_shape-3, len_shape))
+    return np.mean(x, axis=axes)
+
+def dot_prod(x, y, axis):
+    return np.sum(x*y, axis=axis)
+
+def rms(x):
+    '''Returns the fluctuation RMS of a given quantity.
+    Assumes that the spatial indicies are always the last three indices of
+    an array e.g. [time, component, x3, x2, x1].
     '''
-    x_fluc = x
-    if do_fluc:
-        x_mean = x.mean(axis=axis)
-        x_fluc -= x.mean.reshape(*x_mean.shape, 1, 1, 1)
-    return np.sqrt((x_fluc**2).mean(axis=axis))
+    x_mean = box_avg(x)
+    dx = x - x_mean.reshape(*x_mean.shape, 1, 1, 1)
+    if len(x.shape) == 5: # vector quantity
+        dx2 = dot_prod(dx, dx, 1)
+    else:  # scalar quantity
+        dx2 = dx**2
+    return np.sqrt(box_avg(dx2))
 
 
 # --- VECTOR FUNCTIONS --- #
@@ -149,7 +158,7 @@ def get_mag(x):
               [1, 1, 1]]
          get_mag(x) = [√2, 5, √3]
     '''
-    return np.sqrt((x**2).sum(axis=1))
+    return np.sqrt(dot_prod(x, x, 1))
 
 
 def get_unit(x):
@@ -239,11 +248,11 @@ def ft_grid(input_type, data=None, output_dir=None, Ls=None, Ns=None, prob=DEFAU
     # Corresponds to Athena++ standard k=0 ⟺ Z, 1 ⟺ Y, 2 ⟺ X
     K = {}
     for k in range(3):
-        K[k] = 2j*pi/Ls[k]*ft_array(Ns[k])
+        K[k] = 2j*np.pi/Ls[k]*ft_array(Ns[k])
 
     Ks = np.meshgrid(K[0], K[1], K[2], indexing='ij')
     if k_grid:
-        Ks = (Ks, np.arange(0, np.max(np.imag(K[1])), 2*pi/Ls[1]))
+        Ks = (Ks, np.arange(0, np.max(np.imag(K[1])), 2*np.pi/Ls[1]))
 
     return Ks
 
@@ -251,10 +260,56 @@ def ft_grid(input_type, data=None, output_dir=None, Ls=None, Ns=None, prob=DEFAU
 # --- MHD TURBULENCE DIAGNOSTICS --- #
 
 def cross_helicity(rho, u_perp, B_perp): 
-    return 2 * np.mean(np.sqrt(rho) * u_perp * B_perp) / np.mean(rho*u_perp**2 + B_perp**2)
+    udotB = dot_prod(u_perp, B_perp, 1)
+    u2, B2 = dot_prod(u_perp, u_perp, 1), dot_prod(B_perp, B_perp, 1)
 
+    return 2 * box_avg(np.sqrt(rho) * udotB) / box_avg(rho*u2 + B2)
+
+
+def beta(rho, B_mag, c_s_init, expansion_rate, t):
+    # rho and B_mag should be of the form rho[time, x, y, z]
+    # from Squire2020, line before Eq. 4
+    # assuming isothermal eos
+    sound_speed = expand_sound_speed(c_s_init, expansion_rate, t)
+    rhoB2_avg = box_avg(rho / B_mag**2)
+    return 2 * sound_speed**2 * rhoB2_avg
+
+def mag_compress_Squire2020(B):
+    # δ(B^2) / (δB_vec)^2
+    B_mag2 = dot_prod(B, B, 1)
+    rms_Bmag2 = rms(B_mag2, do_fluc=1)
+    sqr_rmsB = rms(B, do_fluc=1)**2
+    return rms_Bmag2 / sqr_rmsB
+
+def mag_compress_Shoda2021(B):
+    # (δB)^2 / (δB_vec)^2
+    B_mag = np.sqrt(dot_prod(B, B, 1))
+    sqr_rmsBmag = rms(B_mag, do_fluc=1)**2
+    sqr_rmsB = rms(B, do_fluc=1)**2
+    return sqr_rmsBmag / sqr_rmsB
+
+def norm_fluc_amp(fluc, background):
+    # quantities of the form <B_⟂^2> / <B_x>**2
+    # or <ρu_⟂^2> / <B_x>**2
+    mean_fluc = box_avg(fluc)
+    mean_bg_sqr = box_avg(background)**2
+    return mean_fluc / mean_bg_sqr
 
 # --- EXPANDING BOX CODE --- #
+
+# def time_to_dist
+
+def switchback_fraction(B_x, B_mag, B0_x):
+    b_x = B_x / B_mag  # unit vector in x direction
+    N_cells = b_x[0].size 
+    # if B0_x is positive, switchbacks are in negative direction
+    # and vice versa
+    sb_frac = []
+    for i in range(b_x.shape[0]):
+        b_x_temp = b_x[i]
+        N_flipped_b = b_x_temp[np.sign(B0_x)*b_x_temp < 0.0].size
+        sb_frac.append(N_flipped_b / N_cells)
+    return np.array(sb_frac)
 
 def a(expansion_rate, t):
     """
@@ -263,12 +318,17 @@ def a(expansion_rate, t):
     return 1 + expansion_rate*t
 
 
+def expand_sound_speed(init_c_s, expansion_rate, t):
+    # tempurature evolution is adiabatic
+    return init_c_s * (a(expansion_rate, t))**(-2/3)
+
+
 def expand_variables(a, vector):
     """
     Takes in a time series of a vector component over the whole box and
     scales by a(t).
     """
-    for i in range(1, 3):
+    for i in range(1, 3): # i = 1 ⟺ y, i = 2 ⟺ z
         vector[:, i, :] *= a.reshape(*a.shape, 1, 1, 1)
 
     return vector

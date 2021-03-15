@@ -76,7 +76,7 @@ def run_tests(Ls, KX, KY, KZ):
         z[mask] = wave
         return z
 
-def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=10.0,
+def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=12.0,
                     gauss_spec=0, prl_spec=0, do_truncation=0, kmag_cutoff=100., run_test=0):
     '''Generate a superposition of random Alfvén waves within a numerical domain
     that follow a given energy spectrum.

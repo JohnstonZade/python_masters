@@ -474,7 +474,7 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
     B_0 = np.array([BXcc, BYcc, BZcc])
 
     dB_y, dB_z = genspec.generate_alfven(n_X, X_min, X_max, B_0, expo,
-                                         do_truncation=do_truncation, kmag_cuttoff=kmag_cuttoff,
+                                         do_truncation=do_truncation, #kmag_cuttoff=kmag_cuttoff,
                                          expo_prl=expo_prl, kpeak=kpeak, gauss_spec=gauss_spec,
                                          prl_spec=prl_spec, run_test=do_mode_test)
 
@@ -552,9 +552,9 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
 
 
 def test(folder, h5name, n_X, X_min, X_max, meshblock,
-                             time_lim=1, dt=0.2, iso_sound_speed=1., expand=0, exp_rate=0.,
-                             athinput='/home/zade/masters_2021/templates_athinput/athinput.from_array',
-                             energy=0.5, expo=-5/3, expo_prl=-2., kpeak=10., gauss_spec=0, prl_spec=0, do_mode_test=0):
+         time_lim=1, dt=0.2, iso_sound_speed=1., expand=0, exp_rate=0.,
+         athinput='/home/zade/masters_2021/templates_athinput/athinput.from_array',
+         energy=0.5, expo=-5/3, expo_prl=-2., kpeak=10., gauss_spec=0, prl_spec=0, do_mode_test=0):
 
     h5name = folder + h5name  # eg 'ICs_template.h5'
     ath_copy = edit_athinput(athinput, folder, n_X, X_min, X_max, meshblock, h5name, time_lim, dt, iso_sound_speed, expand, exp_rate)
