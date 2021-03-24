@@ -162,8 +162,13 @@ def shift_and_extend_A(Ax, Ay, Az):
 
 # reshape helper - concatenates A differently along different axes to allow
 # for periodicity
+# Based off of Jono's MATLAB script
 def reshape_helper(A, component):
     # component = 0 ⟺ x, 1 ⟺ y, 2 ⟺ z
+    # pad notation: first tuple pad on (axis 0, axis 1, axis 2)
+    # second tuple: (x, y) add last x entries to front of axis 
+    # and first y entries to end of array
+    # e.g. x = [0, 1, 2], pad(x, (1, 1), 'wrap') = [2, 0, 1, 2, 0]
     if component != 0:
         pad = ((1, 1), (0, 1), (1, 1)) if component == 1 else ((0, 1), (1, 1), (1, 1))
     else:

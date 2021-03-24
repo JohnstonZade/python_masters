@@ -197,6 +197,7 @@ def get_rootgrid(output_dir, prob=DEFAULT_PROB, zyx=0):
 
 def get_vol(output_dir, prob=DEFAULT_PROB):
     '''Returns the volume of the simulation domain.'''
+    # TODO: Will need to multiply by a^2 if using in expanding box
     X1, X2, X3 = get_lengths(output_dir, prob)
     return abs(X1*X2*X3)  # just a check to make volume positive
 
@@ -334,23 +335,36 @@ def expand_variables(a, vector):
     return vector
 
 
-def load_time_series(output_dir, prob=DEFAULT_PROB, conserved=0):
+def load_time_series(output_dir, n_start=0, n_end=-1, conserved=0, just_time=0, prob=DEFAULT_PROB):
+    # By default load all snapshots
+    # Otherwise load all snapshots n_start...(n_end - 1)
     max_n = get_maxn(output_dir)
+    if n_end >= 0:
+        assert n_end > n_start, 'Please choose a valid range!'
+        n_end = min(n_end, max_n)  # making sure we don't overstep max n by mistake
+    else:
+        n_end = max_n
+    
 
     t, B, u, rho = [], [], [], []
 
-    for n in range(max_n):
+    for n in range(n_start, n_end):
         data_n = load_data(output_dir, n, prob)
         t.append(data_n['Time'])
-        if conserved:
-            B.append((data_n['Bcc1'], data_n['Bcc2'], data_n['Bcc3']))
-            u.append((data_n['mom1'], data_n['mom2'], data_n['mom3']))
-            rho.append(data_n['dens'])
-        else:
-            B.append((data_n['Bcc1'], data_n['Bcc2'], data_n['Bcc3']))
-            u.append((data_n['vel1'], data_n['vel2'], data_n['vel3']))
-            rho.append(data_n['rho'])
+        if not just_time:
+            if conserved:
+                B.append((data_n['Bcc1'], data_n['Bcc2'], data_n['Bcc3']))
+                u.append((data_n['mom1'], data_n['mom2'], data_n['mom3']))
+                rho.append(data_n['dens'])
+            else:
+                B.append((data_n['Bcc1'], data_n['Bcc2'], data_n['Bcc3']))
+                u.append((data_n['vel1'], data_n['vel2'], data_n['vel3']))
+                rho.append(data_n['rho'])
     
     # The full-box variables B, u, rho are indexed in the following format:
     # [timestep, component (if vector quantity, x=0 etc), z_step, y_step, x_step]
-    return np.array(t), np.array(B), np.array(u), np.array(rho)
+    # TODO: may need to break this up for larger simulations
+    if just_time:
+        return np.array(t)
+    else: 
+        return np.array(t), np.array(B), np.array(u), np.array(rho)
