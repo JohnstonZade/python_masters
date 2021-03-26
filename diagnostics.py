@@ -278,15 +278,15 @@ def beta(rho, B_mag, c_s_init, expansion_rate, t):
 def mag_compress_Squire2020(B):
     # δ(B^2) / (δB_vec)^2
     B_mag2 = dot_prod(B, B, 1)
-    rms_Bmag2 = rms(B_mag2, do_fluc=1)
-    sqr_rmsB = rms(B, do_fluc=1)**2
+    rms_Bmag2 = rms(B_mag2)
+    sqr_rmsB = rms(B)**2
     return rms_Bmag2 / sqr_rmsB
 
 def mag_compress_Shoda2021(B):
     # (δB)^2 / (δB_vec)^2
     B_mag = np.sqrt(dot_prod(B, B, 1))
-    sqr_rmsBmag = rms(B_mag, do_fluc=1)**2
-    sqr_rmsB = rms(B, do_fluc=1)**2
+    sqr_rmsBmag = rms(B_mag)**2
+    sqr_rmsB = rms(B)**2
     return sqr_rmsBmag / sqr_rmsB
 
 def norm_fluc_amp(fluc, background):
