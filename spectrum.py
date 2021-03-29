@@ -12,7 +12,7 @@ default_prob = diag.DEFAULT_PROB
 
 
 def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=(10**1.5, 10**2), prob=default_prob,
-                  plot_title='test', dict_name='mhd_spec', do_single_file=0, n=0, a=1, do_mhd=1,
+                  plot_title='test', dict_name='mhd_spec', do_single_file=0, n=0, a=1, normalize_energy=1, do_mhd=1,
                   do_prp_spec=1, do_title=1):
 
     # Getting turnover time and converting to file number
@@ -74,6 +74,10 @@ def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=
                 S[vel] += spect1D(ft, ft, Kspec, kgrid)
                 S['EK'] += S[vel]  # Total spectrum is sum of each component
                 S['EK_prp'] += spect1D(ft, ft, Kperp, kgrid)
+            if normalize_energy:
+                # v_A ~ a^(-1) ⟹ (v_A)^2 ∼ a^(-2), assuming v_A0 = 1
+                S['EK'] /= a**(-2)
+                S['EK_prp'] /= a**(-2)
 
             if do_mhd:
                 Bmag = 0
@@ -84,7 +88,10 @@ def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=
                     S['EM'] += S[Bcc]
                     S['EM_prp'] += spect1D(ft, ft, Kperp, kgrid)
                     Bmag += B**2
-
+                if normalize_energy:
+                    # B_x ∼ a^(-2) ⟹ (B_x)^2 ∼ a^(-4), assuming ⟨B_x0⟩=1
+                    S['EM'] /= a**(-4)
+                    S['EM_prp'] /= a**(-4)
                 Bmag = np.sqrt(Bmag)
                 ft_Bmag = fft.fftn(Bmag)
                 S['B'] += spect1D(ft_Bmag, ft_Bmag, Kspec, kgrid)
@@ -110,7 +117,7 @@ def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=
         plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd, do_prp_spec=do_prp_spec, do_title=do_title)
 
 
-def plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd=1, do_prp_spec=1, do_title=1,
+def plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd=1, do_prp_spec=1, do_title=1, normalized=1,
                   do_pdf=0):
     # plot spectrum
     if do_mhd:
@@ -135,7 +142,10 @@ def plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd=1, do_p
 
         if do_prp_spec:
             plt.xlabel(r'$k_\perp$')
-            plt.ylabel(r'$E(k_\perp)$')
+            if normalized:
+                plt.ylabel(r'$E_{K}(k_\perp) / v^2_A, \ E_{B}(k_\perp) / B^2_x$')
+            else:
+                plt.ylabel(r'$E(k_\perp)$')
             legend = [r'$E_{K,\perp}$', r'$E_{B,\perp}$', r'$k_{\perp}^{-5/3}$', r'$k_{\perp}^{' + slope_label + '}$']
         else:
             plt.xlabel(r'$k$')

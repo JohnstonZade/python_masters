@@ -363,7 +363,6 @@ def load_time_series(output_dir, n_start=0, n_end=-1, conserved=0, just_time=0, 
     
     # The full-box variables B, u, rho are indexed in the following format:
     # [timestep, component (if vector quantity, x=0 etc), z_step, y_step, x_step]
-    # TODO: may need to break this up for larger simulations
     if just_time:
         return np.array(t)
     else: 

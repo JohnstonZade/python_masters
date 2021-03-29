@@ -312,7 +312,7 @@ def calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_bl
 
 def create_athena_fromics(folder, h5name, n_X, X_min, X_max, meshblock,
                           energy=1., time_lim=1, dt=0.2, iso_sound_speed=1.0, expand=0, exp_rate=0., 
-                          athinput=from_array_path):
+                          athinput=from_array_path, set_ics_externally=0, ICs=None):
     '''Function to generate an h5 file containing user set initial conditions 
        for the Athena++ from_array problem generator to start from. Generates a grid the same size as specified in the
        athinput file and calculates the quantities at each grid point, then writes to h5 file.
@@ -343,17 +343,21 @@ def create_athena_fromics(folder, h5name, n_X, X_min, X_max, meshblock,
     # Dimension setting: 1D if only x has more than one gridpoint
     one_D = 1 if np.all(n_X[1:] == 1) else 0
 
-    # User set initial conditions
-    # Density
-    Dnf = lambda X, Y, Z: np.ones(X.shape)
-    # Velocity components
-    UXf = lambda X, Y, Z: np.zeros(X.shape)
-    UYf = lambda X, Y, Z: np.zeros(X.shape)
-    UZf = lambda X, Y, Z: -0.01*np.sin((2*np.pi/X_max[0]) * X + (2*np.pi/X_max[1]) * Y)
-    # Magnetic components
-    BXf = lambda X, Y, Z: np.ones(X.shape)
-    BYf = lambda X, Y, Z: np.zeros(X.shape)
-    BZf = lambda X, Y, Z: -0.01*np.sin((2*np.pi/X_max[0]) * X + (2*np.pi/X_max[1]) * Y)
+    if set_ics_externally:
+        assert ICs is not None, 'Please input valid ICs!'
+        Dnf, UXf, UYf, UZf, BXf, BYf, BZf = ICs
+    else:
+        # User set initial conditions
+        # Density
+        Dnf = lambda X, Y, Z: np.ones(X.shape)
+        # Velocity components
+        UXf = lambda X, Y, Z: np.zeros(X.shape)
+        UYf = lambda X, Y, Z: np.zeros(X.shape)
+        UZf = lambda X, Y, Z: -0.01*np.sin((2*np.pi/X_max[0]) * X + (2*np.pi/X_max[1]) * Y)
+        # Magnetic components
+        BXf = lambda X, Y, Z: np.ones(X.shape)
+        BYf = lambda X, Y, Z: np.zeros(X.shape)
+        BZf = lambda X, Y, Z: -0.01*np.sin((2*np.pi/X_max[0]) * X + (2*np.pi/X_max[1]) * Y)
 
     # --- GRID CREATION --- #
 
