@@ -49,7 +49,7 @@ def flyby(output_dir, flyby_a, flyby_n, do_rand_start=1, l_start=None):
     Ns, Ls = get_grid_info(data, flyby_a)
     
     zg, yg, xg = generate_grid(Ns, Ls)
-    Zg, Yg, Xg = np.meshgrid(zg, yg, xg, indexing='ij')
+    # Zg, Yg, Xg = np.meshgrid(zg, yg, xg, indexing='ij')  # only needed if defining a function on grid
     
     # expand perpendicular values
     Bx = pad_array(data['Bcc1'])

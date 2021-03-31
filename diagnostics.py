@@ -253,7 +253,7 @@ def ft_grid(input_type, data=None, output_dir=None, Ls=None, Ns=None, prob=DEFAU
 
     Ks = np.meshgrid(K[0], K[1], K[2], indexing='ij')
     if k_grid:
-        Ks = (Ks, np.arange(0, np.max(np.imag(K[1])), 2*np.pi/Ls[1]))
+        Ks = (Ks, np.arange(0, np.max(np.imag(K[1])), 2*np.pi/Ls[1])+1e-4)
 
     return Ks
 
