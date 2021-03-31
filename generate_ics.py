@@ -11,8 +11,10 @@ import generate_spectrum as genspec
 
 if diag.COMPUTER == 'local':
     from_array_path = '/home/zade/masters_2021/templates_athinput/athinput.from_array'
+    athena_path = '/home/zade/masters_2021/athena/bin/from_array/athena'
 else:
     from_array_path = '/home/johza721/masters_2021/templates/athinput.from_array'
+    athena_path = '/home/johza721/masters_2021/athena/bin/athena_mauivis/athena'
 
 # --- SUPPORTING FUNCTIONS --- #
 
@@ -104,7 +106,7 @@ def generate_grid(X_min, X_max, n_X):
 def generate_mesh_structure(folder, athinput):
     cdir = os.getcwd()
     os.chdir(folder)
-    os.system('./athena -i ' + athinput + ' -m 1 > /dev/null')  # > /dev/null supresses output, remove if need to see meshblock details
+    os.system(athena_path + ' -i ' + athinput + ' -m 1 > /dev/null')  # > /dev/null supresses output, remove if need to see meshblock details
     blocks = read_mesh_structure('mesh_structure.dat')
     os.remove('mesh_structure.dat')
     n_blocks = blocks.shape[1]
@@ -457,7 +459,7 @@ def create_athena_fromh5(save_folder, athinput_in_folder, athinput_in, h5name, a
 
 def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
                              time_lim=1, dt=0.2, iso_sound_speed=1.0, expand=0, exp_rate=0.,
-                             do_truncation=0, kmag_cuttoff=100., athinput=from_array_path,
+                             do_truncation=0, kmag_cutoff=100., athinput=from_array_path,
                              energy=0.5, expo=-5/3, expo_prl=-2., kpeak=10., gauss_spec=0, prl_spec=0, do_mode_test=0):
     
     ath_copy = edit_athinput(athinput, folder, n_X, X_min, X_max, meshblock,
@@ -483,7 +485,7 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
     B_0 = np.array([BXcc, BYcc, BZcc])
 
     dB_y, dB_z = genspec.generate_alfven(n_X, X_min, X_max, B_0, expo,
-                                         do_truncation=do_truncation, #kmag_cuttoff=kmag_cuttoff,
+                                         do_truncation=do_truncation, kmag_cutoff=kmag_cutoff,
                                          expo_prl=expo_prl, kpeak=kpeak, gauss_spec=gauss_spec,
                                          prl_spec=prl_spec, run_test=do_mode_test)
 
