@@ -77,7 +77,7 @@ def run_tests(Ls, KX, KY, KZ):
         return z
 
 def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=12.0,
-                    gauss_spec=0, prl_spec=0, do_truncation=0, kmag_cutoff=100., run_test=0):
+                    gauss_spec=0, prl_spec=0, do_truncation=0, n_cutoff=(0, 20), run_test=0):
     '''Generate a superposition of random Alfvén waves within a numerical domain
     that follow a given energy spectrum.
 
@@ -184,11 +184,25 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=12.0,
             Kspec = 1 / (1 + Kmag**kpow)
 
         # generate random complex numbers on the grid and weight by spectrum
-        # these complex numbers represent the amplitude and phase of the corresponding
+        # these complex numbers represent the amplitude (r) and phase (theta) of the corresponding
         # Fourier mode at that point in k-space
         r = random.normal(size=n_X)*Kspec
         if do_truncation:
-            r[Kmag >= kmag_cutoff] = 0.0  # cut off wave vectors
+            n_low, n_high = n_cutoff
+
+            NX = Ls[2]*np.imag(KX) / (2*np.pi)
+            NY = Ls[1]*np.imag(KY) / (2*np.pi)
+            NZ = Ls[0]*np.imag(KZ) / (2*np.pi)
+            Nsqr = NX**2 + NY**2 + NZ**2
+
+            # using same conditionals as used in alfven_wave_spectrum problem gen
+            c1 = (abs(NX) >= n_low) & (abs(NY) >= n_low) & (abs(NZ) >= n_low)
+            c2 = (abs(NX) <= n_high) & (abs(NY) <= n_high) & (abs(NZ) <= n_high)
+            c3 = Nsqr < n_high**2
+            # cut off all wavevectors that DON'T satisfy c1, c2, and c3
+            mode_mask = np.logical_not(c1 & c2 & c3)
+            r[mode_mask] = 0.0
+
         theta = random.uniform(0, 2*np.pi, size=n_X)
         z = r*np.exp(1j*theta)
 
