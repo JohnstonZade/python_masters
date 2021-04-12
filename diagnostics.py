@@ -64,7 +64,15 @@ def load_data(output_dir, n, prob=DEFAULT_PROB):
     folder = format_path(output_dir) + prob  # Name of output
     output_id = '2'  # Output ID (set in input file)
     filename = f(n)
-    return athdf(filename)
+
+    # Rescale perpendicular components automatically
+    data = athdf(filename)
+    current_a = data['a_exp']
+    data['Bcc2'] *= current_a
+    data['Bcc3'] *= current_a
+    data['vel2'] *= current_a
+    data['vel3'] *= current_a
+    return data
 
 
 def load_hst(output_dir, prob=DEFAULT_PROB):
@@ -323,16 +331,17 @@ def expand_sound_speed(init_c_s, expansion_rate, t):
     # tempurature evolution is adiabatic
     return init_c_s * (a(expansion_rate, t))**(-2/3)
 
+# 12/4/21: This should be redundant now as this is meant to be done automatically
+#          when the data is loaded.
+# def expand_variables(a, vector):
+#     """
+#     Takes in a time series of a vector component over the whole box and
+#     scales by a(t).
+#     """
+#     for i in range(1, 3): # i = 1 ⟺ y, i = 2 ⟺ z
+#         vector[:, i, :] *= a.reshape(*a.shape, 1, 1, 1)
 
-def expand_variables(a, vector):
-    """
-    Takes in a time series of a vector component over the whole box and
-    scales by a(t).
-    """
-    for i in range(1, 3): # i = 1 ⟺ y, i = 2 ⟺ z
-        vector[:, i, :] *= a.reshape(*a.shape, 1, 1, 1)
-
-    return vector
+#     return vector
 
 
 def load_time_series(output_dir, n_start=0, n_end=-1, conserved=0, just_time=0, prob=DEFAULT_PROB):
@@ -346,11 +355,12 @@ def load_time_series(output_dir, n_start=0, n_end=-1, conserved=0, just_time=0, 
         n_end = max_n
     
 
-    t, B, u, rho = [], [], [], []
+    t, a, B, u, rho = [], [], [], []
 
     for n in range(n_start, n_end):
         data_n = load_data(output_dir, n, prob)
         t.append(data_n['Time'])
+        a.append(data_n['a_exp'])
         if not just_time:
             if conserved:
                 B.append((data_n['Bcc1'], data_n['Bcc2'], data_n['Bcc3']))
@@ -364,6 +374,6 @@ def load_time_series(output_dir, n_start=0, n_end=-1, conserved=0, just_time=0, 
     # The full-box variables B, u, rho are indexed in the following format:
     # [timestep, component (if vector quantity, x=0 etc), z_step, y_step, x_step]
     if just_time:
-        return np.array(t)
+        return np.array(t), np.array(a)
     else: 
-        return np.array(t), np.array(B), np.array(u), np.array(rho)
+        return np.array(t), np.array(a), np.array(B), np.array(u), np.array(rho)

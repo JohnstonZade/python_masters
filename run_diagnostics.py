@@ -47,11 +47,9 @@ def run_loop(output_dir, athinput_path, steps=10, do_spectrum=0, do_flyby=1, fly
             n_start = i*steps
             n_end = (i+1)*steps
             print(' Analysing n = ' + str(i*steps) + ' to ' + str((i+1)*steps - 1))
-            t, B, u, rho = diag.load_time_series(output_dir, n_start, n_end)
+            t, a, B, u, rho = diag.load_time_series(output_dir, n_start, n_end)
             print('     Data loaded')
-            a = diag.a(expansion_rate, t)
-
-            B, u = diag.expand_variables(a, B), diag.expand_variables(a, u)
+            
             u_prp, B_prp = u[:, 1:], B[:, 1:]
             B_x = B[:, 0]
             if i == 0:
