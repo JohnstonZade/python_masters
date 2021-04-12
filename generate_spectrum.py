@@ -77,7 +77,7 @@ def run_tests(Ls, KX, KY, KZ):
         return z
 
 def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=12.0,
-                    gauss_spec=0, prl_spec=0, do_truncation=0, n_cutoff=(0, 20), run_test=0):
+                    gauss_spec=0, prl_spec=0, do_truncation=0, n_cutoff=None, run_test=0):
     '''Generate a superposition of random Alfvén waves within a numerical domain
     that follow a given energy spectrum.
 
@@ -146,7 +146,7 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=12.0,
 
     # grid of allowed wavenumbers corresponding to physical grid
     KZ, KY, KX = diag.ft_grid('array', Ls=Ls, Ns=n_X)
-    
+
     # getting wave vector magntiudes parallel and perpendicular to B_0
     # if B_0 is along x direction then Kprl = KX and Kprp = √(KY^2 + KZ^2)
     # added just in case we change the direction of B_0
@@ -173,6 +173,7 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=12.0,
         kpow /= 2  # initialising B not B^2
 
         if gauss_spec:
+            kpeak /= Ls[1]  # we want k_peak = 12 / L_⟂, L_⟂=L_y=L_z
             Kspec = np.exp(- Kmag**2 / kpeak**2)
         elif prl_spec:
             kprp_exp = (expo - 1) / (expo_prl - 1)  # gives 2/3 for expo, expo_prl = -5/3, -2
@@ -188,7 +189,8 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=12.0,
         # Fourier mode at that point in k-space
         r = random.normal(size=n_X)*Kspec
         if do_truncation:
-            n_low, n_high = n_cutoff
+            # Just a check in case I forget to add specific parameters
+            n_low, n_high = (0, n_X[2]/2) if n_cutoff is None else n_cutoff
 
             NX = Ls[2]*np.imag(KX) / (2*np.pi)
             NY = Ls[1]*np.imag(KY) / (2*np.pi)
