@@ -140,16 +140,22 @@ def box_avg(x):
 def dot_prod(x, y, axis):
     return np.sum(x*y, axis=axis)
 
-def rms(x):
-    '''Returns the fluctuation RMS of a given quantity.
+def rms(x, dot_vector=1, do_fluc=1):
+    '''Returns the fluctuation RMS of a given quantity by default.
+    When do_fluc=0, just computes the RMS with no mean subtracted. If mean = 0
+    (as in the case of superpositions of sinusoidal Alfvén waves), it does not
+    matter whether do_fluc=0 or 1.
     Assumes that the spatial indicies are always the last three indices of
     an array e.g. [time, component, x3, x2, x1].
     '''
     x_mean = box_avg(x)
+    if not do_fluc:
+        x_mean *= 0.
     dx = x - x_mean.reshape(*x_mean.shape, 1, 1, 1)
-    if len(x.shape) == 5: # vector quantity
+    if len(x.shape) == 5 and dot_vector: # vector quantity
+        # This is essentially dx**2 below summed along the component axis
         dx2 = dot_prod(dx, dx, 1)
-    else:  # scalar quantity
+    else:  # scalar quantity or rms of individual vector components
         dx2 = dx**2
     return np.sqrt(box_avg(dx2))
 
@@ -186,8 +192,8 @@ def get_vec(x, ps):
     return np.array((x1, x2, x3)).T
 
 
-def get_lengths(load_data=1, data=None, output_dir=None, prob=DEFAULT_PROB, zyx=0):
-    if load_data:
+def get_lengths(data_load=1, data=None, output_dir=None, prob=DEFAULT_PROB, zyx=0):
+    if data_load:
         assert (output_dir is not None), 'Must have a valid directory path!'
         data = load_data(output_dir, 0, prob)
     else:
@@ -206,7 +212,7 @@ def get_rootgrid(output_dir, prob=DEFAULT_PROB, zyx=0):
 def get_vol(output_dir, prob=DEFAULT_PROB):
     '''Returns the volume of the simulation domain.'''
     # TODO: Will need to multiply by a^2 if using in expanding box
-    X1, X2, X3 = get_lengths(output_dir, prob)
+    X1, X2, X3 = get_lengths(output_dir=output_dir, prob=prob)
     return abs(X1*X2*X3)  # just a check to make volume positive
 
 
@@ -333,15 +339,15 @@ def expand_sound_speed(init_c_s, expansion_rate, t):
 
 # 12/4/21: This should be redundant now as this is meant to be done automatically
 #          when the data is loaded.
-# def expand_variables(a, vector):
-#     """
-#     Takes in a time series of a vector component over the whole box and
-#     scales by a(t).
-#     """
-#     for i in range(1, 3): # i = 1 ⟺ y, i = 2 ⟺ z
-#         vector[:, i, :] *= a.reshape(*a.shape, 1, 1, 1)
+def expand_variables(a, vector):
+    """
+    Takes in a time series of a vector component over the whole box and
+    scales by a(t).
+    """
+    for i in range(1, 3): # i = 1 ⟺ y, i = 2 ⟺ z
+        vector[:, i, :] *= a.reshape(*a.shape, 1, 1, 1)
 
-#     return vector
+    return vector
 
 
 def load_time_series(output_dir, n_start=0, n_end=-1, conserved=0, just_time=0, prob=DEFAULT_PROB):
@@ -355,7 +361,7 @@ def load_time_series(output_dir, n_start=0, n_end=-1, conserved=0, just_time=0, 
         n_end = max_n
     
 
-    t, a, B, u, rho = [], [], [], []
+    t, a, B, u, rho = [], [], [], [], []
 
     for n in range(n_start, n_end):
         data_n = load_data(output_dir, n, prob)

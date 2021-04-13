@@ -20,6 +20,9 @@ def expand_to_a(a_final, exp_rate):
     # inverting definition of a to find time limit
     return (a_final - 1) / exp_rate
 
+def wave_energy(wave_amp):
+    return wave_amp**2 / 4
+
 sim_name = ''  # put simulation name here
 folder = ''    # put folder to output here, make sure Athena binary is in this folder 
 total_folder =  folder_root + folder
@@ -38,7 +41,9 @@ time_lim = expand_to_a(a_final, exp_rate)
 # time_lim = 6  # use this to manually set t_lim
 dt = 0.2        # time step for simulation output
 iso_sound_speed = 0.8  # initial sound speed
-energy = 0.5    # initial energy of Alfvénic fluctuation components
+wave_amp = 0.01  # equiv to amplitude of <δB^2_⟂> / B^2_x when B_x = 1
+energy = wave_energy(wave_amp)
+# energy = 0.5    # initial energy of Alfvénic fluctuation components
 expo = -5/3       # spectrum power law 
 kprl = -2       # aniostropic parallel spectrum power law
 prl_spec = 0    # generate anisotropic spectrum
