@@ -51,10 +51,9 @@ def flyby(output_dir, flyby_a, flyby_n, do_rand_start=1, l_start=None):
     zg, yg, xg = generate_grid(Ns, Ls)
     # Zg, Yg, Xg = np.meshgrid(zg, yg, xg, indexing='ij')  # only needed if defining a function on grid
     
-    # expand perpendicular values
     Bx = pad_array(data['Bcc1'])
-    By = flyby_a*pad_array(data['Bcc2'])
-    Bz = flyby_a*pad_array(data['Bcc3'])
+    By = pad_array(data['Bcc2'])
+    Bz = pad_array(data['Bcc3'])
     rho = pad_array(data['rho'])
     Bmag = np.sqrt(Bx**2 + By**2 + Bz**2)
 

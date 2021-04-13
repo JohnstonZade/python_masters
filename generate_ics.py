@@ -8,9 +8,11 @@ import numpy.fft as fft
 
 import diagnostics as diag
 import generate_spectrum as genspec
+import reinterpolate_to_grid as reinterpolate
 
 if diag.COMPUTER == 'local':
     from_array_path = '/home/zade/masters_2021/templates_athinput/athinput.from_array'
+    from_array_reinterp_path = '/home/zade/masters_2021/templates_athinput/athinput.from_array_reinterp'
     athena_path = '/home/zade/masters_2021/athena/bin/from_array/athena'
 else:
     from_array_path = '/home/johza721/masters_2021/templates/athinput.from_array'
@@ -21,46 +23,83 @@ else:
 # edit_athinput - edits the corresponding athinput file with quantites input below
 # ONLY WORKS FOR athinput.from_array layout
 def edit_athinput(athinput, save_folder, n_X, X_min, X_max, meshblock, h5name,
-                  time_lim, dt, iso_sound_speed, expand, exp_rate):
+                  time_lim, dt, iso_sound_speed, expand, exp_rate,
+                  reinterpolate=0, exp_init=1, nxt_t_hst=0, nxt_t_hdf5=0, nxt_n_hst=0, nxt_n_hdf5=0):
     ath_path = save_folder + athinput.split('/')[-1] + '_' + h5name.split('/')[-1].split('.')[0]
     copy(athinput, ath_path)
     ath = open(ath_path, 'r')
     list_of_lines = ath.readlines()
 
-    # time limit
-    list_of_lines[10] = 'tlim       = ' + str(time_lim) + ' # time limit\n'
-    list_of_lines[22] = 'dt        = ' + str(dt) + '   # time increment between outputs\n'
-    # X1
-    list_of_lines[25] = 'nx1     = ' + str(n_X[0]) + '        # number of zones in x1-direction\n'
-    list_of_lines[26] = 'x1min   = ' + str(X_min[0]) + '     # minimum value of x1\n'
-    list_of_lines[27] = 'x1max   = ' + str(X_max[0]) + '     # maximum value of x1\n'
-    # X2
-    list_of_lines[31] = 'nx2     = ' + str(n_X[1]) + '        # number of zones in x2-direction\n'
-    list_of_lines[32] = 'x2min   = ' + str(X_min[1]) + '     # minimum value of x2\n'
-    list_of_lines[33] = 'x2max   = ' + str(X_max[1]) + '     # maximum value of x2\n'
-    # X3
-    list_of_lines[37] = 'nx3     = ' + str(n_X[2]) + '        # number of zones in x3-direction\n'
-    list_of_lines[38] = 'x3min   = ' + str(X_min[2]) + '     # minimum value of x3\n'
-    list_of_lines[39] = 'x3max   = ' + str(X_max[2]) + '     # maximum value of x3\n'
-    # Meshblocks
-    list_of_lines[47] = 'nx1 = ' + str(meshblock[0]) + '  # block size in x1-direction\n'
-    list_of_lines[48] = 'nx2 = ' + str(meshblock[1]) + '  # block size in x2-direction\n'
-    list_of_lines[49] = 'nx3 = ' + str(meshblock[2]) + '  # block size in x3-direction\n'
-    # sound speed
-    list_of_lines[53] = 'iso_sound_speed = ' + str(iso_sound_speed) + '  # isothermal sound speed (for barotropic EOS)\n'
-    # hdf5 file name
-    list_of_lines[56] = 'input_filename = ' + h5name + '  # name of HDF5 file containing initial conditions\n'
-    # expansion
-    expanding = 'true' if expand else 'false'
-    list_of_lines[66] = 'expanding = ' + expanding + '\n'
-    list_of_lines[67] = 'expand_rate = ' + str(exp_rate) + '\n'
+    if reinterpolate:
+        # time limit
+        list_of_lines[10] = 'tlim       = ' + str(time_lim) + ' # time limit\n'
+        # hst
+        list_of_lines[18] = 'next_time       =' + str(nxt_t_hst) + '\n'
+        list_of_lines[19] = 'file_number       =' + str(nxt_n_hst) + '\n'
+        # hdf5
+        list_of_lines[24] = 'dt        = ' + str(dt) + '   # time increment between outputs\n'
+        list_of_lines[25] = 'next_time       =' + str(nxt_t_hdf5) + '\n'
+        list_of_lines[26] = 'file_number       =' + str(nxt_n_hdf5) + '\n'
+        # X1
+        list_of_lines[29] = 'nx1     = ' + str(n_X[0]) + '        # number of zones in x1-direction\n'
+        list_of_lines[30] = 'x1min   = ' + str(X_min[0]) + '     # minimum value of x1\n'
+        list_of_lines[31] = 'x1max   = ' + str(X_max[0]) + '     # maximum value of x1\n'
+        # X2
+        list_of_lines[35] = 'nx2     = ' + str(n_X[1]) + '        # number of zones in x2-direction\n'
+        list_of_lines[36] = 'x2min   = ' + str(X_min[1]) + '     # minimum value of x2\n'
+        list_of_lines[37] = 'x2max   = ' + str(X_max[1]) + '     # maximum value of x2\n'
+        # X3
+        list_of_lines[41] = 'nx3     = ' + str(n_X[2]) + '        # number of zones in x3-direction\n'
+        list_of_lines[42] = 'x3min   = ' + str(X_min[2]) + '     # minimum value of x3\n'
+        list_of_lines[43] = 'x3max   = ' + str(X_max[2]) + '     # maximum value of x3\n'
+        # Meshblocks
+        list_of_lines[51] = 'nx1 = ' + str(meshblock[0]) + '  # block size in x1-direction\n'
+        list_of_lines[52] = 'nx2 = ' + str(meshblock[1]) + '  # block size in x2-direction\n'
+        list_of_lines[53] = 'nx3 = ' + str(meshblock[2]) + '  # block size in x3-direction\n'
+        # sound speed
+        list_of_lines[57] = 'iso_sound_speed = ' + str(iso_sound_speed) + '  # isothermal sound speed (for barotropic EOS)\n'
+        # hdf5 file name
+        list_of_lines[60] = 'input_filename = ' + h5name + '  # name of HDF5 file containing initial conditions\n'
+        # expansion
+        expanding = 'true' if expand else 'false'
+        list_of_lines[70] = 'expanding = ' + expanding + '\n'
+        list_of_lines[71] = 'expand_rate = ' + str(exp_rate) + '\n'
+        list_of_lines[72] = 'expand_init = ' + str(exp_init) + '\n'
+    else:
+        # time limit
+        list_of_lines[10] = 'tlim       = ' + str(time_lim) + ' # time limit\n'
+        list_of_lines[22] = 'dt        = ' + str(dt) + '   # time increment between outputs\n'
+        # X1
+        list_of_lines[25] = 'nx1     = ' + str(n_X[0]) + '        # number of zones in x1-direction\n'
+        list_of_lines[26] = 'x1min   = ' + str(X_min[0]) + '     # minimum value of x1\n'
+        list_of_lines[27] = 'x1max   = ' + str(X_max[0]) + '     # maximum value of x1\n'
+        # X2
+        list_of_lines[31] = 'nx2     = ' + str(n_X[1]) + '        # number of zones in x2-direction\n'
+        list_of_lines[32] = 'x2min   = ' + str(X_min[1]) + '     # minimum value of x2\n'
+        list_of_lines[33] = 'x2max   = ' + str(X_max[1]) + '     # maximum value of x2\n'
+        # X3
+        list_of_lines[37] = 'nx3     = ' + str(n_X[2]) + '        # number of zones in x3-direction\n'
+        list_of_lines[38] = 'x3min   = ' + str(X_min[2]) + '     # minimum value of x3\n'
+        list_of_lines[39] = 'x3max   = ' + str(X_max[2]) + '     # maximum value of x3\n'
+        # Meshblocks
+        list_of_lines[47] = 'nx1 = ' + str(meshblock[0]) + '  # block size in x1-direction\n'
+        list_of_lines[48] = 'nx2 = ' + str(meshblock[1]) + '  # block size in x2-direction\n'
+        list_of_lines[49] = 'nx3 = ' + str(meshblock[2]) + '  # block size in x3-direction\n'
+        # sound speed
+        list_of_lines[53] = 'iso_sound_speed = ' + str(iso_sound_speed) + '  # isothermal sound speed (for barotropic EOS)\n'
+        # hdf5 file name
+        list_of_lines[56] = 'input_filename = ' + h5name + '  # name of HDF5 file containing initial conditions\n'
+        # expansion
+        expanding = 'true' if expand else 'false'
+        list_of_lines[66] = 'expanding = ' + expanding + '\n'
+        list_of_lines[67] = 'expand_rate = ' + str(exp_rate) + '\n'
 
     ath = open(ath_path, 'w')
     ath.writelines(list_of_lines)
     ath.close()
     return ath_path
 
-def read_athinput(athinput):
+def read_athinput(athinput, reinterpolate=0):
 
     def get_from_string(i, dtype):
         s = list_of_lines[i].split('=')[1].split('#')[0]
@@ -84,7 +123,12 @@ def read_athinput(athinput):
     X_max = np.array([get_from_string(i, 'float') for i in xmax_idx])
     meshblock = np.array([get_from_string(i, 'int') for i in mesh_idx])
 
-    return n_X, X_min, X_max, meshblock 
+    if reinterpolate:
+        dt_hst = float(list_of_lines[17].split('=')[1].split('#')[0])
+
+        return n_X, X_min, X_max, meshblock, dt_hst
+    else:
+        return n_X, X_min, X_max, meshblock 
 
 def generate_grid(X_min, X_max, n_X):
     # cell-edge grid
@@ -339,7 +383,8 @@ def create_athena_fromics(folder, h5name, n_X, X_min, X_max, meshblock,
     # --- INPUTS --- #
     
     ath_copy = edit_athinput(athinput, folder, n_X, X_min, X_max, meshblock,
-                             h5name, time_lim, dt, iso_sound_speed, expand, exp_rate)
+                             h5name, time_lim=time_lim, dt=dt, iso_sound_speed=iso_sound_speed,
+                             expand=expand, exp_rate=exp_rate)
     h5name = folder + h5name  # eg 'ICs_template.h5'
     N_HYDRO = 4  # number of hydro variables (e.g. density and momentum); assuming isothermal here
     # Dimension setting: 1D if only x has more than one gridpoint
@@ -421,8 +466,7 @@ def create_athena_fromh5(save_folder, athinput_in_folder, athinput_in, h5name, a
     
     h5name = save_folder + h5name
     h5name += '.h5' if '.h5' not in h5name else ''
-    if os.path.isfile(h5name):  # 'overwrite' old ICs
-        os.remove(h5name)
+    remove_prev_h5file(h5name)
     if athinput_in_folder not in athinput_in:
         athinput_in = athinput_in_folder + athinput_in
 
@@ -561,67 +605,84 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
     save_hydro_grid(h5name, Hy_grid, N_HYDRO, n_blocks, blocks, meshblock, remove_h5=0)
     print('Hydro Saved Succesfully')
 
+def reinterp_from_h5(save_folder, athinput_in_folder, athinput_in, h5name, athdf_input, athinput_out=from_array_reinterp_path,
+                     a_to_finish=8, dt=0.2, iso_sound_speed=1.0, expand=1, exp_rate=0.5):
+    N_HYDRO = 4
+    def root_path(path):
+        split = path.split('/')[:-1]
+        s = ''
+        for sub in split:
+            s += sub + '/'
+        return s
+    
+    if athinput_in_folder not in athinput_in:
+        athinput_in = athinput_in_folder + athinput_in
 
-def test(folder, h5name, n_X, X_min, X_max, meshblock,
-         time_lim=1, dt=0.2, iso_sound_speed=1., expand=0, exp_rate=0.,
-         athinput='/home/zade/masters_2021/templates_athinput/athinput.from_array',
-         energy=0.5, expo=-5/3, expo_prl=-2., kpeak=10., gauss_spec=0, prl_spec=0, do_mode_test=0):
+    n_f = diag.get_maxn(root_path(athdf_input)) - 1
+    athdf_data = diag.load_data(root_path(athdf_input), n_f)
+    t_f, a_f = athdf_data['Time'], athdf_data['a_exp']
+    old_Xgrid = athdf_data['x1v'], athdf_data['x2v'], athdf_data['x3v']
+    athdf_data = None
 
-    h5name = folder + h5name  # eg 'ICs_template.h5'
-    ath_copy = edit_athinput(athinput, folder, n_X, X_min, X_max, meshblock, h5name, time_lim, dt, iso_sound_speed, expand, exp_rate)
-    N_HYDRO = 4  # number of hydro variables (e.g. density and momentum); assuming isothermal here
-    # Dimension setting: 1D if only x has more than one gridpoint
-    one_D = 1 if np.all(n_X[1:] == 1) else 0
+    old_Ns, X_min, X_max, meshblock, dt_hst = read_athinput(athinput_in, reinterpolate=1)
+    new_Ns, Ls = np.copy(old_Ns)[::-1], (X_max - X_min)[::-1]
+    new_Ns[:2] *= int(a_f)  # rescale perpendicular grid for reinterpolation (in Z, Y, X format)
 
-    # Generate mean fields
-    Dnf = lambda X, Y, Z: np.ones(X.shape)
-    UXf = lambda X, Y, Z: np.zeros(X.shape)
-    UYf = lambda X, Y, Z: np.zeros(X.shape)
-    UZf = lambda X, Y, Z: np.zeros(X.shape)
-    BXf = lambda X, Y, Z: np.ones(X.shape)
-    BYf = lambda X, Y, Z: np.zeros(X.shape)
-    BZf = lambda X, Y, Z: np.zeros(X.shape)
+    h5name = save_folder + h5name
+    h5name += '.h5' if '.h5' not in h5name else ''
+    remove_prev_h5file(h5name)
+    f_athdf = h5py.File(athdf_input, 'r')
+    if 'cons' in list(f_athdf.keys()):  # conserved variables if 1, primitive if 0
+        Hy_grid = np.array(f_athdf['cons']) 
+    else:
+        Hy_grid = np.copy(f_athdf['prim'])  # don't want to modify the original data set
+        Hy_grid[1:] *= Hy_grid[0]  # getting momentum variables (vel * density)
 
-    X_grid, (dx, dy, dz) = generate_grid(X_min, X_max, n_X)
-    Hy_grid, BXcc, BYcc, BZcc = setup_hydro_grid(n_X, X_grid, N_HYDRO, Dnf, UXf, UYf, UZf, BXf, BYf, BZf)
+    dx, dy, dz = generate_grid(X_min, X_max, new_Ns)[1]
+    n_blocks, blocks = generate_mesh_structure(athinput_in_folder, athinput_in)
+    Hydro_unpacked = np.zeros(shape=(N_HYDRO, *old_Ns[::-1]))
+    B_unpacked = np.zeros(shape=(3, *old_Ns[::-1]))
 
-    B_0 = np.array([BXcc, BYcc, BZcc])
-    rho = Hy_grid[0]
+    # unpack from meshblocks
+    for i in range(N_HYDRO):
+        for m in range(n_blocks):
+                off = blocks[:, m]
+                ind_s = (meshblock*off)[::-1]
+                ind_e = (meshblock*off + meshblock)[::-1]
+                Hydro_unpacked[i, ind_s[0]:ind_e[0], ind_s[1]:ind_e[1], ind_s[2]:ind_e[2]] = Hy_grid[i, m, :, :, :]
 
-    # Setting z^- waves = 0
-    dB_y, dB_z = genspec.generate_alfven(n_X, X_min, X_max, B_0,
-                                               expo, expo_prl=expo_prl, kpeak=kpeak, gauss_spec=gauss_spec,
-                                               prl_spec=prl_spec, run_test=do_mode_test)
-    du_y, du_z = dB_y / np.sqrt(rho), dB_z / np.sqrt(rho)
+    for b in range(3):
+        for m in range(n_blocks):
+                off = blocks[:, m]
+                ind_s = (meshblock*off)[::-1]
+                ind_e = (meshblock*off + meshblock)[::-1]
+                B_unpacked[b, ind_s[0]:ind_e[0], ind_s[1]:ind_e[1], ind_s[2]:ind_e[2]] = f_athdf['B'][b, m, :, :, :]
+    
+    Hydro_hires = np.zeros(shape=(N_HYDRO, *new_Ns[::-1]))
+    B_hires = np.zeros(shape=(3, *new_Ns[::-1]))
+    for i in range(4):
+        Hydro_hires[i] = reinterpolate.reinterpolate(Hydro_unpacked[i], old_Xgrid, new_Ns, Ls)
+    for b in range(3):
+        B_hires[b] = reinterpolate.reinterpolate(B_unpacked[b], old_Xgrid, new_Ns, Ls)
+    BXcc, BYcc, BZcc = B_hires
 
-    # dV = V / resolution = (Lx*Ly*Lz) / (Nx*Ny*Nz) = dx*dy*dz
-    dV = np.prod(X_max - X_min) / np.prod(n_X)
-    # give magnetic and velocity fluctuations same initial energy
-    total_energy = 0.5*dV*np.sum(dB_y**2 + dB_z**2)
-    norm_energy = np.sqrt(energy / total_energy)
+    nxt_t_hst, nxt_t_hdf5 = t_f + dt_hst, t_f + dt
+    nxt_n_hst, nxt_n_hdf5 = int(np.ceil(nxt_t_hst / dt_hst)), int(np.ceil(nxt_t_hdf5 / dt))
 
-    du_y *= norm_energy
-    du_z *= norm_energy
-    dB_y *= norm_energy
-    dB_z *= norm_energy
+    time_lim  = (a_to_finish - a_f) / exp_rate  # need to modify the time limit
+    meshblock[1:] *= int(a_f)  # rescale meshblocks too (this is in X, Y, Z format)
+    athinput_out = edit_athinput(athinput_out, save_folder, old_Ns, X_min, X_max, meshblock, h5name,
+                                 time_lim, dt, iso_sound_speed, expand, exp_rate,
+                                 reinterpolate=1, exp_init=a_f, nxt_t_hst=nxt_t_hst,
+                                 nxt_t_hdf5=nxt_t_hdf5, nxt_n_hst=nxt_n_hst, nxt_n_hdf5=nxt_n_hdf5)
 
-    # adding fluctuations
-    BYcc += dB_y
-    BZcc += dB_z
-    Hy_grid[2] += rho*du_y
-    Hy_grid[3] += rho*du_z
-
-    # --- MESHBLOCK STRUCTURE --- #
-
-    n_blocks, blocks = make_meshblocks(folder, ath_copy, n_X, meshblock, one_D)
-
-    # --- SAVING VARIABLES --- #
-
-    # - HYDRO
-    save_hydro_grid(h5name, Hy_grid, N_HYDRO, n_blocks, blocks, meshblock)
+    
+    n_blocks, blocks = generate_mesh_structure(save_folder, athinput_out)
+    save_hydro_grid(h5name, Hydro_hires, N_HYDRO, n_blocks, blocks, meshblock)
     print('Hydro Saved Succesfully')
 
-    # - MAGNETIC
-    calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_blocks, blocks, dx, dy, dz)
+    calc_and_save_B(BXcc, BYcc, BZcc, h5name, new_Ns, X_min, X_max, meshblock, n_blocks, blocks, dx, dy, dz)
     print('Magnetic Saved Successfully')
     print('Done!')
+
+
