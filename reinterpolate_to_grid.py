@@ -35,7 +35,7 @@ def reinterpolate(data, old_Xgrid, new_Ns, Ls):
 
     Zg_hires, Yg_hires, Xg_hires = generate_grid(new_Ns, Ls)
     pts = np.array([Zg_hires.ravel(), Yg_hires.ravel(), Xg_hires.ravel()]).T
-    data_hires = data_interp(pts).reshape(*new_Ns[::-1])
+    data_hires = data_interp(pts).reshape(*new_Ns)
     return data_hires
 
 
