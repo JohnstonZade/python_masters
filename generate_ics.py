@@ -697,4 +697,6 @@ def reinterp_from_h5(save_folder, athinput_in_folder, athinput_in, h5name, athdf
     print('Magnetic Saved Successfully')
     print('Done!')
 
+    return athinput_out
+
 
