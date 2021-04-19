@@ -638,6 +638,7 @@ def reinterp_from_h5(save_folder, athinput_in_folder, athinput_in, h5name, athdf
     else:
         Hy_grid = np.copy(f_athdf['prim'])  # don't want to modify the original data set
         Hy_grid[1:] *= Hy_grid[0]  # getting momentum variables (vel * density)
+    B_grid = f_athdf['B']
 
     # Get meshblock information from initial low resolution simulations
     n_blocks, blocks = generate_mesh_structure(athinput_in_folder, athinput_in)
@@ -657,7 +658,7 @@ def reinterp_from_h5(save_folder, athinput_in_folder, athinput_in, h5name, athdf
                 off = blocks[:, m]
                 ind_s = (meshblock*off)[::-1]
                 ind_e = (meshblock*off + meshblock)[::-1]
-                B_unpacked[b, ind_s[0]:ind_e[0], ind_s[1]:ind_e[1], ind_s[2]:ind_e[2]] = f_athdf['B'][b, m, :, :, :]
+                B_unpacked[b, ind_s[0]:ind_e[0], ind_s[1]:ind_e[1], ind_s[2]:ind_e[2]] = B_grid[b, m, :, :, :]
     
     # Rescale the resolution in the ⟂ (y, z) directions
     # In (X, Y, Z) format
