@@ -2,7 +2,7 @@ from h5py import run_tests
 import numpy as np
 import diagnostics as diag
 import spectrum as spec
-import spacecraft_flyby as spacecraft
+import reinterpolate
 
 
 def read_athinput(athinput_path):
@@ -116,7 +116,7 @@ def run_loop(output_dir, athinput_path, steps=10, do_spectrum=0, do_flyby=1, fly
                                 'max_n = ' + str(max_n), 'expected max_n = ' + str(int((tlim+dt)/dt)), 'flyby_n = ' + str(flyby_n))
 
             flyby_string = 'flyby_a' + str(flyby_a)
-            S[flyby_string] = spacecraft.flyby(output_dir, flyby_a, flyby_n)
+            S[flyby_string] = reinterpolate.flyby(output_dir, flyby_a, flyby_n)
             print(flyby_string + ' done')
         except ValueError as ve:
             print(ve.args)
