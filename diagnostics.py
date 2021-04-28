@@ -8,21 +8,10 @@ import pickle
 import numpy as np
 from pathlib import Path
 from athena_read import athdf, athinput, hst
+from project_paths import PATH
 # from matplotlib import rc
 # rc('text', usetex=True)  # LaTeX labels
 
-COMPUTER = 'local'
-# COMPUTER = 'nesi'
-
-if COMPUTER == 'local':
-    # Path to simulation data
-    PATH = "/home/zade/masters_2021/"
-    # PATH = '/media/zade/Seagate Expansion Drive/honours_project_2020/'
-    # PATH = '/media/zade/STRONTIUM/honours_project_2020/'
-elif COMPUTER == 'nesi':
-    # add NeSI paths here
-    # PATH = '/nesi/nobackup/uoo02637/zade/masters_2021/' # scratch
-    PATH = '/nesi/project/uoo02637/zade/masters_2021/' # project
 DEFAULT_PROB = 'from_array'
 
 

@@ -6,14 +6,8 @@ import diagnostics as diag
 import generate_spectrum as genspec
 import reinterpolate
 from helper_functions import *
+from project_paths import from_array_path, from_array_reinterp_path, athena_path
 
-if diag.COMPUTER == 'local':
-    from_array_path = '/home/zade/masters_2021/templates_athinput/athinput.from_array'
-    from_array_reinterp_path = '/home/zade/masters_2021/templates_athinput/athinput.from_array_reinterp'
-    athena_path = '/home/zade/masters_2021/athena/bin/from_array/athena'
-else:
-    from_array_path = '/home/johza721/masters_2021/templates/athinput.from_array'
-    athena_path = '/home/johza721/masters_2021/athena/bin/athena_mauivis/athena'
 
 # --- GENERATING FUNCTIONS --- #
 

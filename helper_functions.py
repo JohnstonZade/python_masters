@@ -8,14 +8,6 @@ from scipy.interpolate import RegularGridInterpolator as rgi
 
 import diagnostics as diag
 
-if diag.COMPUTER == 'local':
-    from_array_path = '/home/zade/masters_2021/templates_athinput/athinput.from_array'
-    from_array_reinterp_path = '/home/zade/masters_2021/templates_athinput/athinput.from_array_reinterp'
-    athena_path = '/home/zade/masters_2021/athena/bin/from_array/athena'
-else:
-    from_array_path = '/home/johza721/masters_2021/templates/athinput.from_array'
-    athena_path = '/home/johza721/masters_2021/athena/bin/athena_mauivis/athena'
-
 #--- REINTERPOLATION FUNCTIONS ---#
 
 def pad_array(x):
