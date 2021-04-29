@@ -7,6 +7,7 @@ import numpy.fft as fft
 from scipy.interpolate import RegularGridInterpolator as rgi
 
 import diagnostics as diag
+from project_paths import athena_path
 
 #--- REINTERPOLATION FUNCTIONS ---#
 
