@@ -265,7 +265,7 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
     print('Hydro Saved Succesfully')
 
 def reinterp_from_h5(save_folder, athinput_in_folder, athinput_in, h5name, athdf_input, athinput_out=from_array_reinterp_path,
-                     a_to_finish=8, dt=0.2, iso_sound_speed=1.0, expand=1, exp_rate=0.5):
+                     a_to_finish=8, dt=0.2, iso_sound_speed=1.0, expand=1, exp_rate=0.5, new_meshblock=None):
     N_HYDRO = 4
     def root_path(path):
         split = path.split('/')[:-1]
@@ -326,7 +326,10 @@ def reinterp_from_h5(save_folder, athinput_in_folder, athinput_in, h5name, athdf
     # If this becomes a viable option, need to make sure we reinterpolate at an integer value of a
     new_Ns, Ls = np.copy(old_Ns), (X_max - X_min)
     new_Ns[1:] *= int(a_f)
-    meshblock[1:] *= int(a_f)  # rescale meshblocks too (this is in X, Y, Z format)
+    if new_meshblock is not None:
+        meshblock = new_meshblock
+    else:
+        meshblock[1:] *= int(a_f)  # rescale meshblocks too (this is in X, Y, Z format)
     dx, dy, dz = generate_grid(X_min, X_max, new_Ns)[1]
 
     # Reinterpolate the data to the new high resolution grid
