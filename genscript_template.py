@@ -2,12 +2,9 @@ COMPUTER = 'local'
 # COMPUTER = 'nesi'
 
 if COMPUTER == 'local':
-    python_masters_path = '/home/zade/python_masters/'
-    folder_root = '/home/zade/masters_2021/'
-    athena_path = '/home/zade/masters_2021/athena/bin/from_array/athena'
+    python_masters_path = '~/python_masters/'
 else:
     python_masters_path = '/home/johza721/masters_2021/python_masters/'
-    folder_root = '/nesi/project/uoo02637/zade/masters_2021/'  # project directory
 
 import sys
 sys.path.insert(0, python_masters_path)
@@ -15,6 +12,9 @@ import numpy as np
 import os
 gen = __import__('generate_ics')
 spec = __import__('spectrum')
+paths = __import__('project_paths')
+
+folder_root, athena_path = paths.PATH, paths.athena_path
 
 def expand_to_a(a_final, exp_rate):
     # inverting definition of a to find time limit

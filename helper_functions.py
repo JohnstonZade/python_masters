@@ -28,7 +28,7 @@ def pad_grid(Xg):
         r_point = [2*Xg[-1] - Xg[-2]]
     return np.concatenate((l_point, Xg, r_point))
 
-def generate_grid_reinterp(Ns, Ls, return_mesh=0, return_edges=0, pad=1):
+def reinterp_generate_grid(Ns, Ls, return_mesh=0, return_edges=0, pad=1):
     Xs = []
     for i in range(3):
         # z = 0, y = 1, x = 2
@@ -340,6 +340,7 @@ def calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_bl
     A_y = np.real(fft.ifftn(K_z*ftBX - K_x*ftBZ))
     A_z = np.real(fft.ifftn(K_x*ftBY - K_y*ftBX))
 
+
     # A is cell-centred; shift to edges and make periodic
     A_x, A_y, A_z = shift_and_extend_A(A_x, A_y, A_z) 
 
@@ -393,8 +394,8 @@ def calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_bl
 
 def constB2_faceinterp(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_blocks, blocks):
     Ns, Ls = n_X[::-1], (X_max - X_min)[::-1]
-    ze, ye, xe = generate_grid_reinterp(Ns, Ls, return_edges=1, pad=0) 
-    zg, yg, xg = generate_grid_reinterp(Ns, Ls, pad=0) 
+    ze, ye, xe = reinterp_generate_grid(Ns, Ls, return_edges=1, pad=0) 
+    zg, yg, xg = reinterp_generate_grid(Ns, Ls, pad=0) 
 
     BX_interp = rgi((pad_grid(zg), pad_grid(yg), pad_grid(xg)), pad_array(BXcc))
     BY_interp = rgi((pad_grid(zg), pad_grid(yg), pad_grid(xg)), pad_array(BYcc))

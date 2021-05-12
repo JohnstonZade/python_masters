@@ -12,7 +12,7 @@ from project_paths import from_array_path, from_array_reinterp_path, athena_path
 # --- GENERATING FUNCTIONS --- #
 
 def create_athena_fromics(folder, h5name, n_X, X_min, X_max, meshblock,
-                          const_b2=0, energy=1., time_lim=1, dt=0.2, iso_sound_speed=1.0, expand=0, exp_rate=0., 
+                          const_b2=0, do_norm_energy=1, energy=1., time_lim=1, dt=0.2, iso_sound_speed=1.0, expand=0, exp_rate=0., 
                           athinput=from_array_path, set_ics_externally=0, ICs=None):
     '''Function to generate an h5 file containing user set initial conditions 
        for the Athena++ from_array problem generator to start from. Generates a grid the same size as specified in the
@@ -66,7 +66,7 @@ def create_athena_fromics(folder, h5name, n_X, X_min, X_max, meshblock,
     X_grid, (dx, dy, dz) = generate_grid(X_min, X_max, n_X)
     Hy_grid, BXcc, BYcc, BZcc = setup_hydro_grid(n_X, X_grid, N_HYDRO, Dnf, UXf, UYf, UZf, BXf, BYf, BZf)
 
-    if not const_b2:
+    if not const_b2 and do_norm_energy:
         # initializing Alfvén wave fluctuations perpendicular to B_0 (assumed along x-axis)
         # to have same initial energy in velocity and magnetic fields.
         # dV = V / resolution = (Lx*Ly*Lz) / (Nx*Ny*Nz) = dx*dy*dz
@@ -333,9 +333,9 @@ def reinterp_from_h5(save_folder, athinput_in_folder, athinput_in, h5name, athdf
     Hydro_hires = np.zeros(shape=(N_HYDRO, *new_Ns[::-1]))
     B_hires = np.zeros(shape=(3, *new_Ns[::-1]))
     for i in range(4):
-        Hydro_hires[i] = reinterpolate.reinterpolate(Hydro_unpacked[i], old_Xgrid, new_Ns[::-1], Ls[::-1])
+        Hydro_hires[i] = reinterpolate.reinterp_to_grid(Hydro_unpacked[i], old_Xgrid, new_Ns[::-1], Ls[::-1])
     for b in range(3):
-        B_hires[b] = reinterpolate.reinterpolate(B_unpacked[b], old_Xgrid, new_Ns[::-1], Ls[::-1])
+        B_hires[b] = reinterpolate.reinterp_to_grid(B_unpacked[b], old_Xgrid, new_Ns[::-1], Ls[::-1])
     BXcc, BYcc, BZcc = B_hires
 
     
