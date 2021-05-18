@@ -54,7 +54,7 @@ def create_athena_fromics(folder, h5name, n_X, X_min, X_max, meshblock,
         Dnf = lambda X, Y, Z: np.ones(X.shape)
         # Velocity components
         UXf = lambda X, Y, Z: np.zeros(X.shape)
-        UYf = lambda X, Y, Z: np.zeros(X.shape)
+        UYf = lambda X, Y, Z: -np.sin((2*np.pi/X_max[0]) * X + (2*np.pi/X_max[2]) * Z)
         UZf = lambda X, Y, Z: -np.sin((2*np.pi/X_max[0]) * X + (2*np.pi/X_max[1]) * Y)
         # Magnetic components
         BXf = lambda X, Y, Z: np.ones(X.shape)
@@ -70,8 +70,7 @@ def create_athena_fromics(folder, h5name, n_X, X_min, X_max, meshblock,
         # initializing Alfvén wave fluctuations perpendicular to B_0 (assumed along x-axis)
         # to have same initial energy in velocity and magnetic fields.
         # dV = V / resolution = (Lx*Ly*Lz) / (Nx*Ny*Nz) = dx*dy*dz
-        dV = np.prod(X_max - X_min) / np.prod(n_X)
-        total_energy = 0.5*dV*np.sum(BYcc**2 + BZcc**2)
+        total_energy = 0.5*np.mean(BYcc**2 + BZcc**2)
         norm_energy = np.sqrt(energy / total_energy)
         Hy_grid[2] *= norm_energy
         Hy_grid[3] *= norm_energy
@@ -232,10 +231,8 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
     dB_y, dB_z = Bcc_unpacked  # no mean field along y and z axes
     du_y, du_z = dB_y / np.sqrt(rho), dB_z / np.sqrt(rho)
 
-    # dV = V / resolution = (Lx*Ly*Lz) / (Nx*Ny*Nz) = dx*dy*dz
-    dV = np.prod(X_max - X_min) / np.prod(n_X)
     # give magnetic and velocity fluctuations same initial energy
-    total_energy = 0.5*dV*np.sum(dB_y**2 + dB_z**2)
+    total_energy = 0.5*np.mean(dB_y**2 + dB_z**2)  # volume weighted
     norm_energy = np.sqrt(energy / total_energy)
 
     Hy_grid[2] += rho*norm_energy*du_y
