@@ -1,5 +1,5 @@
-# COMPUTER = 'linux'
-COMPUTER = 'mac'
+COMPUTER = 'linux'
+#  COMPUTER = 'mac'
 # COMPUTER = 'nesi'
 
 if COMPUTER == 'linux':
@@ -17,6 +17,6 @@ elif COMPUTER == 'mac':
 elif COMPUTER == 'nesi':
     PATH = '/nesi/project/uoo02637/zade/masters_2021/' # project directory
     python_masters_path = '/home/johza721/masters_2021/python_masters/'
-    from_array_path = '/home/johza721/masters_2021/templates/athinput.from_array'
-    from_array_reinterp_path = '/home/johza721/masters_2021/templates/athinput.from_array_reinterp'
+    from_array_path = '/home/johza721/masters_2021/templates_athinput/athinput.from_array'
+    from_array_reinterp_path = '/home/johza721/masters_2021/templates_athinput/athinput.from_array_reinterp'
     athena_path = '/home/johza721/masters_2021/athena/bin/athena_mauivis/athena'
