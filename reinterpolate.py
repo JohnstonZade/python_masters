@@ -1,7 +1,7 @@
 import numpy as np
 from numpy.random import uniform
 import diagnostics as diag
-from helper_functions import pad_array, pad_grid, generate_grid_reinterp, get_grid_info
+from helper_functions import pad_array, pad_grid, reinterp_generate_grid, get_grid_info
 from scipy.interpolate import RegularGridInterpolator as rgi
 
 
@@ -10,7 +10,7 @@ def reinterp_to_grid(data, old_Xgrid, new_Ns, Ls):
     xg, yg, zg = pad_grid(xg), pad_grid(yg), pad_grid(zg)
     data_interp = rgi((zg, yg, xg), pad_array(data))
 
-    Zg_hires, Yg_hires, Xg_hires = generate_grid_reinterp(new_Ns, Ls, return_mesh=1)
+    Zg_hires, Yg_hires, Xg_hires = reinterp_generate_grid(new_Ns, Ls, return_mesh=1, pad=0)
     pts = np.array([Zg_hires.ravel(), Yg_hires.ravel(), Xg_hires.ravel()]).T
     data_hires = data_interp(pts).reshape(*new_Ns)
     return data_hires
@@ -21,7 +21,7 @@ def flyby(output_dir, flyby_a, flyby_n, do_rand_start=1, l_start=None, l_dir=np.
     data = diag.load_data(output_dir, flyby_n, prob='from_array')
     Ns, Ls = get_grid_info(data, flyby_a)
     
-    zg, yg, xg = generate_grid_reinterp(Ns, Ls)
+    zg, yg, xg = reinterp_generate_grid(Ns, Ls)
     # Zg, Yg, Xg = np.meshgrid(zg, yg, xg, indexing='ij')  # only needed if defining a function on grid
     
     Bx = pad_array(data['Bcc1'])

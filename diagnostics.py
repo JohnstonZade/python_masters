@@ -7,6 +7,7 @@ import os
 import pickle
 import numpy as np
 from pathlib import Path
+from itertools import permutations as perm
 from athena_read import athdf, athinput, hst
 from project_paths import PATH
 # from matplotlib import rc
@@ -116,6 +117,59 @@ def get_maxn(output_dir):
     '''Gets the total number of simulation timesteps.
     '''
     return len(glob.glob(format_path(output_dir)+'*.athdf'))
+
+def get_meshblocks(n_X, n_cpus):
+    def divisors(n):
+        divs = [1]
+        for i in range(2,int(np.sqrt(n))+1):
+            if n%i == 0:
+                divs.extend([i,n//i])
+        divs.extend([n])
+        return np.sort(np.array(list(set(divs))))[::-1]
+    def get_divs(n_points, n_dir, mesh, min_divs=10):
+        if n_dir == 1:
+            return [1], n_points
+        else:
+            n = n_points // mesh
+            divs = divisors(n)
+            return divs[(min_divs <= divs) & (divs <= n_dir) & (n_dir % divs == 0)], n
+    possible = []
+    nx, ny, nz = n_X
+    MX, n = get_divs(np.prod(n_X), nx, n_cpus, min_divs=(nx//10))
+    for mx in MX:
+        MY, n2 = get_divs(n, ny, mx)
+        for my in MY:
+            MZ, n3 = get_divs(n2, nz, my)
+            for mz in MZ:
+                tup = (mx, my, mz)
+                perm_in_poss = any([p in possible for p in list(perm(tup))])
+                if (np.prod(n_X) / (mx*my*mz) == n_cpus) and not perm_in_poss:
+                        possible.append(tup)
+    return np.array(possible)
+
+
+def get_est_cputime(dx, resolution, n_cpus, tlim, cputime=0):
+    # Obtained from the six simulations in superexpand_numerical
+    avg_time_per_stepres = 1e-6
+    dt_cfl = 0.15*0.3*dx
+    n_steps = tlim / dt_cfl
+    if cputime:
+        est_time = avg_time_per_stepres * resolution * n_steps
+    else:
+        est_time = avg_time_per_stepres * resolution * n_steps / n_cpus
+    return est_time
+
+def format_cputime(est_time, n_cpus, cputime=0, day_format=1):
+    est_time_hrs = est_time / (60*60)
+    est_time_days = (est_time_hrs - est_time_hrs % 24) // 24
+    est_tim_mins = round((est_time_hrs % 1) * 12)*5 % 60
+    prefix_str = 'Est. CPU Time: ' if cputime else 'Est. Physical Time: '
+    suffix_str = ' (' + str(n_cpus) + 'x physical time)' if cputime else ''
+    if day_format:
+        est_time_hrs %= 24
+        return prefix_str + str(int(est_time_days)) + ' days ' + str(int(est_time_hrs)) + ' hrs ' + str(int(est_tim_mins)) + ' mins' + suffix_str
+    else:
+        return prefix_str + str(round(est_time_hrs, 2)) + ' hrs' + suffix_str
 
 
 # --- MATH FUNCTIONS --- #
@@ -349,7 +403,6 @@ def load_time_series(output_dir, n_start=0, n_end=-1, conserved=0, just_time=0, 
     else:
         n_end = max_n
     
-
     t, a, B, u, rho = [], [], [], [], []
 
     for n in range(n_start, n_end):
