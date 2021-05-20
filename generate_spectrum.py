@@ -205,6 +205,7 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=12.0,
             # cut off all wavevectors that DON'T satisfy c1, c2, and c3
             mode_mask = np.logical_not(c1 & c2 & c3)
             r[mode_mask] = 0.0
+            c1, c2, c3 = None, None, None
             NX, NY, NZ, Nsqr = None, None, None, None
 
         theta = random.uniform(0, 2*np.pi, size=n_X)
