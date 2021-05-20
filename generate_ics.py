@@ -184,9 +184,9 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
     X_grid, (dx, dy, dz) = generate_grid(X_min, X_max, n_X)
     Hy_grid, BXcc, BYcc, BZcc = setup_hydro_grid(n_X, X_grid, N_HYDRO, Dnf, UXf, UYf, UZf, BXf, BYf, BZf)
 
-    B_0 = np.array([BXcc, BYcc, BZcc])
+    X_grid = None
 
-    dB_y, dB_z = genspec.generate_alfven(n_X, X_min, X_max, B_0, expo,
+    dB_y, dB_z = genspec.generate_alfven(n_X, X_min, X_max, np.array([BXcc, BYcc, BZcc]), expo,
                                          do_truncation=do_truncation, n_cutoff=n_cutoff,
                                          expo_prl=expo_prl, kpeak=kpeak, gauss_spec=gauss_spec,
                                          prl_spec=prl_spec, run_test=do_mode_test)
@@ -207,6 +207,8 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
     
     calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_blocks, blocks, dx, dy, dz)
     print('Magnetic Saved Successfully')
+    BXcc, BYcc, BZcc = None, None, None
+    dx, dy, dz = None, None, None
 
     # Only looking at perturbations perpendicular to B_0, assumed to be along x-axis initially.
     # Will add perturation after t=0 corresponding to Parker spiral?

@@ -188,6 +188,7 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=12.0,
         # these complex numbers represent the amplitude (r) and phase (theta) of the corresponding
         # Fourier mode at that point in k-space
         r = random.normal(size=n_X)*Kspec
+        Kspec, Kmag = None, None
         if do_truncation:
             # Just a check in case I forget to add specific parameters
             n_low, n_high = (0, n_X[2]/2) if n_cutoff is None else n_cutoff
@@ -204,9 +205,11 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=12.0,
             # cut off all wavevectors that DON'T satisfy c1, c2, and c3
             mode_mask = np.logical_not(c1 & c2 & c3)
             r[mode_mask] = 0.0
+            NX, NY, NZ, Nsqr = None, None, None, None
 
         theta = random.uniform(0, 2*np.pi, size=n_X)
         z = r*np.exp(1j*theta)
+        r, theta = None, None
 
         # excluding purely parallel waves
         prl_mask = (Kprp == 0.)
@@ -215,12 +218,16 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=12.0,
         # remember ω_A = k_prl * v_A
         prp_mask = (Kprl == 0.)
         z[prp_mask] = 0j
-    
+        Kprl, Kprp = None, None
+
+
     # Alfvén wave definition performed in k-space: δB = k × B
     # don't need to Fourier transform B0 as it is constant
     # ft_dB_x = (KY*B0_z - KZ*B0_y)
     ft_dB_y = (KZ*B0_x - KX*B0_z)
     ft_dB_z = (KX*B0_y - KY*B0_x)
+    KX, KY, KZ = None, None, None
+    B0_x, B0_y, B0_z = None, None, None
 
     # rescaling the amplitude of the Alfvén waves by
     # removing the magnitude of the k vector and replacing
@@ -232,6 +239,7 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=12.0,
     # ft_dB_x *= z / ft_dB_mag
     ft_dB_y *= z / ft_dB_mag
     ft_dB_z *= z / ft_dB_mag
+    ft_dB_mag, z = None, None
 
     # The IFT in Python is normalized by the total number of grid points.
     # This scales down the amplitude by a factor of Nx*Ny*Nz.
@@ -248,6 +256,7 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=12.0,
     # dB_x = np.real(fft.ifftn(ft_dB_x))
     dB_y = np.real(fft.ifftn(ft_dB_y))
     dB_z = np.real(fft.ifftn(ft_dB_z))
+    ft_dB_y, ft_dB_z = None, None
 
     # return dB_x, dB_y, dB_z
     return dB_y, dB_z
