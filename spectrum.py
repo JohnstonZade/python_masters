@@ -46,10 +46,6 @@ def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=
         S['nnorm'] = S['nbin']/S['kgrid']**2
         S['nnorm'] /= np.mean(S['nnorm'])
 
-        # average over snapshots in nums
-        def m3(a):
-            return np.mean(np.mean(np.mean(a)))
-
         ns = 0  # counter
         fields = ['vel1', 'vel2', 'vel3', 'Bcc1', 'Bcc2', 'Bcc3',
                   'EK', 'EK_prp', 'EM', 'EM_prp', 'B', 'rho']
@@ -73,6 +69,7 @@ def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=
                 ft = fft.fftn(v)
                 S[vel] += spect1D(ft, ft, Kspec, kgrid)
                 S['EK'] += S[vel]  # Total spectrum is sum of each component
+                S['EK_prl'] += spect1D(ft, ft, Kprl, kgrid)
                 S['EK_prp'] += spect1D(ft, ft, Kperp, kgrid)
             if normalize_energy:
                 # v_A ~ a^(-1) ⟹ (v_A)^2 ∼ a^(-2), assuming v_A0 = 1
@@ -86,6 +83,7 @@ def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=
                     ft = fft.fftn(B)
                     S[Bcc] += spect1D(ft, ft, Kspec, kgrid)
                     S['EM'] += S[Bcc]
+                    S['EM_prl'] += spect1D(ft, ft, Kprl, kgrid)
                     S['EM_prp'] += spect1D(ft, ft, Kperp, kgrid)
                     Bmag += B**2
                 if normalize_energy:
@@ -96,7 +94,7 @@ def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=
                 ft_Bmag = fft.fftn(Bmag)
                 S['B'] += spect1D(ft_Bmag, ft_Bmag, Kspec, kgrid)
 
-            ft_rho = fft.fftn(data['rho'] - m3(data['rho']))
+            ft_rho = fft.fftn(data['rho'] - np.mean(data['rho']))
             S['rho'] += spect1D(ft_rho, ft_rho, Kspec, kgrid)
 
             ns += 1

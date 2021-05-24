@@ -54,12 +54,12 @@ def create_athena_fromics(folder, h5name, n_X, X_min, X_max, meshblock,
         Dnf = lambda X, Y, Z: np.ones(X.shape)
         # Velocity components
         UXf = lambda X, Y, Z: np.zeros(X.shape)
-        UYf = lambda X, Y, Z: -np.sin((2*np.pi/X_max[0]) * X + (2*np.pi/X_max[2]) * Z)
-        UZf = lambda X, Y, Z: -np.sin((2*np.pi/X_max[0]) * X + (2*np.pi/X_max[1]) * Y)
+        UYf = lambda X, Y, Z: np.zeros(X.shape)
+        UZf = lambda X, Y, Z: np.sin((2*np.pi/X_max[0]) * X + (2*np.pi/X_max[1]) * Y)
         # Magnetic components
         BXf = lambda X, Y, Z: np.ones(X.shape)
         BYf = lambda X, Y, Z: np.zeros(X.shape)
-        BZf = lambda X, Y, Z: -np.sin((2*np.pi/X_max[0]) * X + (2*np.pi/X_max[1]) * Y)
+        BZf = lambda X, Y, Z: np.sin((2*np.pi/X_max[0]) * X + (2*np.pi/X_max[1]) * Y)
 
     # --- GRID CREATION --- #
 

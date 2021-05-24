@@ -77,7 +77,8 @@ def run_tests(Ls, KX, KY, KZ):
         return z
 
 def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=12.0,
-                    gauss_spec=0, prl_spec=0, do_truncation=0, n_cutoff=None, run_test=0):
+                    gauss_spec=0, prl_spec=0, do_truncation=0, n_cutoff=None,
+                    make_isotropic=1, run_test=0):
     '''Generate a superposition of random Alfvén waves within a numerical domain
     that follow a given energy spectrum.
 
@@ -142,6 +143,7 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=12.0,
     # want in form Z, Y, X conforming to Athena++
     n_X = n_X[::-1]
     Ls = (X_max - X_min)[::-1]
+    Lprl, Lprp = Ls[0], Ls[1]
     B0_x, B0_y, B0_z = B_0
 
     # grid of allowed wavenumbers corresponding to physical grid
@@ -173,8 +175,9 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=12.0,
         kpow /= 2  # initialising B not B^2
 
         if gauss_spec:
-            kpeak /= Ls[1]  # we want k_peak = 12 / L_⟂, L_⟂=L_y=L_z
-            Kspec = np.exp(- Kmag**2 / kpeak**2)
+            if not make_isotropic:
+                kpeak /= Lprp # we want k_peak = 12 / L_⟂, L_⟂=L_y=L_z
+                Kspec = np.exp(- Kmag**2 / kpeak**2)
         elif prl_spec:
             kprp_exp = (expo - 1) / (expo_prl - 1)  # gives 2/3 for expo, expo_prl = -5/3, -2
             kprl_exp = 1.0
