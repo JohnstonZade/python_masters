@@ -133,7 +133,7 @@ def get_meshblocks(n_X, n_cpus):
             n = n_points // mesh
             divs = divisors(n)
             return divs[(min_divs <= divs) & (divs <= n_dir) & (n_dir % divs == 0)], n
-    possible = []
+    possible, sa_to_v = [], []
     nx, ny, nz = n_X
     MX, n = get_divs(np.prod(n_X), nx, n_cpus, min_divs=(nx//10))
     for mx in MX:
@@ -145,13 +145,18 @@ def get_meshblocks(n_X, n_cpus):
                 perm_in_poss = any([p in possible for p in list(perm(tup))])
                 if (np.prod(n_X) / (mx*my*mz) == n_cpus) and not perm_in_poss:
                         possible.append(tup)
-    return np.array(possible)
+                        sa_to_v.append(2*(mx*my + my*mz + mz*mx) / (mx*my*mz))
+    temp, meshblocks = zip(*sorted(zip(sa_to_v, possible)))
+    meshblocks = np.array(meshblocks)
+    return meshblocks
+    # return np.array(possible), np.array(sa_to_v)
 
 
-def get_est_cputime(dx, resolution, n_cpus, tlim, cputime=0):
+def get_est_cputime(dx, resolution, n_cpus, a_start, a_end, a_dot, cputime=0):
     # Obtained from the six simulations in superexpand_numerical
     avg_time_per_stepres = 1e-6
-    dt_cfl = 0.15*0.3*dx
+    dt_cfl = 0.5*0.15*0.3*dx
+    tlim = (a_end - a_start) / a_dot
     n_steps = tlim / dt_cfl
     if cputime:
         est_time = avg_time_per_stepres * resolution * n_steps
@@ -159,17 +164,43 @@ def get_est_cputime(dx, resolution, n_cpus, tlim, cputime=0):
         est_time = avg_time_per_stepres * resolution * n_steps / n_cpus
     return est_time
 
-def format_cputime(est_time, n_cpus, cputime=0, day_format=1):
+def format_cputime(est_time, n_cpus, cputime=0, add_suffix=0, day_format=1):
     est_time_hrs = est_time / (60*60)
     est_time_days = (est_time_hrs - est_time_hrs % 24) // 24
     est_tim_mins = round((est_time_hrs % 1) * 12)*5 % 60
     prefix_str = 'Est. CPU Time: ' if cputime else 'Est. Physical Time: '
-    suffix_str = ' (' + str(n_cpus) + 'x physical time)' if cputime else ''
+    suffix_str = ' (' + str(n_cpus) + 'x physical time)' if (cputime and add_suffix) else ''
     if day_format:
         est_time_hrs %= 24
         return prefix_str + str(int(est_time_days)) + ' days ' + str(int(est_time_hrs)) + ' hrs ' + str(int(est_tim_mins)) + ' mins' + suffix_str
     else:
         return prefix_str + str(round(est_time_hrs, 2)) + ' hrs' + suffix_str
+
+def get_split_cputime(dx, resolution, n_cpus_list, a_list, a_dot, total_time=1):
+    cpu_time, phys_time = [], []
+    for idx, a in enumerate(a_list[1:]):
+        a_start = a_list[idx]
+        a_end = a
+        if n_cpus_list.size > 1:
+            n_cpus = n_cpus_list[idx]
+        else:
+            n_cpus = n_cpus_list[0]
+        print(a_start, a_end)
+        new_res = np.copy(resolution)
+        new_res[1:] *= a_start
+        cpu_time.append(get_est_cputime(dx, new_res.prod(), n_cpus, a_start, a_end, a_dot, cputime=1))
+        phys_time.append(get_est_cputime(dx, new_res.prod(), n_cpus, a_start, a_end, a_dot))
+    cpu_time, phys_time = np.array(cpu_time), np.array(phys_time)
+    if total_time:
+        tot_cpu = cpu_time.sum()
+        tot_phys = phys_time.sum()
+        return format_cputime(tot_cpu, n_cpus, cputime=1, day_format=0), format_cputime(tot_phys, n_cpus, day_format=0)
+    else:
+        return (['a = ' + str(a_list[i]) + '->' + str(a_list[i+1]) + ': ' + format_cputime(t, n_cpus, cputime=1, day_format=0) for i, t in enumerate(cpu_time)],
+               ['a = ' + str(a_list[i]) + '->' + str(a_list[i+1]) + ': ' + format_cputime(t, n_cpus, day_format=0) for i, t in enumerate(phys_time)])
+            
+            
+        
 
 
 # --- MATH FUNCTIONS --- #

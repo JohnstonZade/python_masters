@@ -87,7 +87,7 @@ def run_loop(output_dir, athinput_path, steps=10, do_spectrum=0, do_flyby=1, fly
     if do_spectrum:
         spec_hik_energy, spec_hik_a = np.array([]), np.array([])
         for n in range(max_n):
-            if n % 10 == 0:  # don't want to run too often
+            if n % 5 == 0:  # don't want to run too often
                 print('Spectrum calculation started at n = ' + str(n))
                 spec_a = round(S['perp_expand'][n], 2)
                 spec_name = 'mhd_spec_a' + str(spec_a)

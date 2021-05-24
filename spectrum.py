@@ -69,7 +69,7 @@ def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=
             # Find their energy (i.e. Parseval's theorem)
             # Add to total energy spectrum
             for vel in fields[:3]:
-                v = a*data[vel] if vel != 'vel1' else data[vel]
+                v = data[vel]
                 ft = fft.fftn(v)
                 S[vel] += spect1D(ft, ft, Kspec, kgrid)
                 S['EK'] += S[vel]  # Total spectrum is sum of each component
@@ -82,7 +82,7 @@ def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=
             if do_mhd:
                 Bmag = 0
                 for Bcc in fields[3:6]:
-                    B = a*data[Bcc] if Bcc != 'Bcc1' else data[Bcc]
+                    B = data[Bcc]
                     ft = fft.fftn(B)
                     S[Bcc] += spect1D(ft, ft, Kspec, kgrid)
                     S['EM'] += S[Bcc]
