@@ -23,6 +23,9 @@ def expand_to_a(a_final, exp_rate):
 def wave_energy(wave_amp):
     return wave_amp**2 / 4
 
+def cs_from_beta(init_norm_fluc, beta):
+    return np.sqrt((1 + init_norm_fluc) * beta)
+
 sim_name = ''  # put simulation name here
 folder = ''    # put folder to output here, make sure Athena binary is in this folder 
 total_folder =  folder_root + folder
@@ -40,10 +43,15 @@ a_final = 8
 time_lim = expand_to_a(a_final, exp_rate)
 # time_lim = 6  # use this to manually set t_lim
 dt = 0.2        # time step for simulation output
-iso_sound_speed = 0.8  # initial sound speed
-wave_amp = 0.01  # equiv to amplitude of <δB^2_⟂> / B^2_x when B_x = 1
-energy = wave_energy(wave_amp)
-# energy = 0.5    # initial energy of Alfvénic fluctuation components
+
+# wave_amp = 0.01  # equiv to amplitude of <δB^2_⟂> / B^2_x when B_x = 1
+# energy = wave_energy(wave_amp)
+init_norm_fluc = 0.2  # <B^2_⟂0> / B^2_x0 = initial perp energy / initial parallel energy
+perp_energy = 0.5*init_norm_fluc    # initial energy of Alfvénic fluctuation components (assuming Bx0=1)
+
+beta = 0.2
+iso_sound_speed = cs_from_beta(init_norm_fluc, beta)  # initial sound speed
+
 expo = -5/3       # spectrum power law 
 kprl = -2       # aniostropic parallel spectrum power law
 prl_spec = 0    # generate anisotropic spectrum
@@ -69,7 +77,7 @@ if generate:
     gen.create_athena_alfvenspec(total_folder, h5name, n_X, X_min, X_max, meshblock, 
                                 time_lim=time_lim, dt=dt, iso_sound_speed=iso_sound_speed,
                                 expand=expand, exp_rate=exp_rate, do_truncation=do_truncation, n_cutoff=n_cutoff,
-                                energy=energy, expo=expo, expo_prl=kprl, prl_spec=prl_spec, gauss_spec=gauss_spec)                      
+                                energy=perp_energy, expo=expo, expo_prl=kprl, prl_spec=prl_spec, gauss_spec=gauss_spec)                      
 
 if COMPUTER == 'local' and run_athena:
     os.chdir(total_folder)

@@ -19,6 +19,10 @@ def expand_to_a(a_final, exp_rate):
     # inverting definition of a to find time limit
     return (a_final - 1) / exp_rate
 
+
+def cs_from_beta(init_norm_fluc, beta):
+    return np.sqrt((1 + init_norm_fluc) * beta)
+
 sim_name = ''
 folder = ''
 total_folder = folder + sim_name
@@ -33,7 +37,9 @@ new_meshblock = None # np.array([50, 50, 50])
 expand = 1
 exp_rate = 0.5
 a_final = 10
-iso_sound_speed = 1.
+init_norm_fluc = 0.2
+beta = 0.2
+iso_sound_speed = cs_from_beta(init_norm_fluc, beta)
 dt = 0.2
 
 print('Reinterpolating ' + sim_name)

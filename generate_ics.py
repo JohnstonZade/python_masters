@@ -54,7 +54,7 @@ def create_athena_fromics(folder, h5name, n_X, X_min, X_max, meshblock,
         Dnf = lambda X, Y, Z: np.ones(X.shape)
         # Velocity components
         UXf = lambda X, Y, Z: np.zeros(X.shape)
-        UYf = lambda X, Y, Z: np.zeros(X.shape)
+        UYf = lambda X, Y, Z: -np.sin((2*np.pi/X_max[0]) * X + (2*np.pi/X_max[2]) * Z)
         UZf = lambda X, Y, Z: -np.sin((2*np.pi/X_max[0]) * X + (2*np.pi/X_max[1]) * Y)
         # Magnetic components
         BXf = lambda X, Y, Z: np.ones(X.shape)
@@ -70,8 +70,7 @@ def create_athena_fromics(folder, h5name, n_X, X_min, X_max, meshblock,
         # initializing Alfvén wave fluctuations perpendicular to B_0 (assumed along x-axis)
         # to have same initial energy in velocity and magnetic fields.
         # dV = V / resolution = (Lx*Ly*Lz) / (Nx*Ny*Nz) = dx*dy*dz
-        dV = np.prod(X_max - X_min) / np.prod(n_X)
-        total_energy = 0.5*dV*np.sum(BYcc**2 + BZcc**2)
+        total_energy = 0.5*np.mean(BYcc**2 + BZcc**2)
         norm_energy = np.sqrt(energy / total_energy)
         Hy_grid[2] *= norm_energy
         Hy_grid[3] *= norm_energy
@@ -185,9 +184,9 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
     X_grid, (dx, dy, dz) = generate_grid(X_min, X_max, n_X)
     Hy_grid, BXcc, BYcc, BZcc = setup_hydro_grid(n_X, X_grid, N_HYDRO, Dnf, UXf, UYf, UZf, BXf, BYf, BZf)
 
-    B_0 = np.array([BXcc, BYcc, BZcc])
+    X_grid = None
 
-    dB_y, dB_z = genspec.generate_alfven(n_X, X_min, X_max, B_0, expo,
+    dB_y, dB_z = genspec.generate_alfven(n_X, X_min, X_max, np.array([BXcc, BYcc, BZcc]), expo,
                                          do_truncation=do_truncation, n_cutoff=n_cutoff,
                                          expo_prl=expo_prl, kpeak=kpeak, gauss_spec=gauss_spec,
                                          prl_spec=prl_spec, run_test=do_mode_test)
@@ -208,6 +207,8 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
     
     calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_blocks, blocks, dx, dy, dz)
     print('Magnetic Saved Successfully')
+    BXcc, BYcc, BZcc = None, None, None
+    dx, dy, dz = None, None, None
 
     # Only looking at perturbations perpendicular to B_0, assumed to be along x-axis initially.
     # Will add perturation after t=0 corresponding to Parker spiral?
@@ -232,10 +233,8 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
     dB_y, dB_z = Bcc_unpacked  # no mean field along y and z axes
     du_y, du_z = dB_y / np.sqrt(rho), dB_z / np.sqrt(rho)
 
-    # dV = V / resolution = (Lx*Ly*Lz) / (Nx*Ny*Nz) = dx*dy*dz
-    dV = np.prod(X_max - X_min) / np.prod(n_X)
     # give magnetic and velocity fluctuations same initial energy
-    total_energy = 0.5*dV*np.sum(dB_y**2 + dB_z**2)
+    total_energy = 0.5*np.mean(dB_y**2 + dB_z**2)  # volume weighted
     norm_energy = np.sqrt(energy / total_energy)
 
     Hy_grid[2] += rho*norm_energy*du_y
