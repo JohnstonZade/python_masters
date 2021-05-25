@@ -12,8 +12,8 @@ default_prob = diag.DEFAULT_PROB
 
 
 def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=(10**1.5, 10**2), prob=default_prob,
-                  plot_title='test', dict_name='mhd_spec', do_single_file=0, n=0, a=1, normalize_energy=1, do_mhd=1,
-                  do_prp_spec=1, do_title=1):
+                  plot_title='test', dict_name='mhd_spec', do_single_file=0, n=0, a=1, do_isotropic=1,
+                  normalize_energy=1, do_mhd=1, gaussian=0, do_prp_spec=1, do_prl_spec=0, do_title=1):
 
     # Getting turnover time and converting to file number
     if do_single_file:
@@ -27,7 +27,7 @@ def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=
     if do_full_calc:
         # create grid of K from first time step
         data = diag.load_data(output_dir, 0, prob=prob)
-        (KZ, KY, KX), kgrid = diag.ft_grid('data', data=data, prob=prob, k_grid=1)
+        (KZ, KY, KX), kgrid = diag.ft_grid('data', data=data, prob=prob, k_grid=1, make_iso_box=do_isotropic)
         Kprl = np.abs(KX)
         Kperp = np.sqrt(np.abs(KY)**2 + np.abs(KZ)**2)
         Kmag = np.sqrt(Kprl**2+Kperp**2)
@@ -48,7 +48,7 @@ def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=
 
         ns = 0  # counter
         fields = ['vel1', 'vel2', 'vel3', 'Bcc1', 'Bcc2', 'Bcc3',
-                  'EK', 'EK_prp', 'EM', 'EM_prp', 'B', 'rho']
+                  'EK', 'EK_prp', 'EK_prl', 'EM', 'EM_prp', 'EM_prl', 'B', 'rho']
 
         # Initializing variable fields in spectrum dictionary
         for var in fields:
@@ -112,10 +112,11 @@ def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=
     if return_dict:
         return S
     else:
-        plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd, do_prp_spec=do_prp_spec, do_title=do_title)
+        plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_isotropic=do_isotropic, gaussian=gaussian, do_mhd=do_mhd, do_prp_spec=do_prp_spec,
+                      do_prl_spec=do_prl_spec, do_title=do_title)
 
 
-def plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd=1, do_prp_spec=1, do_title=1, normalized=1,
+def plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd=1, do_isotropic=1, gaussian=0, do_prp_spec=1, do_prl_spec=0, do_title=1, normalized=1,
                   do_pdf=0):
     # plot spectrum
     if do_mhd:
@@ -125,6 +126,9 @@ def plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd=1, do_p
         if do_prp_spec:
             EK = S['EK_prp'][1:]
             EM = S['EM_prp'][1:]
+        elif do_prl_spec:
+            EK = S['EK_prl'][1:]
+            EM = S['EM_prl'][1:]
         else:
             EK = S['EK'][1:]
             EM = S['EM'][1:]
@@ -139,12 +143,26 @@ def plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd=1, do_p
         slope_label = "{:+.2f}".format(slope)
 
         if do_prp_spec:
-            plt.xlabel(r'$k_\perp$')
+            plt.xlabel(r'$k_\perp L_\perp$')
             if normalized:
-                plt.ylabel(r'$E_{K}(k_\perp) / v^2_A, \ E_{B}(k_\perp) / B^2_x$')
+                plt.ylabel(r'$E_{K}(k_\perp L_\perp) / v^2_A, \ E_{B}(k_\perp L_\perp) / B^2_x$')
             else:
-                plt.ylabel(r'$E(k_\perp)$')
-            legend = [r'$E_{K,\perp}$', r'$E_{B,\perp}$', r'$k_{\perp}^{-5/3}$', r'$k_{\perp}^{' + slope_label + '}$']
+                plt.ylabel(r'$E(k_\perp L\perp)$')
+            if gaussian:
+                legend = [r'$E_{K,\perp}$', r'$E_{B,\perp}$']
+            else:
+                legend = [r'$E_{K,\perp}$', r'$E_{B,\perp}$', r'$(k_{\perp}L_{\perp})^{-5/3}$',
+                          r'$(k_{\perp}L_{\perp})^{' + slope_label + '}$']
+        elif do_prl_spec:
+            plt.xlabel(r'$k_\| L_\|$')
+            if normalized:
+                plt.ylabel(r'$E_{K}(k_\| L\|) / v^2_A, \ E_{B}(k_\| L\|) / B^2_x$')
+            else:
+                plt.ylabel(r'$E(k_\| L\|)$')
+            if gaussian:
+                legend = [r'$E_{K,\|}$', r'$E_{B,\|}$']
+            else:
+                legend = [r'$E_{K,\|}$', r'$E_{B,\|}$', r'$(k_{\|}L_{\|})^{-5/3}$', r'$(k_{\|}L_{\|})^{' + slope_label + '}$']
         else:
             plt.xlabel(r'$k$')
             plt.ylabel(r'$E(k)$')
@@ -160,7 +178,8 @@ def plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd=1, do_p
         x_theory_slope = -5/3
         x_theory = fit_start * (k_inertial/inertial_range[0])**(x_theory_slope)
         x_slope = fit_start * (k_inertial/inertial_range[0])**(slope)
-        plt.loglog(k_inertial, x_theory, ':', k_inertial, x_slope, ':')
+        if not gaussian:
+            plt.loglog(k_inertial, x_theory, ':', k_inertial, x_slope, ':')
         
         plt.legend(legend)
     else:
@@ -174,7 +193,13 @@ def plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd=1, do_p
 
     save_dir = diag.format_path(save_dir)
 
-    fig_suffix = '_perpspec' if do_prp_spec else '_spec'
+    if do_prp_spec:
+        fig_suffix = '_prpspec'
+    elif do_prl_spec:
+        fig_suffix = '_prlspec'
+    else:
+        fig_suffix = '_spec'
+    
     if do_pdf:
         plt.savefig(save_dir + fname + fig_suffix + '.pdf')
     plt.savefig(save_dir + fname + fig_suffix + '.png')
