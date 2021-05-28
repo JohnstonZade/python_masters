@@ -82,7 +82,7 @@ def run_loop(output_dir, athinput_path, steps=10, do_spectrum=0, do_flyby=1, fly
         S['C_B2_Squire'] = magcomp_sq_full
         # S['C_B2_Shoda'] = magcomp_sh_full
         
-        a_normfluc, Bprp_fluc, uprp_fluc = diag.norm_fluc_amp_hst(output_dir)
+        a_normfluc, Bprp_fluc, uprp_fluc = diag.norm_fluc_amp_hst(output_dir, expansion_rate)
         S['a_normfluc'] = a_normfluc
         S['norm_fluc_Bprp'] = Bprp_fluc
         S['norm_fluc_uprp'] = uprp_fluc

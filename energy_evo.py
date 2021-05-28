@@ -4,12 +4,12 @@ import numpy as np
 default_prob = diag.DEFAULT_PROB
 
 
-def get_energy_data(output_dir,
+def get_energy_data(output_dir, adot,
                     prob=default_prob,
                     vol_norm=0,
                     B0=1.0,
                     Lx=1.0):
-    hstData = diag.load_hst(output_dir, prob)
+    hstData = diag.load_hst(output_dir, adot, prob)
 
     # Volume to calculate energy density
     if vol_norm:
