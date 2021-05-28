@@ -10,6 +10,7 @@ from pathlib import Path
 from itertools import permutations as perm
 from athena_read import athdf, athinput, hst
 from project_paths import PATH
+import energy_evo as energy
 # from matplotlib import rc
 # rc('text', usetex=True)  # LaTeX labels
 
@@ -69,7 +70,16 @@ def load_hst(output_dir, prob=DEFAULT_PROB):
     '''Loads data from .hst files output from Athena++.
     '''
     hstLoc = format_path(output_dir) + prob + '.hst'
-    return hst(hstLoc)
+    hst_data = hst(hstLoc)
+    if 'a' in hst_data.keys():
+        a_hst = hst_data['a']
+        hst_data['2-mom'] *= a_hst  # perp momenta ~ u_perp
+        hst_data['3-mom'] *= a_hst
+        hst_data['2-KE'] *= a_hst**2  # perp energies ~ u_perp^2 and B_perp^2
+        hst_data['3-KE'] *= a_hst**2
+        hst_data['2-ME'] *= a_hst**2
+        hst_data['3-ME'] *= a_hst**2
+    return hst_data
 
 
 def load_athinput(athinput_path):
@@ -389,6 +399,13 @@ def norm_fluc_amp(fluc, background):
     mean_fluc = box_avg(fluc)
     mean_bg_sqr = box_avg(background)**2
     return mean_fluc / mean_bg_sqr
+
+def norm_fluc_amp_hst(output_dir):
+    t, a, EKprp, EMprp = energy.get_energy_data(output_dir)
+    Bx2 = 0.5*a**(-2)*a**(-2) # mean field energy * Bx evolution * volume evolution
+    Bprp_fluc = EMprp / Bx2
+    uprp_fluc = EKprp / Bx2
+    return a, Bprp_fluc, uprp_fluc
 
 # --- EXPANDING BOX CODE --- #
 

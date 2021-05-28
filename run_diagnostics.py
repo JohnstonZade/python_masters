@@ -63,10 +63,10 @@ def run_loop(output_dir, athinput_path, steps=10, do_spectrum=0, do_flyby=1, fly
             beta_full = np.append(beta_full, diag.beta(rho, B_mag, c_s_init, expansion_rate, t))
             sb_frac_full = np.append(sb_frac_full, diag.switchback_fraction(B_x, B_mag, B0_x))
             cross_h_full = np.append(cross_h_full, diag.cross_helicity(rho, u_prp, B_prp))
-            Bprp_fluc_full = np.append(Bprp_fluc_full, diag.norm_fluc_amp(diag.dot_prod(B_prp, B_prp, 1), B_x))
-            uprp_fluc_full = np.append(uprp_fluc_full, diag.norm_fluc_amp(rho*diag.dot_prod(u_prp, u_prp, 1), B_x))
+            # Bprp_fluc_full = np.append(Bprp_fluc_full, diag.norm_fluc_amp(diag.dot_prod(B_prp, B_prp, 1), B_x))
+            # uprp_fluc_full = np.append(uprp_fluc_full, diag.norm_fluc_amp(rho*diag.dot_prod(u_prp, u_prp, 1), B_x))
             magcomp_sq_full = np.append(magcomp_sq_full, diag.mag_compress_Squire2020(B))
-            magcomp_sh_full = np.append(magcomp_sh_full, diag.mag_compress_Shoda2021(B))
+            # magcomp_sh_full = np.append(magcomp_sh_full, diag.mag_compress_Shoda2021(B))
 
             # clear unneeded variables to save memory, run flyby code after this
             t, a = None, None
@@ -79,10 +79,13 @@ def run_loop(output_dir, athinput_path, steps=10, do_spectrum=0, do_flyby=1, fly
         S['beta'] = beta_full
         S['sb_frac'] = sb_frac_full
         S['cross_helicity'] = cross_h_full
-        S['norm_fluc_Bprp'] = Bprp_fluc_full
-        S['norm_fluc_uprp'] = uprp_fluc_full
         S['C_B2_Squire'] = magcomp_sq_full
-        S['C_B2_Shoda'] = magcomp_sh_full
+        # S['C_B2_Shoda'] = magcomp_sh_full
+        
+        a_normfluc, Bprp_fluc, uprp_fluc = diag.norm_fluc_amp_hst(output_dir)
+        S['a_normfluc'] = a_normfluc
+        S['norm_fluc_Bprp'] = Bprp_fluc
+        S['norm_fluc_uprp'] = uprp_fluc
 
     if do_spectrum:
         spec_hik_energy, spec_hik_a = np.array([]), np.array([])
