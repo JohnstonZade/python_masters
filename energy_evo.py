@@ -1,8 +1,8 @@
 from athena_read import hst
 import diagnostics as diag
 import numpy as np
-default_prob = diag.DEFAULT_PROB
 
+default_prob = 'from_array'
 
 def get_energy_data(output_dir,
                     prob=default_prob,

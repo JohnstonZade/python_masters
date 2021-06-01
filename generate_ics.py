@@ -69,7 +69,6 @@ def create_athena_fromics(folder, h5name, n_X, X_min, X_max, meshblock,
     if not const_b2 and do_norm_energy:
         # initializing Alfvén wave fluctuations perpendicular to B_0 (assumed along x-axis)
         # to have same initial energy in velocity and magnetic fields.
-        # dV = V / resolution = (Lx*Ly*Lz) / (Nx*Ny*Nz) = dx*dy*dz
         total_energy = 0.5*np.mean(BYcc**2 + BZcc**2)
         norm_energy = np.sqrt(energy / total_energy)
         Hy_grid[2] *= norm_energy
@@ -162,7 +161,7 @@ def create_athena_fromh5(save_folder, athinput_in_folder, athinput_in, h5name, a
 def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
                              time_lim=1, dt=0.2, iso_sound_speed=1.0, expand=0, exp_rate=0.,
                              do_truncation=0, n_cutoff=None, athinput=from_array_path,
-                             energy=0.5, expo=-5/3, expo_prl=-2., kpeak=10., gauss_spec=0, prl_spec=0, do_mode_test=0):
+                             perp_energy=0.5, expo=-5/3, expo_prl=-2., kpeak=10., gauss_spec=0, prl_spec=0, do_mode_test=0):
     
     ath_copy = edit_athinput(athinput, folder, n_X, X_min, X_max, meshblock,
                              h5name, time_lim, dt, iso_sound_speed, expand, exp_rate)
@@ -204,7 +203,6 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
     remove_prev_h5file(h5name)
 
     # - MAGNETIC
-    
     calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_blocks, blocks, dx, dy, dz)
     print('Magnetic Saved Successfully')
     BXcc, BYcc, BZcc = None, None, None
@@ -233,12 +231,12 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
     dB_y, dB_z = Bcc_unpacked  # no mean field along y and z axes
     du_y, du_z = dB_y / np.sqrt(rho), dB_z / np.sqrt(rho)
 
-    # give magnetic and velocity fluctuations same initial energy
-    total_energy = 0.5*np.mean(dB_y**2 + dB_z**2)  # volume weighted
-    norm_energy = np.sqrt(energy / total_energy)
+    # total volume weighted energy = sum(0.5*dV*B^2) = 0.5*(V/N)sum(B^2) = 0.5*V*mean(B^2)
+    total_perp_energy = 0.5*np.mean(dB_y**2 + dB_z**2)
+    norm_perp_energy = np.sqrt(perp_energy / total_perp_energy)
 
-    Hy_grid[2] += rho*norm_energy*du_y
-    Hy_grid[3] += rho*norm_energy*du_z
+    Hy_grid[2] += rho*norm_perp_energy*du_y
+    Hy_grid[3] += rho*norm_perp_energy*du_z
 
     dB_y, dB_z, du_y, du_z = None, None, None, None
 
@@ -255,8 +253,8 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
         # otherwise rescale Alfvénic fluctations to desiered energy
         # B_y,z = B0_y,z + dB_y,z + (norm_energy - 1)*dB_y,z = B0_y,z + norm_energy*dB_y,z
         f['bf1'][...] += -dB_x
-        f['bf2'][...] += dB_y*(norm_energy-1)
-        f['bf3'][...] += dB_z*(norm_energy-1)
+        f['bf2'][...] += dB_y*(norm_perp_energy-1)
+        f['bf3'][...] += dB_z*(norm_perp_energy-1)
 
 
     # - HYDRO

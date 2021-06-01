@@ -2,7 +2,7 @@ COMPUTER = 'local'
 # COMPUTER = 'nesi'
 
 if COMPUTER == 'local':
-    python_masters_path = '~/python_masters/'
+    python_masters_path = '/Users/johza22p/python_masters/'
 else:
     python_masters_path = '/home/johza721/masters_2021/python_masters/'
 
@@ -77,7 +77,7 @@ if generate:
     gen.create_athena_alfvenspec(total_folder, h5name, n_X, X_min, X_max, meshblock, 
                                 time_lim=time_lim, dt=dt, iso_sound_speed=iso_sound_speed,
                                 expand=expand, exp_rate=exp_rate, do_truncation=do_truncation, n_cutoff=n_cutoff,
-                                energy=perp_energy, expo=expo, expo_prl=kprl, prl_spec=prl_spec, gauss_spec=gauss_spec)                      
+                                perp_energy=perp_energy, expo=expo, expo_prl=kprl, prl_spec=prl_spec, gauss_spec=gauss_spec)                      
 
 if COMPUTER == 'local' and run_athena:
     os.chdir(total_folder)
