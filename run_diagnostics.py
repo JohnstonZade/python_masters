@@ -39,8 +39,10 @@ def run_loop(output_dir, athinput_path, steps=10, do_spectrum=0, do_flyby=1, fly
     if do_full_calc:
         t_full, a_full = np.array([]), np.array([])
         Bx_mean_full, beta_full, sb_frac_full = np.array([]), np.array([]), np.array([])
-        cross_h_full, Bprp_fluc_full, uprp_fluc_full = np.array([]), np.array([]), np.array([])
-        magcomp_sq_full, magcomp_sh_full = np.array([]), np.array([])
+        cross_h_full = np.array([])
+        # Bprp_fluc_full, uprp_fluc_full = np.array([]), np.array([])
+        magcomp_sq_full = np.array([])
+        # magcomp_sh_full = np.array([])
 
         print('max_n = ' + str(max_n))
         for i in range(n_steps):

@@ -406,9 +406,9 @@ def norm_fluc_amp(fluc, background):
     mean_bg_sqr = box_avg(background)**2
     return mean_fluc / mean_bg_sqr
 
-def norm_fluc_amp_hst(output_dir):
-    t, a, EKprp, EMprp = energy.get_energy_data(output_dir)
-    Bx2 = 0.5*a**(-4) # mean field energy (Bx_0 = 1) * <Bx>^2 evolution 
+def norm_fluc_amp_hst(output_dir, adot):
+    a, EKprp, EMprp, EBx_init = energy.get_energy_data(output_dir, adot)[1:]
+    Bx2 = EBx_init*a**(-4) # mean field energy (Bx_0 = 1) * <Bx>^2 evolution 
     Bprp_fluc = EMprp / Bx2
     uprp_fluc = EKprp / Bx2
     return a, Bprp_fluc, uprp_fluc
