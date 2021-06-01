@@ -1,5 +1,5 @@
-# COMPUTER = 'linux'
-COMPUTER = 'mac'
+COMPUTER = 'linux'
+# COMPUTER = 'mac'
 # COMPUTER = 'nesi'
 
 if COMPUTER == 'linux':

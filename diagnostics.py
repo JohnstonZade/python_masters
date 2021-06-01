@@ -5,6 +5,7 @@ All copied from code written in 2020 for my Honours project with some improvemen
 import glob
 import os
 import pickle
+from re import T
 import numpy as np
 from pathlib import Path
 from itertools import permutations as perm
@@ -66,19 +67,24 @@ def load_data(output_dir, n, prob=DEFAULT_PROB):
     return data
 
 
-def load_hst(output_dir, prob=DEFAULT_PROB):
+def load_hst(output_dir, adot, prob=DEFAULT_PROB):
     '''Loads data from .hst files output from Athena++.
     '''
     hstLoc = format_path(output_dir) + prob + '.hst'
     hst_data = hst(hstLoc)
-    if 'a' in hst_data.keys():
-        a_hst = hst_data['a']
-        hst_data['2-mom'] *= a_hst  # perp momenta ~ u_perp
-        hst_data['3-mom'] *= a_hst
-        hst_data['2-KE'] *= a_hst**2  # perp energies ~ u_perp^2 and B_perp^2
-        hst_data['3-KE'] *= a_hst**2
-        hst_data['2-ME'] *= a_hst**2
-        hst_data['3-ME'] *= a_hst**2
+
+    if 'a' not in hst_data.keys():
+        t_hst = hst_data['time']
+        hst_data['a'] = 1.0 + adot*t_hst
+    
+    a_hst = hst_data['a']
+    hst_data['2-mom'] *= a_hst  # perp momenta ~ u_perp
+    hst_data['3-mom'] *= a_hst
+    hst_data['2-KE'] *= a_hst**2  # perp energies ~ u_perp^2 and B_perp^2
+    hst_data['3-KE'] *= a_hst**2
+    hst_data['2-ME'] *= a_hst**2
+    hst_data['3-ME'] *= a_hst**2
+
     return hst_data
 
 
