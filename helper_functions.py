@@ -7,6 +7,7 @@ import numpy.fft as fft
 from scipy.interpolate import RegularGridInterpolator as rgi
 
 import diagnostics as diag
+from athena_read import athinput as athinput_dict
 from project_paths import athena_path
 
 #--- REINTERPOLATION FUNCTIONS ---#
@@ -70,78 +71,61 @@ def get_grid_info(data, a):
 # ONLY WORKS FOR athinput.from_array layout
 def edit_athinput(athinput, save_folder, n_X, X_min, X_max, meshblock, h5name,
                   time_lim, dt, iso_sound_speed, expand, exp_rate,
-                  reinterpolate=0, exp_init=1, start_time=1., n_hst=0, n_hdf5=0):
+                  exp_init=1, start_time=0.0, n_hst=0, n_hdf5=0):
     ath_path = save_folder + athinput.split('/')[-1] + '_' + h5name.split('/')[-1].split('.')[0]
     copy(athinput, ath_path)
-    ath = open(ath_path, 'r')
-    list_of_lines = ath.readlines()
+    ath_dict = athinput_dict(athinput)
+    
+    # tlim and start time
+    ath_dict['time']['tlim'] = time_lim
+    ath_dict['time']['start_time'] = start_time
 
-    if reinterpolate:
-        # time limit
-        list_of_lines[10] = 'tlim       = ' + str(time_lim) + '  # time limit\n'
-        list_of_lines[11] = 'start_time = ' + str(start_time) + '  # start time\n'
-        # hst
-        list_of_lines[19] = 'file_number = ' + str(n_hst) + '\n'
-        # hdf5
-        list_of_lines[24] = 'dt        = ' + str(dt) + '   # time increment between outputs\n'
-        list_of_lines[25] = 'file_number = ' + str(n_hdf5) + '\n'
-        # X1
-        list_of_lines[28] = 'nx1     = ' + str(n_X[0]) + '        # number of zones in x1-direction\n'
-        list_of_lines[29] = 'x1min   = ' + str(X_min[0]) + '     # minimum value of x1\n'
-        list_of_lines[30] = 'x1max   = ' + str(X_max[0]) + '     # maximum value of x1\n'
-        # X2
-        list_of_lines[34] = 'nx2     = ' + str(n_X[1]) + '        # number of zones in x2-direction\n'
-        list_of_lines[35] = 'x2min   = ' + str(X_min[1]) + '     # minimum value of x2\n'
-        list_of_lines[36] = 'x2max   = ' + str(X_max[1]) + '     # maximum value of x2\n'
-        # X3
-        list_of_lines[40] = 'nx3     = ' + str(n_X[2]) + '        # number of zones in x3-direction\n'
-        list_of_lines[41] = 'x3min   = ' + str(X_min[2]) + '     # minimum value of x3\n'
-        list_of_lines[42] = 'x3max   = ' + str(X_max[2]) + '     # maximum value of x3\n'
-        # Meshblocks
-        list_of_lines[50] = 'nx1 = ' + str(meshblock[0]) + '  # block size in x1-direction\n'
-        list_of_lines[51] = 'nx2 = ' + str(meshblock[1]) + '  # block size in x2-direction\n'
-        list_of_lines[52] = 'nx3 = ' + str(meshblock[2]) + '  # block size in x3-direction\n'
-        # sound speed
-        list_of_lines[56] = 'iso_sound_speed = ' + str(iso_sound_speed) + '  # isothermal sound speed (for barotropic EOS)\n'
-        # hdf5 file name
-        list_of_lines[59] = 'input_filename = ' + h5name + '  # name of HDF5 file containing initial conditions\n'
-        # expansion
-        expanding = 'true' if expand else 'false'
-        list_of_lines[69] = 'expanding = ' + expanding + '\n'
-        list_of_lines[70] = 'expand_rate = ' + str(exp_rate) + '\n'
-        # list_of_lines[71] = 'expand_init = ' + str(exp_init) + '\n'
-    else:
-        # time limit
-        list_of_lines[10] = 'tlim       = ' + str(time_lim) + ' # time limit\n'
-        list_of_lines[22] = 'dt        = ' + str(dt) + '   # time increment between outputs\n'
-        # X1
-        list_of_lines[25] = 'nx1     = ' + str(n_X[0]) + '        # number of zones in x1-direction\n'
-        list_of_lines[26] = 'x1min   = ' + str(X_min[0]) + '     # minimum value of x1\n'
-        list_of_lines[27] = 'x1max   = ' + str(X_max[0]) + '     # maximum value of x1\n'
-        # X2
-        list_of_lines[31] = 'nx2     = ' + str(n_X[1]) + '        # number of zones in x2-direction\n'
-        list_of_lines[32] = 'x2min   = ' + str(X_min[1]) + '     # minimum value of x2\n'
-        list_of_lines[33] = 'x2max   = ' + str(X_max[1]) + '     # maximum value of x2\n'
-        # X3
-        list_of_lines[37] = 'nx3     = ' + str(n_X[2]) + '        # number of zones in x3-direction\n'
-        list_of_lines[38] = 'x3min   = ' + str(X_min[2]) + '     # minimum value of x3\n'
-        list_of_lines[39] = 'x3max   = ' + str(X_max[2]) + '     # maximum value of x3\n'
-        # Meshblocks
-        list_of_lines[47] = 'nx1 = ' + str(meshblock[0]) + '  # block size in x1-direction\n'
-        list_of_lines[48] = 'nx2 = ' + str(meshblock[1]) + '  # block size in x2-direction\n'
-        list_of_lines[49] = 'nx3 = ' + str(meshblock[2]) + '  # block size in x3-direction\n'
-        # sound speed
-        list_of_lines[53] = 'iso_sound_speed = ' + str(iso_sound_speed) + '  # isothermal sound speed (for barotropic EOS)\n'
-        # hdf5 file name
-        list_of_lines[56] = 'input_filename = ' + h5name + '  # name of HDF5 file containing initial conditions\n'
-        # expansion
-        expanding = 'true' if expand else 'false'
-        list_of_lines[66] = 'expanding = ' + expanding + '\n'
-        list_of_lines[67] = 'expand_rate = ' + str(exp_rate) + '\n'
+    # hst output
+    ath_dict['output1']['file_number'] = n_hst
 
-    ath = open(ath_path, 'w')
-    ath.writelines(list_of_lines)
-    ath.close()
+    # hdf5 output
+    ath_dict['output2']['dt'] = dt
+    ath_dict['output2']['file_number'] = n_hdf5
+
+    # X1
+    ath_dict['mesh']['nx1'] = n_X[0]
+    ath_dict['mesh']['x1min'] = X_min[0]
+    ath_dict['mesh']['x1max'] = X_max[0]
+
+    # X2
+    ath_dict['mesh']['nx2'] = n_X[1]
+    ath_dict['mesh']['x2min'] = X_min[1]
+    ath_dict['mesh']['x2max'] = X_max[1]
+
+    # X3
+    ath_dict['mesh']['nx3'] = n_X[2]
+    ath_dict['mesh']['x3min'] = X_min[2]
+    ath_dict['mesh']['x3max'] = X_max[2]
+
+    # meshblocks
+    ath_dict['meshblock']['nx1'] = meshblock[0]
+    ath_dict['meshblock']['nx2'] = meshblock[1]
+    ath_dict['meshblock']['nx3'] = meshblock[2]
+
+    # sound speed
+    ath_dict['hydro']['iso_sound_speed'] = iso_sound_speed
+
+    # hdf5 file name
+    ath_dict['problem']['input_filename'] = h5name
+
+    # expansion
+    ath_dict['problem']['expanding'] = 'true' if expand else 'false'
+    ath_dict['problem']['expand_rate'] = exp_rate
+
+    with open(ath_path, 'w') as f:
+        for key in ath_dict.keys():
+            f.write('<' + key + '>\n')
+            for value in ath_dict[key]:
+                f.write(value + ' = ' + str(ath_dict[key][value]) + '\n')
+                if key == 'mesh' and value.startswith('o'):
+                    f.write('\n')
+            f.write('\n')
+
     return ath_path
 
 def read_athinput(athinput, reinterpolate=0):

@@ -6,7 +6,7 @@ import diagnostics as diag
 import generate_spectrum as genspec
 import reinterpolate
 from helper_functions import *
-from project_paths import from_array_path, from_array_reinterp_path, athena_path
+from project_paths import from_array_path, athena_path
 
 
 # --- GENERATING FUNCTIONS --- #
@@ -261,7 +261,7 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
     save_hydro_grid(h5name, Hy_grid, N_HYDRO, n_blocks, blocks, meshblock, remove_h5=0)
     print('Hydro Saved Succesfully')
 
-def reinterp_from_h5(save_folder, athinput_in_folder, athinput_in, h5name, athdf_input, athinput_out=from_array_reinterp_path,
+def reinterp_from_h5(save_folder, athinput_in_folder, athinput_in, h5name, athdf_input, athinput_out=from_array_path,
                      a_to_finish=8, dt=0.2, iso_sound_speed=1.0, expand=1, exp_rate=0.5, new_meshblock=None):
     N_HYDRO = 4
     def root_path(path):
@@ -345,7 +345,7 @@ def reinterp_from_h5(save_folder, athinput_in_folder, athinput_in, h5name, athdf
     time_lim  = (a_to_finish - 1) / exp_rate 
     athinput_out = edit_athinput(athinput_out, save_folder, new_Ns, X_min, X_max, meshblock, h5name,
                                  time_lim, dt, iso_sound_speed, expand, exp_rate,
-                                 reinterpolate=1, start_time=start_time, n_hst=n_hst, n_hdf5=n_hdf5)
+                                 start_time=start_time, n_hst=n_hst, n_hdf5=n_hdf5)
 
     h5name = save_folder + h5name
     remove_prev_h5file(h5name)
