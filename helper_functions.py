@@ -115,7 +115,7 @@ def edit_athinput(athinput, save_folder, n_X, X_min, X_max, meshblock, h5name,
 
     # expansion
     ath_dict['problem']['expanding'] = 'true' if expand else 'false'
-    ath_dict['problem']['expand_rate'] = exp_rate
+    ath_dict['problem']['expand_rate'] = exp_rate if expand else 0.
 
     with open(ath_path, 'w') as f:
         for key in ath_dict.keys():

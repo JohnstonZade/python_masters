@@ -3,20 +3,22 @@ import numpy as np
 import diagnostics as diag
 import spectrum as spec
 import reinterpolate
+from athena_read import athinput as athinput_dict
 
 
 def read_athinput(athinput_path):
-    ath = open(athinput_path, 'r')
-    list_of_lines = ath.readlines()
-    tlim = float(list_of_lines[10].split('=')[1].split('#')[0])
-    dt = float(list_of_lines[22].split('=')[1].split('#')[0])
-    iso_sound_speed = float(list_of_lines[53].split('=')[1].split('#')[0])
-    expand = bool(list_of_lines[66].split('=')[1].split('#')[0])
-    expansion_rate = float(list_of_lines[67].split('=')[1].split('#')[0]) if expand else 0.
+    ath_dict = athinput_dict(athinput_path)
+    
+    tlim = ath_dict['time']['tlim']
+    dt = ath_dict['output2']['dt']
+    iso_sound_speed = ath_dict['hydro']['iso_sound_speed']
+    expand = bool(ath_dict['problem']['expanding'])
+    expansion_rate = ath_dict['problem']['expand_rate'] if expand else 0.
+    
     return expansion_rate, iso_sound_speed, tlim, dt
  
 
-def run_loop(output_dir, athinput_path, steps=10, do_spectrum=0, do_flyby=1, flyby_a=-999):
+def run_loop(output_dir, athinput_path, steps=10, do_spectrum=0, do_flyby=1, flyby_a=-999, override_not_full_calc=0):
     
     max_n = diag.get_maxn(output_dir)
     # overestimate the number of steps needed; edge case is handled when loading data
@@ -24,7 +26,7 @@ def run_loop(output_dir, athinput_path, steps=10, do_spectrum=0, do_flyby=1, fly
 
     # if dictionary is not already there, do full calc
     # otherwise load dictionary
-    do_full_calc = not diag.check_dict(output_dir, 'data_dump')
+    do_full_calc = (not diag.check_dict(output_dir, 'data_dump')) or override_not_full_calc
     if not do_full_calc:
         S = diag.load_dict(output_dir, 'data_dump')
         print('Not doing full calculation')
@@ -40,7 +42,7 @@ def run_loop(output_dir, athinput_path, steps=10, do_spectrum=0, do_flyby=1, fly
         t_full, a_full = np.array([]), np.array([])
         Bx_mean_full, beta_full, sb_frac_full = np.array([]), np.array([]), np.array([])
         cross_h_full = np.array([])
-        # Bprp_fluc_full, uprp_fluc_full = np.array([]), np.array([])
+        Bprp_fluc_full, uprp_fluc_full, kinetic_fluc_full = np.array([]), np.array([]), np.array([])
         magcomp_sq_full = np.array([])
         # magcomp_sh_full = np.array([])
 
@@ -57,6 +59,7 @@ def run_loop(output_dir, athinput_path, steps=10, do_spectrum=0, do_flyby=1, fly
             if i == 0:
                 B0_x = B_x[0, 0, 0, 0]  # initial B0_x
             B_mag = np.sqrt(diag.dot_prod(B, B, 1))
+            rho_avg = diag.box_avg(rho)
 
             t_full = np.append(t_full, t)
             a_full = np.append(a_full, a)
@@ -65,14 +68,15 @@ def run_loop(output_dir, athinput_path, steps=10, do_spectrum=0, do_flyby=1, fly
             beta_full = np.append(beta_full, diag.beta(rho, B_mag, c_s_init, expansion_rate, t))
             sb_frac_full = np.append(sb_frac_full, diag.switchback_fraction(B_x, B_mag, B0_x))
             cross_h_full = np.append(cross_h_full, diag.cross_helicity(rho, u_prp, B_prp))
-            # Bprp_fluc_full = np.append(Bprp_fluc_full, diag.norm_fluc_amp(diag.dot_prod(B_prp, B_prp, 1), B_x))
-            # uprp_fluc_full = np.append(uprp_fluc_full, diag.norm_fluc_amp(rho*diag.dot_prod(u_prp, u_prp, 1), B_x))
+            Bprp_fluc_full = np.append(Bprp_fluc_full, diag.norm_fluc_amp(diag.dot_prod(B_prp, B_prp, 1), B_x))
+            uprp_fluc_full = np.append(uprp_fluc_full, diag.norm_fluc_amp(diag.dot_prod(u_prp, u_prp, 1), B_x / np.sqrt(rho_avg)))
+            kinetic_fluc_full = np.append(kinetic_fluc_full, diag.norm_fluc_amp(rho*diag.dot_prod(u_prp, u_prp, 1), B_x))
             magcomp_sq_full = np.append(magcomp_sq_full, diag.mag_compress_Squire2020(B))
             # magcomp_sh_full = np.append(magcomp_sh_full, diag.mag_compress_Shoda2021(B))
 
             # clear unneeded variables to save memory, run flyby code after this
             t, a = None, None
-            B, u, B_prp, u_prp, B_x, B_mag = None, None, None, None, None, None
+            B, u, B_prp, u_prp, B_x, B_mag, rho_avg = None, None, None, None, None, None, None
             print('     Data cleared')
 
         S['time'] = t_full
@@ -80,17 +84,20 @@ def run_loop(output_dir, athinput_path, steps=10, do_spectrum=0, do_flyby=1, fly
         S['Bx_mean'] = Bx_mean_full
         S['beta'] = beta_full
         S['sb_frac'] = sb_frac_full
+        S['Bprp_norm_fluc'] = Bprp_fluc_full
+        S['uprp_norm_fluc'] = uprp_fluc_full
+        S['kinetic_norm_fluc'] = kinetic_fluc_full
         S['cross_helicity'] = cross_h_full
         S['C_B2_Squire'] = magcomp_sq_full
         # S['C_B2_Shoda'] = magcomp_sh_full
         
-        a_normfluc, Bprp_fluc, uprp_fluc = diag.norm_fluc_amp_hst(output_dir, expansion_rate)
-        S['a_normfluc'] = a_normfluc
-        S['norm_fluc_Bprp'] = Bprp_fluc
-        S['norm_fluc_uprp'] = uprp_fluc
+        a_normfluc, Bprp_fluc, kinetic_fluc = diag.norm_fluc_amp_hst(output_dir, expansion_rate)
+        S['a_norm_fluc_hst'] = a_normfluc
+        S['Bprp_norm_fluc_hst'] = Bprp_fluc
+        S['kinetic_norm_fluc_hst'] = kinetic_fluc
 
     if do_spectrum:
-        spec_hik_energy, spec_hik_a = np.array([]), np.array([])
+        spec_hik_mag, spec_hik_kin, spec_hik_a = np.array([]), np.array([]), np.array([])
         for n in range(max_n):
             if n % 5 == 0:  # don't want to run too often
                 print('Spectrum calculation started at n = ' + str(n))
@@ -99,9 +106,10 @@ def run_loop(output_dir, athinput_path, steps=10, do_spectrum=0, do_flyby=1, fly
                 S[spec_name] = spec.calc_spectrum(output_dir, output_dir, prob='from_array', dict_name=spec_name,
                                                 return_dict=1, do_single_file=1, n=n, a=spec_a)
                 spec_hik_a = np.append(spec_hik_a, spec_a)
-                spec_hik_energy = np.append(spec_hik_energy, spec_hik_energy_frac(S[spec_name]))
+                spec_hik_mag = np.append(spec_hik_mag, spec_hik_energy_frac(S[spec_name]))
+                spec_hik_kin = np.append(spec_hik_kin, spec_hik_energy_frac(S[spec_name], do_magnetic=0))
         T = {}
-        T['hi_energy_frac'], T['hi_energy_a'] = spec_hik_energy, spec_hik_a
+        T['hi_mag_energy_frac'], T['hi_kin_energy_frac'], T['hi_energy_a'] = spec_hik_mag, spec_hik_kin, spec_hik_a
         S['energy_in_hi_k'] = T
 
     if do_flyby:
@@ -129,10 +137,13 @@ def run_loop(output_dir, athinput_path, steps=10, do_spectrum=0, do_flyby=1, fly
     diag.save_dict(S, output_dir, 'data_dump')
 
 
-def spec_hik_energy_frac(S):
+def spec_hik_energy_frac(S, do_magnetic=1):
     k = S['kgrid']
     kmax = max(k)
-    EM = S['EM_prp']
-    hik_EM = EM[k > (kmax/6)].sum()
-    tot_EM = EM.sum()
-    return hik_EM / tot_EM
+    if do_magnetic:
+        E = S['EM_prp']
+    else:
+        E = S['EK_prp']
+    hik_E = E[k > (kmax/6)].sum()
+    tot_E = E.sum()
+    return hik_E / tot_E

@@ -1,6 +1,14 @@
-# COMPUTER = 'linux'
-COMPUTER = 'mac'
-# COMPUTER = 'nesi'
+import os
+
+cdir_root = os.getcwd().split('/')
+
+if cdir_root[1] == 'Users':
+    COMPUTER = 'mac'
+elif cdir_root[1] == 'home':
+    if cdir_root[2] == 'zade':
+        COMPUTER = 'linux'
+    else:
+        COMPUTER = 'nesi'
 
 if COMPUTER == 'linux':
     PATH = '/home/zade/masters_2021/'
@@ -8,10 +16,10 @@ if COMPUTER == 'linux':
     from_array_path = '/home/zade/masters_2021/templates_athinput/athinput.from_array'
     athena_path = '/home/zade/masters_2021/athena/bin/from_array/athena'
 elif COMPUTER == 'mac':
-    PATH = '/Users/johza22p/masters_2021/'
+    PATH = '/Users/johza22p/Google Drive/masters_2021/'
     python_masters_path = '/Users/johza22p/python_masters/'
     from_array_path = '/Users/johza22p/masters_2021/templates_athinput/athinput.from_array'
-    athena_path = '/Users/johza22p/masters_2021/athena/bin/from_array/athena'
+    athena_path = '/Users/johza22p/athena/athena_masters/bin/from_array/athena'
 elif COMPUTER == 'nesi':
     PATH = '/nesi/project/uoo02637/zade/masters_2021/' # project directory
     python_masters_path = '/home/johza721/masters_2021/python_masters/'
