@@ -87,7 +87,7 @@ def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=
                     S[Bcc] += spect1D(ft, ft, Kspec, kgrid)
                     S['EM'] += S[Bcc]
                     S['EM_prl'] += spect1D(ft, ft, Kprl, kgrid)
-                    S['EM_prp'] += spect1D(ft, ft, Kperp, kgrid)
+                    S['EM_prp'] += spect1D_test(ft, ft, Kperp, kgrid)
                     S['EM_2D']  += spect2D(ft, ft, Kprl, Kperp, kgrid)
                     Bmag += B**2
                 if normalize_energy:
@@ -217,9 +217,9 @@ def spect1D(v1, v2, K, kgrid):
     K is the kgrid associated with v1 and v2
     kgrid is the grid for spectral shell binning
     '''
-    nk = len(kgrid) - 1
+    nk = len(kgrid) - 1  # number of bins
     out = np.zeros((nk, 1))
-    NT2 = np.size(K)**2
+    NT2 = np.size(K)**2  # total number of elements summed over, used as normalization
     for k in range(nk):
         # For k between kgrid[k] and kgrid[k+1]
         mask = np.logical_and(K <= kgrid[k+1], K > kgrid[k])
@@ -230,6 +230,23 @@ def spect1D(v1, v2, K, kgrid):
         spec_sum = np.sum(np.real(v1[mask])*np.conj(v2[mask]))
         out[k] = np.real(spec_sum) / NT2
     return out
+
+
+def spect1D_test(v1, v2, K, kgrid):
+    nk = len(kgrid) - 1
+    NT2 = (K.size)**2
+    k = np.copy(kgrid)
+    k.reshape(kgrid.shape, 1, 1, 1)
+    Kb = np.broadcast_to(K, (nk, *K.shape))
+    v1b = np.broadcast_to(v1, (nk, *v1.shape))
+    v2b = np.broadcast_to(v2, (nk, *v2.shape))
+    mask = np.logical_not( (k[:-1] < Kb) & (Kb <= k[1:]) )
+    v1m = np.ma.array(v1b, mask=mask)
+    v2m = np.ma.array(v2b, mask=mask)
+    prod = np.real(v1m)*np.conj(v2m)
+    out = np.real(prod.sum(axis=(1,2,3))) / NT2
+    return out
+
 
 def spect2D(v1, v2, Kprl, Kprp, kgrid):
     '''Function to find the spectrum < v1 v2 >,
