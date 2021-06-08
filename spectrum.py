@@ -48,7 +48,8 @@ def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=
 
         ns = 0  # counter
         fields = ['vel1', 'vel2', 'vel3', 'Bcc1', 'Bcc2', 'Bcc3',
-                  'EK', 'EK_prp', 'EK_prl', 'EM', 'EM_prp', 'EM_prl', 'B', 'rho']
+                  'EK', 'EK_prp', 'EK_prl', 'EM', 'EM_prp', 'EM_prl',
+                  'EK_2D', 'EM_2D', 'B', 'rho']
 
         # Initializing variable fields in spectrum dictionary
         for var in fields:
@@ -71,10 +72,12 @@ def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=
                 S['EK'] += S[vel]  # Total spectrum is sum of each component
                 S['EK_prl'] += spect1D(ft, ft, Kprl, kgrid)
                 S['EK_prp'] += spect1D(ft, ft, Kperp, kgrid)
+                S['EK_2D']  += spect2D(ft, ft, Kprl, Kperp, kgrid)
             if normalize_energy:
                 # v_A ~ a^(-1) ⟹ (v_A)^2 ∼ a^(-2), assuming v_A0 = 1
                 S['EK'] /= a**(-2)
                 S['EK_prp'] /= a**(-2)
+                S['EK_2D'] /= a**(-2)
 
             if do_mhd:
                 Bmag = 0
@@ -85,11 +88,14 @@ def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=
                     S['EM'] += S[Bcc]
                     S['EM_prl'] += spect1D(ft, ft, Kprl, kgrid)
                     S['EM_prp'] += spect1D(ft, ft, Kperp, kgrid)
+                    S['EM_2D']  += spect2D(ft, ft, Kprl, Kperp, kgrid)
                     Bmag += B**2
                 if normalize_energy:
                     # B_x ∼ a^(-2) ⟹ (B_x)^2 ∼ a^(-4), assuming ⟨B_x0⟩=1
                     S['EM'] /= a**(-4)
                     S['EM_prp'] /= a**(-4)
+                    S['EM_2D'] /= a**(-4)
+            
                 Bmag = np.sqrt(Bmag)
                 ft_Bmag = fft.fftn(Bmag)
                 S['B'] += spect1D(ft_Bmag, ft_Bmag, Kspec, kgrid)
@@ -223,6 +229,28 @@ def spect1D(v1, v2, K, kgrid):
         # essentially the mean of v1 v2* within this frequency range and thus the mean energy
         spec_sum = np.sum(np.real(v1[mask])*np.conj(v2[mask]))
         out[k] = np.real(spec_sum) / NT2
+    return out
+
+def spect2D(v1, v2, Kprl, Kprp, kgrid):
+    '''Function to find the spectrum < v1 v2 >,
+    K is the kgrid associated with v1 and v2
+    kgrid is the grid for spectral shell binning
+    '''
+    nk = len(kgrid) - 1
+    out = np.zeros((nk, nk))
+    NT2 = np.size(Kprp)**2
+    for kprl in range(nk):
+        mask_prl = (kgrid[kprl] < Kprl) & (Kprl <= kgrid[kprl+1])
+        for kprp in range(nk):
+            # For k between kgrid[k] and kgrid[k+1]
+            mask_prp = (kgrid[kprp] < Kprp) & (Kprp <= kgrid[kprp+1])
+            mask = mask_prl & mask_prp
+            # Find the total energy within that k range
+            # This is the specturm <v1 v2>(k) ~ integral(v1 v2* dk) with kgrid[k] < k < kgrid[k+1]
+            # which is equivalent to the total energy in that range via Parseval's theorem
+            # essentially the mean of v1 v2* within this frequency range and thus the mean energy
+            spec_sum = np.sum(np.real(v1[mask])*np.conj(v2[mask]))
+            out[kprp, kprl] = np.real(spec_sum) / NT2
     return out
 
 

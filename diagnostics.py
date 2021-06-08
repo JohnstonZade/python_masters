@@ -192,8 +192,9 @@ def format_cputime(est_time, n_cpus, cputime=0, add_suffix=0, day_format=1):
     else:
         return prefix_str + str(round(est_time_hrs, 2)) + ' hrs' + suffix_str
 
-def get_split_cputime(dx, resolution, n_cpus_list, a_list, a_dot, total_time=1):
+def get_split_cputime(dx, resolution, n_cpus_list, a_list, a_dot, total_time=1, scale_prl=1):
     cpu_time, phys_time = [], []
+    res = np.copy(resolution)
     for idx, a in enumerate(a_list[1:]):
         a_start = a_list[idx]
         a_end = a
@@ -201,11 +202,16 @@ def get_split_cputime(dx, resolution, n_cpus_list, a_list, a_dot, total_time=1):
             n_cpus = n_cpus_list[idx]
         else:
             n_cpus = n_cpus_list[0]
-        print(a_start, a_end)
-        new_res = np.copy(resolution)
-        new_res[1:] *= a_start
-        cpu_time.append(get_est_cputime(dx, new_res.prod(), n_cpus, a_start, a_end, a_dot, cputime=1))
-        phys_time.append(get_est_cputime(dx, new_res.prod(), n_cpus, a_start, a_end, a_dot))
+        print(str(a_start) + '->' + str(a_end))
+        print(res)
+        cpu_time.append(get_est_cputime(dx, res.prod(), n_cpus, a_start, a_end, a_dot, cputime=1))
+        phys_time.append(get_est_cputime(dx, res.prod(), n_cpus, a_start, a_end, a_dot))
+        if scale_prl:
+            res[0] //= (a / a_list[idx])
+            dx *= (a / a_list[idx])
+        else:
+            res[1:] *= a_start
+        
     cpu_time, phys_time = np.array(cpu_time), np.array(phys_time)
     if total_time:
         tot_cpu = cpu_time.sum()
