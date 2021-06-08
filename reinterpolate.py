@@ -15,7 +15,8 @@ def reinterp_to_grid(data, old_Xgrid, new_Ns, Ls):
     data_hires = data_interp(pts).reshape(*new_Ns)
     return data_hires
 
-def flyby(output_dir, flyby_a, flyby_n, do_rand_start=1, l_start=None, l_dir=np.array([np.pi/8, np.sqrt(0.5), 1.])):
+def flyby(output_dir, flyby_a, flyby_n, do_rand_start=1, l_start=None,
+          l_dir=np.array([np.pi/8, np.sqrt(0.5), 1.]), norm_Bx=1):
     
     # assuming always from_array
     data = diag.load_data(output_dir, flyby_n, prob='from_array')
@@ -24,16 +25,27 @@ def flyby(output_dir, flyby_a, flyby_n, do_rand_start=1, l_start=None, l_dir=np.
     zg, yg, xg = reinterp_generate_grid(Ns, Ls)
     # Zg, Yg, Xg = np.meshgrid(zg, yg, xg, indexing='ij')  # only needed if defining a function on grid
     
-    Bx = pad_array(data['Bcc1'])
-    By = pad_array(data['Bcc2'])
-    Bz = pad_array(data['Bcc3'])
-    rho = pad_array(data['rho'])
+
+    rho_data = data['rho']
+    scale_Bx = flyby_a**2 if norm_Bx else 1  # 1 / <Bx> = a^2
+    scale_u = np.sqrt(rho_data) * flyby_a**2 if norm_Bx else 1  # rho^1/2 / <Bx> = rho^1/2 * a^2
+
+    Bx = pad_array(data['Bcc1'] * scale_Bx)
+    By = pad_array(data['Bcc2'] * scale_Bx)
+    Bz = pad_array(data['Bcc3'] * scale_Bx)
+    ux = pad_array(data['vel1'] * scale_u)
+    uy = pad_array(data['vel2'] * scale_u)
+    uz = pad_array(data['vel3'] * scale_u)
+    rho = pad_array(rho_data)
     Bmag = np.sqrt(Bx**2 + By**2 + Bz**2)
 
     # interpolaters
     Bx_i = rgi((zg, yg, xg), Bx)
     By_i = rgi((zg, yg, xg), By)
-    Bz_i = rgi((zg, yg, xg), Bz)
+    Bz_i = rgi((zg, yg, xg), Bz)    
+    ux_i = rgi((zg, yg, xg), ux)
+    uy_i = rgi((zg, yg, xg), uy)
+    uz_i = rgi((zg, yg, xg), uz)
     Bmag_i = rgi((zg, yg, xg), Bmag)
     rho_i = rgi((zg, yg, xg), rho)
 
@@ -58,6 +70,7 @@ def flyby(output_dir, flyby_a, flyby_n, do_rand_start=1, l_start=None, l_dir=np.
     # Interpolate data along line running through box
     FB = {}
     FB['Bx'], FB['By'], FB['Bz'] = Bx_i(pts), By_i(pts), Bz_i(pts)
+    FB['ux'], FB['uy'], FB['uz'] = ux_i(pts), uy_i(pts), uz_i(pts)
     FB['Bmag'], FB['rho'] = Bmag_i(pts), rho_i(pts)
     FB['start_point'], FB['direction'] = l_start, l_dir
     FB['l_param'], FB['points'] = lvec, pts
