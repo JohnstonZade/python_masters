@@ -136,7 +136,7 @@ def run_loop(output_dir, athinput_path, steps=10, do_spectrum=0, do_flyby=1, ove
 
         for n in range(max_n):
             if n % 5 == 0:
-                flyby_a = a[n]
+                flyby_a = round(S['perp_expand'][n], 2)
                 flyby_string = 'flyby_a' + str(flyby_a)
                 S[flyby_string] = reinterpolate.flyby(output_dir, flyby_a, n)
                 print(flyby_string + ' done')
