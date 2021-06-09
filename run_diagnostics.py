@@ -18,7 +18,7 @@ def read_athinput(athinput_path):
     return expansion_rate, iso_sound_speed, tlim, dt
  
 
-def run_loop(output_dir, athinput_path, steps=10, do_spectrum=0, do_flyby=1, flyby_a=-999, override_not_full_calc=0):
+def run_loop(output_dir, athinput_path, steps=10, do_spectrum=0, do_flyby=1, override_not_full_calc=0):
     
     max_n = diag.get_maxn(output_dir)
     # overestimate the number of steps needed; edge case is handled when loading data
@@ -113,26 +113,33 @@ def run_loop(output_dir, athinput_path, steps=10, do_spectrum=0, do_flyby=1, fly
         S['energy_in_hi_k'] = T
 
     if do_flyby:
-        try:
-            t = np.arange(0, tlim+dt, dt)
-            a = diag.a(expansion_rate, t)
+        # try:
+        #     t = np.arange(0, tlim+dt, dt)
+        #     a = diag.a(expansion_rate, t)
 
-            # set to do last flyby by default
-            if flyby_a == -999:
-                flyby_a = a[-1]
-            assert a[0] <= flyby_a <= a[-1], 'Please choose a valid a!'
-            # index of the given a value we want
-            flyby_n = int(np.round((flyby_a - 1) / (expansion_rate * dt)))
+        #     # set to do last flyby by default
+        #     if flyby_a == -999:
+        #         flyby_a = a[-1]
+        #     assert a[0] <= flyby_a <= a[-1], 'Please choose a valid a!'
+        #     # index of the given a value we want
+        #     flyby_n = int(np.round((flyby_a - 1) / (expansion_rate * dt)))
 
-            if max_n < int((tlim+dt)/dt) and max_n <= flyby_n:
-                raise ValueError('Athena has not output the expected number of .athdf files, and we are trying to access a file that does not exist',
-                                'max_n = ' + str(max_n), 'expected max_n = ' + str(int((tlim+dt)/dt)), 'flyby_n = ' + str(flyby_n))
+        #     if max_n < int((tlim+dt)/dt) and max_n <= flyby_n:
+        #         raise ValueError('Athena has not output the expected number of .athdf files, and we are trying to access a file that does not exist',
+        #                         'max_n = ' + str(max_n), 'expected max_n = ' + str(int((tlim+dt)/dt)), 'flyby_n = ' + str(flyby_n))
 
-            flyby_string = 'flyby_a' + str(flyby_a)
-            S[flyby_string] = reinterpolate.flyby(output_dir, flyby_a, flyby_n)
-            print(flyby_string + ' done')
-        except ValueError as ve:
-            print(ve.args)
+        #     flyby_string = 'flyby_a' + str(flyby_a)
+        #     S[flyby_string] = reinterpolate.flyby(output_dir, flyby_a, flyby_n)
+        #     print(flyby_string + ' done')
+        # except ValueError as ve:
+        #     print(ve.args)
+
+        for n in range(max_n):
+            if n % 5 == 0:
+                flyby_a = a[n]
+                flyby_string = 'flyby_a' + str(flyby_a)
+                S[flyby_string] = reinterpolate.flyby(output_dir, flyby_a, n)
+                print(flyby_string + ' done')
 
     diag.save_dict(S, output_dir, 'data_dump')
 
