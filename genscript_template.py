@@ -31,15 +31,32 @@ folder = ''    # put folder to output here, make sure Athena binary is in this f
 total_folder =  folder_root + folder
 
 # X, Y, Z
-n_X = np.array([64, 64, 64])
-X_min = np.array([0., 0., 0.])
-X_max = np.array([1., 1., 1.])
-meshblock = np.array([32, 32, 32])
+reinterpolating = 0
+if reinterpolating:
+    box_aspect = 1  # L_prl / L_prp
+    L_prp = 1 / box_aspect
+    cell_aspect = 1  # dx / dx_perp
+    res_aspect = box_aspect / cell_aspect  # N_prl / N_prp
+    N_prl = 500
+    N_prp = N_prl // res_aspect
+    
+    n_X = np.array([N_prl, N_prp, N_prp])
+    X_min = np.array([0., 0., 0.])
+    X_max = np.array([1., L_prp, L_prp])
+    meshblock = np.array([32, 32, 32])
+else:
+    n_X = np.array([64, 64, 64])
+    X_min = np.array([0., 0., 0.])
+    X_max = np.array([1., 1., 1.])
+    meshblock = np.array([32, 32, 32])
 
 # for editing athinput.from_array file
 expand = 1      # use expanding box model
 exp_rate = 0.5  # expansion rate
-a_final = 8     
+if reinterpolating and cell_aspect >= 1:
+    a_final = cell_aspect
+else:
+    a_final = 8
 time_lim = expand_to_a(a_final, exp_rate)
 # time_lim = 6  # use this to manually set t_lim
 dt = 0.2        # time step for simulation output
