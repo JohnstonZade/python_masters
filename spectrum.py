@@ -87,7 +87,7 @@ def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=
                     S[Bcc] += spect1D(ft, ft, Kspec, kgrid)
                     S['EM'] += S[Bcc]
                     S['EM_prl'] += spect1D(ft, ft, Kprl, kgrid)
-                    S['EM_prp'] += spect1D_test(ft, ft, Kperp, kgrid)
+                    S['EM_prp'] += spect1D(ft, ft, Kperp, kgrid)
                     S['EM_2D']  += spect2D(ft, ft, Kprl, Kperp, kgrid)
                     Bmag += B**2
                 if normalize_energy:
@@ -222,7 +222,7 @@ def spect1D(v1, v2, K, kgrid):
     NT2 = np.size(K)**2  # total number of elements summed over, used as normalization
     for k in range(nk):
         # For k between kgrid[k] and kgrid[k+1]
-        mask = np.logical_and(K <= kgrid[k+1], K > kgrid[k])
+        mask = (kgrid[k] < K) & (K <= kgrid[k+1])
         # Find the total energy within that k range
         # This is the specturm <v1 v2>(k) ~ integral(v1 v2* dk) with kgrid[k] < k < kgrid[k+1]
         # which is equivalent to the total energy in that range via Parseval's theorem

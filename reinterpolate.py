@@ -75,6 +75,7 @@ def flyby(output_dir, flyby_a, flyby_n, do_rand_start=1, l_start=None,
     FB['start_point'], FB['direction'] = l_start, l_dir
     FB['l_param'], FB['points'] = lvec, pts
     FB['a'], FB['snapshot_number'] = flyby_a, flyby_n
+    FB['normed_to_Bx'] = 'true' if norm_Bx else 'false'
 
     return FB
 

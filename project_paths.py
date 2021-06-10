@@ -16,7 +16,7 @@ if COMPUTER == 'linux':
     from_array_path = PATH + 'templates_athinput/athinput.from_array'
     athena_path = '/home/zade/athena/athena_masters/bin/from_array/athena'
 elif COMPUTER == 'mac':
-    PATH = '/Users/johza22p/Google Drive/masters_2021/'
+    PATH = "/Users/johza22p/GoogleDrive/masters_2021/"
     python_masters_path = '/Users/johza22p/python_masters/'
     from_array_path = PATH + 'templates_athinput/athinput.from_array'
     athena_path = '/Users/johza22p/athena/athena_masters/bin/from_array/athena'

@@ -130,30 +130,15 @@ def edit_athinput(athinput, save_folder, n_X, X_min, X_max, meshblock, h5name,
 
 def read_athinput(athinput, reinterpolate=0):
 
-    def get_from_string(i, dtype):
-        s = list_of_lines[i].split('=')[1].split('#')[0]
-        if dtype == 'int':
-            return int(s)
-        elif dtype == 'float':
-            return float(s)
-
-    def get_value_indices():
-        nx = [i for i, j in enumerate(list_of_lines) if ('nx1' in j or 'nx2' in j or 'nx3' in j)]
-        xmin = [i for i, j in enumerate(list_of_lines) if ('x1min' in j or 'x2min' in j or 'x3min' in j)]
-        xmax = [i for i, j in enumerate(list_of_lines) if ('x1max' in j or 'x2max' in j or 'x3max' in j)]
-        return nx[:3], xmin, xmax, nx[3:]
-
-    ath = open(athinput, 'r')
-    list_of_lines = ath.readlines()
-    nx_idx, xmin_idx, xmax_idx, mesh_idx = get_value_indices()
+    ath_dict = athinput_dict(athinput)
+    n_X = np.array([ath_dict['mesh']['nx1'], ath_dict['mesh']['nx2'], ath_dict['mesh']['nx3']])
+    X_min = np.array([ath_dict['mesh']['x1min'], ath_dict['mesh']['x2min'], ath_dict['mesh']['x3min']])
+    X_max = np.array([ath_dict['mesh']['x1max'], ath_dict['mesh']['x2max'], ath_dict['mesh']['x3max']])
+    meshblock = np.array([ath_dict['meshblock']['nx1'], ath_dict['meshblock']['nx2'], ath_dict['meshblock']['nx3']])
     
-    n_X = np.array([get_from_string(i, 'int') for i in nx_idx])
-    X_min = np.array([get_from_string(i, 'float') for i in xmin_idx])
-    X_max = np.array([get_from_string(i, 'float') for i in xmax_idx])
-    meshblock = np.array([get_from_string(i, 'int') for i in mesh_idx])
 
     if reinterpolate:
-        dt_hst = float(list_of_lines[17].split('=')[1].split('#')[0])
+        dt_hst = ath_dict['output1']['dt']
 
         return n_X, X_min, X_max, meshblock, dt_hst
     else:
@@ -177,9 +162,10 @@ def generate_grid(X_min, X_max, n_X):
     return Xgrid, dX
 
 def generate_mesh_structure(folder, athinput):
+    ath_path = athena_path
     cdir = os.getcwd()
     os.chdir(folder)
-    os.system(athena_path + ' -i ' + athinput + ' -m 1 > /dev/null')  # > /dev/null supresses output, remove if need to see meshblock details
+    os.system(ath_path + ' -i ' + athinput + ' -m 1 > /dev/null')  # > /dev/null supresses output, remove if need to see meshblock details
     blocks = read_mesh_structure('mesh_structure.dat')
     os.remove('mesh_structure.dat')
     n_blocks = blocks.shape[1]
