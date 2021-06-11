@@ -29,14 +29,19 @@ def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=
         data = diag.load_data(output_dir, 0, prob=prob)
         (KZ, KY, KX), kgrid = diag.ft_grid('data', data=data, prob=prob, k_grid=1, make_iso_box=do_isotropic)
         Kprl = np.abs(KX)
-        Kperp = np.sqrt(np.abs(KY)**2 + np.abs(KZ)**2)
-        Kmag = np.sqrt(Kprl**2+Kperp**2)
+        Kprp = np.sqrt(np.abs(KY)**2 + np.abs(KZ)**2)
+        Kmag = np.sqrt(Kprl**2+Kprp**2)
         Kspec = Kmag
+        
+        Kmag_mult, Kmag_grid = get_k_grid(Kmag)
+        Kprl_mult, Kprl_grid = get_k_grid(Kprl)
+        Kprp_mult, Kprp_grid = get_k_grid(Kprp)
 
         # Dictionary to hold spectrum information
         S = {}
         S['Nk'] = len(kgrid) - 1  # number of elements in kgrid
         S['kgrid'] = 0.5*(kgrid[:-1] + kgrid[1:])  # average of neighbours
+        S['Kprp_grid'] = 0.5*(Kprp_grid[:-1] + Kprp_grid[1:])  # average of neighbours
 
         # Count the number of modes in each bin to normalize later -- this
         # gives a smoother result, as we want the average energy in each bin.
@@ -49,7 +54,8 @@ def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=
         ns = 0  # counter
         fields = ['vel1', 'vel2', 'vel3', 'Bcc1', 'Bcc2', 'Bcc3',
                   'EK', 'EK_prp', 'EK_prl', 'EM', 'EM_prp', 'EM_prl',
-                  'EK_2D', 'EM_2D', 'B', 'rho']
+                  'EK_2D', 'EM_2D', 'B', 'rho',
+                  'EK_prp_hist', 'EM_prp_hist']
 
         # Initializing variable fields in spectrum dictionary
         for var in fields:
@@ -71,8 +77,9 @@ def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=
                 S[vel] += spect1D(ft, ft, Kspec, kgrid)
                 S['EK'] += S[vel]  # Total spectrum is sum of each component
                 S['EK_prl'] += spect1D(ft, ft, Kprl, kgrid)
-                S['EK_prp'] += spect1D(ft, ft, Kperp, kgrid)
-                S['EK_2D']  += spect2D(ft, ft, Kprl, Kperp, kgrid)
+                S['EK_prp'] += spect1D(ft, ft, Kprp, kgrid)
+                S['EK_prp_hist'] += spec1D_hist(ft, ft, Kprp, Kprp_grid, Kprp_mult, norm_perp=1)
+                S['EK_2D']  += spect2D(ft, ft, Kprl, Kprp, kgrid)
             if normalize_energy:
                 # v_A ~ a^(-1) ⟹ (v_A)^2 ∼ a^(-2), assuming v_A0 = 1
                 S['EK'] /= a**(-2)
@@ -87,8 +94,9 @@ def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=
                     S[Bcc] += spect1D(ft, ft, Kspec, kgrid)
                     S['EM'] += S[Bcc]
                     S['EM_prl'] += spect1D(ft, ft, Kprl, kgrid)
-                    S['EM_prp'] += spect1D(ft, ft, Kperp, kgrid)
-                    S['EM_2D']  += spect2D(ft, ft, Kprl, Kperp, kgrid)
+                    S['EM_prp'] += spect1D(ft, ft, Kprp, kgrid)
+                    S['EM_prp_hist'] += spec1D_hist(ft, ft, Kprp, Kprp_grid, Kprp_mult, norm_perp=1)
+                    S['EM_2D']  += spect2D(ft, ft, Kprl, Kprp, kgrid)
                     Bmag += B**2
                 if normalize_energy:
                     # B_x ∼ a^(-2) ⟹ (B_x)^2 ∼ a^(-4), assuming ⟨B_x0⟩=1
@@ -232,22 +240,6 @@ def spect1D(v1, v2, K, kgrid):
     return out
 
 
-def spect1D_test(v1, v2, K, kgrid):
-    nk = len(kgrid) - 1
-    NT2 = (K.size)**2
-    k = np.copy(kgrid)
-    k.reshape(kgrid.shape, 1, 1, 1)
-    Kb = np.broadcast_to(K, (nk, *K.shape))
-    v1b = np.broadcast_to(v1, (nk, *v1.shape))
-    v2b = np.broadcast_to(v2, (nk, *v2.shape))
-    mask = np.logical_not( (k[:-1] < Kb) & (Kb <= k[1:]) )
-    v1m = np.ma.array(v1b, mask=mask)
-    v2m = np.ma.array(v2b, mask=mask)
-    prod = np.real(v1m)*np.conj(v2m)
-    out = np.real(prod.sum(axis=(1,2,3))) / NT2
-    return out
-
-
 def spect2D(v1, v2, Kprl, Kprp, kgrid):
     '''Function to find the spectrum < v1 v2 >,
     K is the kgrid associated with v1 and v2
@@ -285,3 +277,27 @@ def get_spectral_slope(kgrid, spectrum, inertial_range):
     model = LinearRegression().fit(log_k, log_spec)
     slope = model.coef_
     return slope[0, 0]
+
+def get_k_grid(k):
+    k_flat = k.reshape(-1)
+    k_min, k_max = k[k > 0].min(), k.max()
+    k_bins = np.logspace(np.log10(k_min), np.log10(k_max), 2000)
+    k_hist = np.histogram(k_flat, k_bins)[0]  # multiplicity of a mode
+    
+    mode_mult = np.delete(k_hist, k_hist == 0)
+    k_bins = np.hstack((np.delete(k_bins[:-1], k_hist == 0), k_bins[-1]))
+    return mode_mult, k_bins
+    
+    
+def spec1D_hist(v1, v2, k, k_bins, mode_mult, norm_perp=0):
+    k_flat = k.reshape(-1)
+    energy = (np.real(v1)*np.conj(v2)).reshape(-1)
+    e_hist = np.histogram(k_flat, k_bins, weights=energy)[0]
+    e_hist = np.real(e_hist)
+    
+    if norm_perp:
+        # e_hist /= mode_mult
+        e_hist /= mode_mult**2  # can't remember which
+    
+    return e_hist
+    
