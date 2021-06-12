@@ -80,8 +80,8 @@ def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=
                     # Perpendicular fluctuation spectra
                     S['EK_fluc_prp'] += spec1D(ft, ft, Kmag, Kmag_bins, Kmag_mult, kmode_norm=1)
                     S['EK_fluc_prp_box_prp'] += spec1D(ft, ft, Kprp, Kprp_bins, Kprp_mult, kmode_norm=1)
-                # 2D (k_prl and k_prl) spectrum
-                S['EK_2D']  += spec2D(ft, ft, Kprp, Kprl, Kprp_bins, Kprl_bins, Kprp_mult)
+                    # 2D (k_prl and k_prl) spectrum
+                    S['EK_2D']  += spec2D(ft, ft, Kprp, Kprl, Kprp_bins, Kprl_bins, Kprp_mult)
             if normalize_energy:
                 # v_A ~ a^(-1) ⟹ (v_A)^2 ∼ a^(-2), assuming v_A0 = 1
                 for key in S.keys():
@@ -104,8 +104,8 @@ def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=
                         # Perpendicular fluctuation spectra
                         S['EM_fluc_prp'] += spec1D(ft, ft, Kmag, Kmag_bins, Kmag_mult, kmode_norm=1)
                         S['EM_fluc_prp_box_prp'] += spec1D(ft, ft, Kprp, Kprp_bins, Kprp_mult, kmode_norm=1)
-                    # 2D (k_prl and k_prl) spectrum
-                    S['EM_2D']  += spec2D(ft, ft, Kprp, Kprl, Kprp_bins, Kprl_bins, Kprp_mult)
+                        # 2D (k_prl and k_prl) spectrum
+                        S['EM_2D']  += spec2D(ft, ft, Kprp, Kprl, Kprp_bins, Kprl_bins, Kprp_mult)
                     Bmag += B**2
                 if normalize_energy:
                     # B_x ∼ a^(-2) ⟹ (B_x)^2 ∼ a^(-4), assuming ⟨B_x0⟩=1
