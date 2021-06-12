@@ -329,7 +329,7 @@ def ft_array(N):
     return array
 
 
-def ft_grid(input_type, data=None, output_dir=None, Ls=None, Ns=None, prob=DEFAULT_PROB, k_grid=0, make_iso_box=0):
+def ft_grid(input_type, data=None, output_dir=None, Ls=None, Ns=None, prob=DEFAULT_PROB, make_iso_box=0):
     '''
     Creates a grid in k-space corresponding to the real grid given in data.
     k_grid is a boolean that when True calculates a regularly spaced array
@@ -365,12 +365,6 @@ def ft_grid(input_type, data=None, output_dir=None, Ls=None, Ns=None, prob=DEFAU
             K[k] = 2j*np.pi/Ls[k]*ft_array(Ns[k])
 
     Ks = np.meshgrid(K[0], K[1], K[2], indexing='ij')
-    if k_grid:
-        if make_iso_box:
-            Ks = (Ks, np.arange(0, np.max(np.imag(K[1])), 2*np.pi)+1e-4)
-        else:
-            Ks = (Ks, np.arange(0, np.max(np.imag(K[1])), 2*np.pi/Ls[1])+1e-4)
-
     return Ks
 
 

@@ -26,36 +26,31 @@ def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=
     do_full_calc = not diag.check_dict(save_dir, dict_name)
     if do_full_calc:
         # create grid of K from first time step
-        data = diag.load_data(output_dir, 0, prob=prob)
-        (KZ, KY, KX), kgrid = diag.ft_grid('data', data=data, prob=prob, k_grid=1, make_iso_box=do_isotropic)
-        Kprl = np.abs(KX)
-        Kprp = np.sqrt(np.abs(KY)**2 + np.abs(KZ)**2)
+        data = diag.load_data(output_dir, n, prob=prob)
+        KZ, KY, KX = diag.ft_grid('data', data=data, prob=prob, make_iso_box=do_isotropic)
+        Kprl = np.maximum(np.abs(KX), 1e-4)
+        Kprp = np.maximum(np.sqrt(abs(KY)**2 + abs(KZ)**2), 1e-4)
         Kmag = np.sqrt(Kprl**2+Kprp**2)
-        Kspec = Kmag
         
-        Kmag_mult, Kmag_grid = get_k_grid(Kmag)
-        Kprl_mult, Kprl_grid = get_k_grid(Kprl)
-        Kprp_mult, Kprp_grid = get_k_grid(Kprp)
+        Kmag_mult, Kmag_bins = get_k_bins(Kmag)
+        Kprl_mult, Kprl_bins = get_k_bins(Kprl)
+        Kprp_mult, Kprp_bins = get_k_bins(Kprp)
+
+        def grid_from_bins(bins):
+            return 0.5*(bins[1:] + bins[:-1])
 
         # Dictionary to hold spectrum information
         S = {}
-        S['Nk'] = len(kgrid) - 1  # number of elements in kgrid
-        S['kgrid'] = 0.5*(kgrid[:-1] + kgrid[1:])  # average of neighbours
-        S['Kprp_grid'] = 0.5*(Kprp_grid[:-1] + Kprp_grid[1:])  # average of neighbours
-
-        # Count the number of modes in each bin to normalize later -- this
-        # gives a smoother result, as we want the average energy in each bin.
-        # This isn't usually used, but will keep it in case it is needed.
-        oneGrid = np.ones(KX.shape)
-        S['nbin'] = spect1D(oneGrid, oneGrid, Kspec, kgrid)*np.size(oneGrid)**2
-        S['nnorm'] = S['nbin']/S['kgrid']**2
-        S['nnorm'] /= np.mean(S['nnorm'])
+        grids, bins = {}, {}
+        grids['Kmag'], grids['Kprl'], grids['Kprp'] = grid_from_bins(Kmag_bins), grid_from_bins(Kprl_bins), grid_from_bins(Kprp_bins)
+        bins['Kmag'], bins['Kprl'], bins['Kprp'] = Kmag_bins, Kprl_bins, Kprp_bins
+        S['grids'], S['bins'] = grids, bins
 
         ns = 0  # counter
         fields = ['vel1', 'vel2', 'vel3', 'Bcc1', 'Bcc2', 'Bcc3',
-                  'EK', 'EK_prp', 'EK_prl', 'EM', 'EM_prp', 'EM_prl',
-                  'EK_2D', 'EM_2D', 'B', 'rho',
-                  'EK_prp_hist', 'EM_prp_hist']
+                  'EK', 'EK_box_prl', 'EK_box_prp', 'EK_fluc_prp', 'EK_fluc_prp_box_prp', 'EK_2D',
+                  'EM', 'EM_box_prl', 'EM_box_prp', 'EM_fluc_prp', 'EM_fluc_prp_box_prp', 'EM_2D',
+                  'B', 'rho']
 
         # Initializing variable fields in spectrum dictionary
         for var in fields:
@@ -74,42 +69,56 @@ def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=
             for vel in fields[:3]:
                 v = data[vel]
                 ft = fft.fftn(v)
-                S[vel] += spect1D(ft, ft, Kspec, kgrid)
+                # Isotropic spectra
+                S[vel] += spec1D(ft, ft, Kmag, Kmag_bins, Kmag_mult, kmode_norm=1)
                 S['EK'] += S[vel]  # Total spectrum is sum of each component
-                S['EK_prl'] += spect1D(ft, ft, Kprl, kgrid)
-                S['EK_prp'] += spect1D(ft, ft, Kprp, kgrid)
-                S['EK_prp_hist'] += spec1D_hist(ft, ft, Kprp, Kprp_grid, Kprp_mult, norm_perp=1)
-                S['EK_2D']  += spect2D(ft, ft, Kprl, Kprp, kgrid)
+                # Box-parallel (along x-axis) spectrum
+                S['EK_box_prl'] += spec1D(ft, ft, Kprl, Kprl_bins, Kprl_mult)
+                # Box-perpendicular spectrum
+                S['EK_box_prp'] += spec1D(ft, ft, Kprp, Kprp_bins, Kprp_mult, kmode_norm=1)
+                if vel != 'vel1':
+                    # Perpendicular fluctuation spectra
+                    S['EK_fluc_prp'] += spec1D(ft, ft, Kmag, Kmag_bins, Kmag_mult, kmode_norm=1)
+                    S['EK_fluc_prp_box_prp'] += spec1D(ft, ft, Kprp, Kprp_bins, Kprp_mult, kmode_norm=1)
+                # 2D (k_prl and k_prl) spectrum
+                S['EK_2D']  += spec2D(ft, ft, Kprp, Kprl, Kprp_bins, Kprl_bins, Kprp_mult)
             if normalize_energy:
                 # v_A ~ a^(-1) ⟹ (v_A)^2 ∼ a^(-2), assuming v_A0 = 1
-                S['EK'] /= a**(-2)
-                S['EK_prp'] /= a**(-2)
-                S['EK_2D'] /= a**(-2)
+                for key in S.keys():
+                    if 'EK' in key:
+                        S[key] /= a**(-2)
 
             if do_mhd:
                 Bmag = 0
                 for Bcc in fields[3:6]:
                     B = data[Bcc]
                     ft = fft.fftn(B)
-                    S[Bcc] += spect1D(ft, ft, Kspec, kgrid)
-                    S['EM'] += S[Bcc]
-                    S['EM_prl'] += spect1D(ft, ft, Kprl, kgrid)
-                    S['EM_prp'] += spect1D(ft, ft, Kprp, kgrid)
-                    S['EM_prp_hist'] += spec1D_hist(ft, ft, Kprp, Kprp_grid, Kprp_mult, norm_perp=1)
-                    S['EM_2D']  += spect2D(ft, ft, Kprl, Kprp, kgrid)
+                    # Isotropic spectra
+                    S[Bcc] += spec1D(ft, ft, Kmag, Kmag_bins, Kmag_mult, kmode_norm=1)
+                    S['EM'] += S[Bcc]  # Total spectrum is sum of each component
+                    # Box-parallel (along x-axis) spectrum
+                    S['EM_box_prl'] += spec1D(ft, ft, Kprl, Kprl_bins, Kprl_mult)
+                    # Box-perpendicular spectrum
+                    S['EM_box_prp'] += spec1D(ft, ft, Kprp, Kprp_bins, Kprp_mult, kmode_norm=1)
+                    if Bcc != 'Bcc1':
+                        # Perpendicular fluctuation spectra
+                        S['EM_fluc_prp'] += spec1D(ft, ft, Kmag, Kmag_bins, Kmag_mult, kmode_norm=1)
+                        S['EM_fluc_prp_box_prp'] += spec1D(ft, ft, Kprp, Kprp_bins, Kprp_mult, kmode_norm=1)
+                    # 2D (k_prl and k_prl) spectrum
+                    S['EM_2D']  += spec2D(ft, ft, Kprp, Kprl, Kprp_bins, Kprl_bins, Kprp_mult)
                     Bmag += B**2
                 if normalize_energy:
                     # B_x ∼ a^(-2) ⟹ (B_x)^2 ∼ a^(-4), assuming ⟨B_x0⟩=1
-                    S['EM'] /= a**(-4)
-                    S['EM_prp'] /= a**(-4)
-                    S['EM_2D'] /= a**(-4)
+                    for key in S.keys():
+                        if 'EM' in key:
+                            S[key] /= a**(-4)
             
                 Bmag = np.sqrt(Bmag)
                 ft_Bmag = fft.fftn(Bmag)
-                S['B'] += spect1D(ft_Bmag, ft_Bmag, Kspec, kgrid)
+                S['B'] += spec1D(ft_Bmag, ft_Bmag, Kmag, Kmag_bins, Kmag_mult, kmode_norm=1)
 
             ft_rho = fft.fftn(data['rho'] - np.mean(data['rho']))
-            S['rho'] += spect1D(ft_rho, ft_rho, Kspec, kgrid)
+            S['rho'] += spec1D(ft_rho, ft_rho, Kmag, Kmag_bins, Kmag_mult, kmode_norm=1)
 
             ns += 1
 
@@ -219,49 +228,48 @@ def plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd=1, do_i
     plt.savefig(save_dir + fname + fig_suffix + '.png')
     plt.close()
 
+def get_k_bins(k):
+    k_flat = k.reshape(-1)
+    k_min, k_max = 1e-5, k.max()
+    # k_min, k_max = k[k > 0].min(), k.max()
+    k_bins = np.logspace(np.log10(k_min), np.log10(k_max), 2000)
+    # multiplicity of a mode (number of times we see that wavenumber)
+    k_hist = np.histogram(k_flat, k_bins)[0]
+    
+    # Removing bins that have no modes in them (essentially widening the bins)
+    mode_mult = np.delete(k_hist, k_hist == 0)
+    k_bins = np.hstack((np.delete(k_bins[:-1], k_hist == 0), k_bins[-1]))
+    return mode_mult, k_bins
 
-def spect1D(v1, v2, K, kgrid):
-    '''Function to find the spectrum < v1 v2 >,
-    K is the kgrid associated with v1 and v2
-    kgrid is the grid for spectral shell binning
-    '''
-    nk = len(kgrid) - 1  # number of bins
-    out = np.zeros((nk, 1))
-    NT2 = np.size(K)**2  # total number of elements summed over, used as normalization
-    for k in range(nk):
-        # For k between kgrid[k] and kgrid[k+1]
-        mask = (kgrid[k] < K) & (K <= kgrid[k+1])
-        # Find the total energy within that k range
-        # This is the specturm <v1 v2>(k) ~ integral(v1 v2* dk) with kgrid[k] < k < kgrid[k+1]
-        # which is equivalent to the total energy in that range via Parseval's theorem
-        # essentially the mean of v1 v2* within this frequency range and thus the mean energy
-        spec_sum = np.sum(np.real(v1[mask])*np.conj(v2[mask]))
-        out[k] = np.real(spec_sum) / NT2
-    return out
+def spec1D(v1, v2, k, k_bins, mode_mult, kmode_norm=0):
+    # 1-to-1 correspondence in flattening grid
+    # (i.e. FT gets mapped to the same index as its corresponding k-point)
+    k_flat = k.reshape(-1)
+    energy = (0.5*v1*np.conj(v2)).reshape(-1)  # Parseval's theorem
+    # Bin energies in a given k_range
+    e_hist = np.histogram(k_flat, k_bins, weights=np.real(energy))[0]
+    
+    if kmode_norm:
+        # accounting for increase in modes in kspace
+        # as we move further out
+        n_modes = mode_mult.sum()
+        e_hist /= n_modes**2
+    return e_hist
 
-
-def spect2D(v1, v2, Kprl, Kprp, kgrid):
-    '''Function to find the spectrum < v1 v2 >,
-    K is the kgrid associated with v1 and v2
-    kgrid is the grid for spectral shell binning
-    '''
-    nk = len(kgrid) - 1
-    out = np.zeros((nk, nk))
-    NT2 = np.size(Kprp)**2
-    for kprl in range(nk):
-        mask_prl = (kgrid[kprl] < Kprl) & (Kprl <= kgrid[kprl+1])
-        for kprp in range(nk):
-            # For k between kgrid[k] and kgrid[k+1]
-            mask_prp = (kgrid[kprp] < Kprp) & (Kprp <= kgrid[kprp+1])
-            mask = mask_prl & mask_prp
-            # Find the total energy within that k range
-            # This is the specturm <v1 v2>(k) ~ integral(v1 v2* dk) with kgrid[k] < k < kgrid[k+1]
-            # which is equivalent to the total energy in that range via Parseval's theorem
-            # essentially the mean of v1 v2* within this frequency range and thus the mean energy
-            spec_sum = np.sum(np.real(v1[mask])*np.conj(v2[mask]))
-            out[kprp, kprl] = np.real(spec_sum) / NT2
-    return out
-
+def spec2D(v1, v2, kprp, kprl, kprp_bins, kprl_bins, mode_mult):
+    # 1-to-1 correspondence in flattening grid
+    # (i.e. FT gets mapped to the same index as its corresponding k-point)
+    kprp_flat = kprp.reshape(-1)
+    kprl_flat = kprl.reshape(-1)
+    energy = (0.5*v1*np.conj(v2)).reshape(-1)  # Parseval's theorem
+    # Bin energies in a given k_range
+    e_hist = np.histogram2d(kprp_flat, kprl_flat, [kprp_bins, kprl_bins], weights=np.real(energy))[0]
+    
+    # accounting for increase in modes in kspace
+    # as we move further out
+    n_modes = mode_mult.sum()
+    e_hist /= n_modes**2
+    return e_hist
 
 def get_spectral_slope(kgrid, spectrum, inertial_range):
     mask = (inertial_range[0] <= kgrid) & (kgrid <= inertial_range[1])
@@ -278,26 +286,9 @@ def get_spectral_slope(kgrid, spectrum, inertial_range):
     slope = model.coef_
     return slope[0, 0]
 
-def get_k_grid(k):
-    k_flat = k.reshape(-1)
-    k_min, k_max = k[k > 0].min(), k.max()
-    k_bins = np.logspace(np.log10(k_min), np.log10(k_max), 2000)
-    k_hist = np.histogram(k_flat, k_bins)[0]  # multiplicity of a mode
-    
-    mode_mult = np.delete(k_hist, k_hist == 0)
-    k_bins = np.hstack((np.delete(k_bins[:-1], k_hist == 0), k_bins[-1]))
-    return mode_mult, k_bins
+
+
     
     
-def spec1D_hist(v1, v2, k, k_bins, mode_mult, norm_perp=0):
-    k_flat = k.reshape(-1)
-    energy = (np.real(v1)*np.conj(v2)).reshape(-1)
-    e_hist = np.histogram(k_flat, k_bins, weights=energy)[0]
-    e_hist = np.real(e_hist)
-    
-    if norm_perp:
-        # e_hist /= mode_mult
-        e_hist /= mode_mult**2  # can't remember which
-    
-    return e_hist
+
     
