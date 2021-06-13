@@ -96,6 +96,8 @@ def run_loop(output_dir, athinput_path, steps=10, do_spectrum=0, do_flyby=1, ove
         S['Bprp_norm_fluc_hst'] = Bprp_fluc
         S['kinetic_norm_fluc_hst'] = kinetic_fluc
 
+        diag.save_dict(S, output_dir, 'data_dump')
+
     if do_spectrum:
         spec_hik_mag, spec_hik_kin, spec_hik_a = np.array([]), np.array([]), np.array([])
         for n in range(max_n):
@@ -111,6 +113,7 @@ def run_loop(output_dir, athinput_path, steps=10, do_spectrum=0, do_flyby=1, ove
         T = {}
         T['hi_mag_energy_frac'], T['hi_kin_energy_frac'], T['hi_energy_a'] = spec_hik_mag, spec_hik_kin, spec_hik_a
         S['energy_in_hi_k'] = T
+        diag.save_dict(S, output_dir, 'data_dump')
 
     if do_flyby:
         # try:
@@ -145,12 +148,12 @@ def run_loop(output_dir, athinput_path, steps=10, do_spectrum=0, do_flyby=1, ove
 
 
 def spec_hik_energy_frac(S, do_magnetic=1):
-    k = S['kgrid']
+    k = S['grids']['Kmag']
     kmax = max(k)
     if do_magnetic:
-        E = S['EM_prp']
+        E = S['EM']
     else:
-        E = S['EK_prp']
+        E = S['EK']
     hik_E = E[k > (kmax/6)].sum()
     tot_E = E.sum()
     return hik_E / tot_E

@@ -13,7 +13,8 @@ default_prob = diag.DEFAULT_PROB
 
 def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=(10**1.5, 10**2), prob=default_prob,
                   plot_title='test', dict_name='mhd_spec', do_single_file=0, n=0, a=1, do_isotropic=1,
-                  normalize_energy=1, do_mhd=1, gaussian=0, do_prp_spec=1, do_prl_spec=0, do_title=1):
+                  normalize_energy=1, do_mhd=1, gaussian=0, do_prp_spec=1, do_prl_spec=0, do_title=1,
+                  bmag_and_rho=0):
 
     # Getting turnover time and converting to file number
     if do_single_file:
@@ -48,10 +49,11 @@ def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=
 
         ns = 0  # counter
         fields = ['vel1', 'vel2', 'vel3', 'Bcc1', 'Bcc2', 'Bcc3',
-                  'EK', 'EK_box_prl', 'EK_box_prp', 'EK_fluc_prp', 'EK_fluc_prp_box_prp', 'EK_2D',
-                  'EM', 'EM_box_prl', 'EM_box_prp', 'EM_fluc_prp', 'EM_fluc_prp_box_prp', 'EM_2D',
-                  'B', 'rho']
-
+                  'EK', 'EK_prlbox', 'EK_prpbox', 'EK_prpfluc', 'EK_prpfluc_prlbox', 'EK_prpfluc_prpbox', 'EK_prpfluc_2D',
+                  'EM', 'EM_prlbox', 'EM_prpbox', 'EM_prpfluc', 'EM_prpfluc_prlbox', 'EM_prpfluc_prpbox', 'EM_prpfluc_2D']
+        if bmag_and_rho:
+            fields.append('B')
+            fields.append('rho')
         # Initializing variable fields in spectrum dictionary
         for var in fields:
             S[var] = 0
@@ -69,19 +71,23 @@ def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=
             for vel in fields[:3]:
                 v = data[vel]
                 ft = fft.fftn(v)
+                iso = spec1D(ft, ft, Kmag, Kmag_bins, Kmag_mult)
+                prlbox = spec1D(ft, ft, Kprl, Kprl_bins, Kprp_mult)
+                prpbox = spec1D(ft, ft, Kprp, Kprp_bins, Kprp_mult)
                 # Isotropic spectra
-                S[vel] += spec1D(ft, ft, Kmag, Kmag_bins, Kmag_mult, kmode_norm=1)
-                S['EK'] += S[vel]  # Total spectrum is sum of each component
+                S[vel] += iso
+                S['EK'] += iso  # Total spectrum is sum of each component
                 # Box-parallel (along x-axis) spectrum
-                S['EK_box_prl'] += spec1D(ft, ft, Kprl, Kprl_bins, Kprl_mult)
+                S['EK_prlbox'] += prlbox
                 # Box-perpendicular spectrum
-                S['EK_box_prp'] += spec1D(ft, ft, Kprp, Kprp_bins, Kprp_mult, kmode_norm=1)
+                S['EK_prpbox'] += prpbox
                 if vel != 'vel1':
                     # Perpendicular fluctuation spectra
-                    S['EK_fluc_prp'] += spec1D(ft, ft, Kmag, Kmag_bins, Kmag_mult, kmode_norm=1)
-                    S['EK_fluc_prp_box_prp'] += spec1D(ft, ft, Kprp, Kprp_bins, Kprp_mult, kmode_norm=1)
+                    S['EK_prpfluc'] += iso
+                    S['EK_prpfluc_prlbox'] += prlbox
+                    S['EK_prpfluc_prpbox'] += prpbox
                     # 2D (k_prl and k_prl) spectrum
-                    S['EK_2D']  += spec2D(ft, ft, Kprp, Kprl, Kprp_bins, Kprl_bins, Kprp_mult)
+                    S['EK_prpfluc_2D']  += spec2D(ft, ft, Kprp, Kprl, Kprp_bins, Kprl_bins, Kprp_mult)
             if normalize_energy:
                 # v_A ~ a^(-1) ⟹ (v_A)^2 ∼ a^(-2), assuming v_A0 = 1
                 for key in S.keys():
@@ -93,32 +99,38 @@ def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=
                 for Bcc in fields[3:6]:
                     B = data[Bcc]
                     ft = fft.fftn(B)
+                    iso = spec1D(ft, ft, Kmag, Kmag_bins, Kmag_mult)
+                    prlbox = spec1D(ft, ft, Kprl, Kprl_bins, Kprp_mult)
+                    prpbox = spec1D(ft, ft, Kprp, Kprp_bins, Kprp_mult)
                     # Isotropic spectra
-                    S[Bcc] += spec1D(ft, ft, Kmag, Kmag_bins, Kmag_mult, kmode_norm=1)
-                    S['EM'] += S[Bcc]  # Total spectrum is sum of each component
+                    S[Bcc] += iso
+                    S['EM'] += iso  # Total spectrum is sum of each component
                     # Box-parallel (along x-axis) spectrum
-                    S['EM_box_prl'] += spec1D(ft, ft, Kprl, Kprl_bins, Kprl_mult)
+                    S['EM_prlbox'] += prlbox
                     # Box-perpendicular spectrum
-                    S['EM_box_prp'] += spec1D(ft, ft, Kprp, Kprp_bins, Kprp_mult, kmode_norm=1)
+                    S['EM_prpbox'] += prpbox
                     if Bcc != 'Bcc1':
                         # Perpendicular fluctuation spectra
-                        S['EM_fluc_prp'] += spec1D(ft, ft, Kmag, Kmag_bins, Kmag_mult, kmode_norm=1)
-                        S['EM_fluc_prp_box_prp'] += spec1D(ft, ft, Kprp, Kprp_bins, Kprp_mult, kmode_norm=1)
+                        S['EM_prpfluc'] += iso
+                        S['EM_prpfluc_prlbox'] += prlbox
+                        S['EM_prpfluc_prpbox'] += prpbox
                         # 2D (k_prl and k_prl) spectrum
-                        S['EM_2D']  += spec2D(ft, ft, Kprp, Kprl, Kprp_bins, Kprl_bins, Kprp_mult)
+                        S['EM_prpfluc_2D']  += spec2D(ft, ft, Kprp, Kprl, Kprp_bins, Kprl_bins, Kprp_mult)
                     Bmag += B**2
                 if normalize_energy:
                     # B_x ∼ a^(-2) ⟹ (B_x)^2 ∼ a^(-4), assuming ⟨B_x0⟩=1
                     for key in S.keys():
                         if 'EM' in key:
                             S[key] /= a**(-4)
-            
-                Bmag = np.sqrt(Bmag)
-                ft_Bmag = fft.fftn(Bmag)
-                S['B'] += spec1D(ft_Bmag, ft_Bmag, Kmag, Kmag_bins, Kmag_mult, kmode_norm=1)
 
-            ft_rho = fft.fftn(data['rho'] - np.mean(data['rho']))
-            S['rho'] += spec1D(ft_rho, ft_rho, Kmag, Kmag_bins, Kmag_mult, kmode_norm=1)
+                if bmag_and_rho:
+                    Bmag = np.sqrt(Bmag)
+                    ft_Bmag = fft.fftn(Bmag)
+                    S['B'] += spec1D(ft_Bmag, ft_Bmag, Kmag, Kmag_bins, Kmag_mult)
+
+            if bmag_and_rho:
+                ft_rho = fft.fftn(data['rho'] - np.mean(data['rho']))
+                S['rho'] += spec1D(ft_rho, ft_rho, Kmag, Kmag_bins, Kmag_mult)
 
             ns += 1
 
@@ -230,18 +242,19 @@ def plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd=1, do_i
 
 def get_k_bins(k):
     k_flat = k.reshape(-1)
-    k_min, k_max = 1e-5, k.max()
+    k_min, k_max = 0.5*k[k > 0].min(), k.max()
     # k_min, k_max = k[k > 0].min(), k.max()
     k_bins = np.logspace(np.log10(k_min), np.log10(k_max), 2000)
     # multiplicity of a mode (number of times we see that wavenumber)
     k_hist = np.histogram(k_flat, k_bins)[0]
     
     # Removing bins that have no modes in them (essentially widening the bins)
-    mode_mult = np.delete(k_hist, k_hist == 0)
-    k_bins = np.hstack((np.delete(k_bins[:-1], k_hist == 0), k_bins[-1]))
+    zero_mask = np.where(k_hist == 0)
+    mode_mult = np.delete(k_hist, zero_mask)
+    k_bins = np.hstack((np.delete(k_bins[:-1], zero_mask), k_bins[-1]))
     return mode_mult, k_bins
 
-def spec1D(v1, v2, k, k_bins, mode_mult, kmode_norm=0):
+def spec1D(v1, v2, k, k_bins, mode_mult):
     # 1-to-1 correspondence in flattening grid
     # (i.e. FT gets mapped to the same index as its corresponding k-point)
     k_flat = k.reshape(-1)
@@ -249,11 +262,8 @@ def spec1D(v1, v2, k, k_bins, mode_mult, kmode_norm=0):
     # Bin energies in a given k_range
     e_hist = np.histogram(k_flat, k_bins, weights=np.real(energy))[0]
     
-    if kmode_norm:
-        # accounting for increase in modes in kspace
-        # as we move further out
-        n_modes = mode_mult.sum()
-        e_hist /= n_modes**2
+    n_modes = mode_mult.sum()
+    e_hist /= n_modes**2
     return e_hist
 
 def spec2D(v1, v2, kprp, kprl, kprp_bins, kprl_bins, mode_mult):

@@ -18,15 +18,18 @@ import energy_evo as energy
 DEFAULT_PROB = 'from_array'
 
 
-def format_path(output_dir):
-    if PATH not in output_dir:
-        output_dir = PATH + output_dir
-    if output_dir[-1] != '/':
-        output_dir += '/'
-    return output_dir
+def format_path(output_dir, format=1):
+    if format:
+        if PATH not in output_dir:
+            output_dir = PATH + output_dir
+        if output_dir[-1] != '/':
+            output_dir += '/'
+        return output_dir
+    else:
+        return output_dir
 
 
-def load_data(output_dir, n, prob=DEFAULT_PROB):
+def load_data(output_dir, n, prob=DEFAULT_PROB, do_path_format=1):
     '''Loads data from .athdf files output from Athena++.
 
     Parameters
@@ -53,7 +56,7 @@ def load_data(output_dir, n, prob=DEFAULT_PROB):
         return folder + '.out' + output_id + '.%05d' % n + '.athdf'
 
     # Input
-    folder = format_path(output_dir) + prob  # Name of output
+    folder = format_path(output_dir, do_path_format) + prob  # Name of output
     output_id = '2'  # Output ID (set in input file)
     filename = f(n)
 
@@ -67,10 +70,10 @@ def load_data(output_dir, n, prob=DEFAULT_PROB):
     return data
 
 
-def load_hst(output_dir, adot, prob=DEFAULT_PROB):
+def load_hst(output_dir, adot, prob=DEFAULT_PROB, do_path_format=1):
     '''Loads data from .hst files output from Athena++.
     '''
-    hstLoc = format_path(output_dir) + prob + '.hst'
+    hstLoc = format_path(output_dir, do_path_format) + prob + '.hst'
     hst_data = hst(hstLoc)
 
     if 'a' not in hst_data.keys():
@@ -88,39 +91,38 @@ def load_hst(output_dir, adot, prob=DEFAULT_PROB):
     return hst_data
 
 
-def load_athinput(athinput_path):
+def load_athinput(athinput_path, do_path_format=1):
     '''Loads data from athinput files.
     '''
-    return athinput(format_path(athinput_path))
+    return athinput(format_path(athinput_path, do_path_format))
 
 
-def load_dict(output_dir, fname=''):
+def load_dict(output_dir, fname='', do_path_format=1):
     file = 'dict.pkl'
     if fname != '':
         file = fname + '_' + file
 
-    pkl_file = open(format_path(output_dir)+file, 'rb')
+    pkl_file = open(format_path(output_dir, do_path_format)+file, 'rb')
     dict = pickle.load(pkl_file)
     pkl_file.close()
     return dict
 
 
-def save_dict(dict, output_dir, fname=''):
+def save_dict(dict, output_dir, fname='', do_path_format=1):
     file = 'dict.pkl'
     if fname != '':
         file = fname + '_' + file
 
-    output_dir = format_path(output_dir)
-    output = open(output_dir+file, 'wb')
+    output = open(format_path(output_dir, do_path_format)+file, 'wb')
     pickle.dump(dict, output)
     output.close()
 
 
-def check_dict(output_dir, fname=''):
+def check_dict(output_dir, fname='', do_path_format=1):
     file = 'dict.pkl'
     if fname != '':
         file = fname + '_' + file
-    return os.path.isfile(format_path(output_dir)+file)
+    return os.path.isfile(format_path(output_dir, do_path_format)+file)
 
 
 def make_folder(dir_name):
@@ -129,10 +131,10 @@ def make_folder(dir_name):
         path.mkdir(parents=True, exist_ok=True)
 
 
-def get_maxn(output_dir):
+def get_maxn(output_dir, do_path_format=1):
     '''Gets the total number of simulation timesteps.
     '''
-    return len(glob.glob(format_path(output_dir)+'*.athdf'))
+    return len(glob.glob(format_path(output_dir, do_path_format)+'*.athdf'))
 
 def get_meshblocks(n_X, n_cpus):
     def divisors(n):
@@ -155,7 +157,7 @@ def get_meshblocks(n_X, n_cpus):
     for mx in MX:
         MY, n2 = get_divs(n, ny, mx)
         for my in MY:
-            MZ, n3 = get_divs(n2, nz, my)
+            MZ = get_divs(n2, nz, my)[0]
             for mz in MZ:
                 tup = (mx, my, mz)
                 perm_in_poss = any([p in possible for p in list(perm(tup))])
