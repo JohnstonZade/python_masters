@@ -12,9 +12,8 @@ default_prob = diag.DEFAULT_PROB
 
 
 def calc_spectrum(output_dir, save_dir, return_dict=0, prob=default_prob,
-                  dict_name='mhd_spec', do_single_file=0, n=0, a=1, do_isotropic=1,
-                  normalize_energy=1, do_mhd=1, gaussian=0, do_prp_spec=1, do_prl_spec=0, do_title=1,
-                  bmag_and_rho=0):
+                  dict_name='mhd_spec', do_single_file=0, n=0, a=1,
+                  normalize_energy=1, do_mhd=1, bmag_and_rho=0):
 
     # Getting turnover time and converting to file number
     if do_single_file:
@@ -28,7 +27,7 @@ def calc_spectrum(output_dir, save_dir, return_dict=0, prob=default_prob,
     if do_full_calc:
         # create grid of K from first time step
         data = diag.load_data(output_dir, n, prob=prob)
-        KZ, KY, KX = diag.ft_grid('data', data=data, prob=prob, make_iso_box=do_isotropic)
+        KZ, KY, KX = diag.ft_grid('data', data=data, prob=prob)
         Kprl = np.maximum(np.abs(KX), 1e-4)
         Kprp = np.maximum(np.sqrt(abs(KY)**2 + abs(KZ)**2), 1e-4)
         Kmag = np.sqrt(Kprl**2+Kprp**2)
@@ -261,11 +260,11 @@ def spec1D(v1, v2, k, k_bins, mode_norm):
     # Squared as we have two fft'ed arrays
     Npoints2 = (k_flat.size)**2
     energy = np.real(0.5*v1*np.conj(v2)).reshape(-1)  # Parseval's theorem
-    tot_energy = np.sum(energy)
     # Bin energies in a given k_range
     e_hist = np.histogram(k_flat, k_bins, weights=energy)[0]
     e_hist /= Npoints2  # FFT normalization
-    
+    tot_energy = np.sum(e_hist)
+
     # mode per bin normalization
     # will not currently output the energy if summed
     e_hist /= mode_norm
@@ -273,7 +272,8 @@ def spec1D(v1, v2, k, k_bins, mode_norm):
     # energy area test
     dk = np.diff(k_bins)
     area = np.sum(e_hist*dk)
-    e_hist *= tot_energy / area
+    if area != 0.0:
+        e_hist *= tot_energy / area
     return e_hist
 
 def spec2D(v1, v2, kprp, kprl, kprp_bins, kprl_bins, mode_norm):
@@ -288,10 +288,20 @@ def spec2D(v1, v2, kprp, kprl, kprp_bins, kprl_bins, mode_norm):
     # Bin energies in a given k_range
     e_hist = np.histogram2d(kprp_flat, kprl_flat, [kprp_bins, kprl_bins], weights=energy)[0]
     e_hist /= Npoints2  # FFT normalization
+    tot_energy = np.sum(e_hist)
+
 
     # mode per bin normalization
     # will not currently output the energy if summed
     e_hist /= mode_norm.reshape(mode_norm.size, 1)
+
+    # energy area test
+    dk_prp = np.diff(kprp_bins)
+    kprp_grid = 0.5*(kprp_bins[1:] + kprp_bins[:-1])
+    dk_prl = np.diff(kprl_bins)
+    area = np.sum(np.sum(e_hist*dk_prl, axis=1)*dk_prp, axis=0)
+    if area != 0.0:
+        e_hist *= tot_energy / area
     return e_hist
 
 def get_spectral_slope(kgrid, spectrum, inertial_range):
