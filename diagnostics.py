@@ -331,11 +331,12 @@ def ft_array(N):
     return array
 
 
-def ft_grid(input_type, data=None, output_dir=None, Ls=None, Ns=None, prob=DEFAULT_PROB, make_iso_box=0):
+def ft_grid(input_type, data=None, output_dir=None, Ls=None,
+            Ns=None, prob=DEFAULT_PROB, make_iso_box=1):
     '''
     Creates a grid in k-space corresponding to the real grid given in data.
     k_grid is a boolean that when True calculates a regularly spaced array
-    in k-space.
+    in k-space. Isotropic-to-box by default.
     '''
 
     if input_type == 'data':

@@ -18,7 +18,7 @@ def read_athinput(athinput_path):
     return expansion_rate, iso_sound_speed, tlim, dt
  
 
-def run_loop(output_dir, athinput_path, steps=10, do_spectrum=0, do_flyby=1, override_not_full_calc=0):
+def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spectrum=0, do_flyby=1, override_not_full_calc=0):
     
     max_n = diag.get_maxn(output_dir)
     # overestimate the number of steps needed; edge case is handled when loading data
@@ -26,9 +26,9 @@ def run_loop(output_dir, athinput_path, steps=10, do_spectrum=0, do_flyby=1, ove
 
     # if dictionary is not already there, do full calc
     # otherwise load dictionary
-    do_full_calc = (not diag.check_dict(output_dir, 'data_dump')) or override_not_full_calc
+    do_full_calc = (not diag.check_dict(output_dir, dict_name)) or override_not_full_calc
     if not do_full_calc:
-        S = diag.load_dict(output_dir, 'data_dump')
+        S = diag.load_dict(output_dir, dict_name)
         print('Not doing full calculation')
     else:
         S = {}
@@ -106,37 +106,16 @@ def run_loop(output_dir, athinput_path, steps=10, do_spectrum=0, do_flyby=1, ove
                 spec_a = round(S['perp_expand'][n], 2)
                 spec_name = 'mhd_spec_a' + str(spec_a)
                 S[spec_name] = spec.calc_spectrum(output_dir, output_dir, prob='from_array', dict_name=spec_name,
-                                                return_dict=1, do_single_file=1, n=n, a=spec_a)
+                                                  do_single_file=1, n=n, a=spec_a)
                 spec_hik_a = np.append(spec_hik_a, spec_a)
                 spec_hik_mag = np.append(spec_hik_mag, spec_hik_energy_frac(S[spec_name]))
                 spec_hik_kin = np.append(spec_hik_kin, spec_hik_energy_frac(S[spec_name], do_magnetic=0))
         T = {}
         T['hi_mag_energy_frac'], T['hi_kin_energy_frac'], T['hi_energy_a'] = spec_hik_mag, spec_hik_kin, spec_hik_a
         S['energy_in_hi_k'] = T
-        diag.save_dict(S, output_dir, 'data_dump')
+        diag.save_dict(S, output_dir, dict_name)
 
     if do_flyby:
-        # try:
-        #     t = np.arange(0, tlim+dt, dt)
-        #     a = diag.a(expansion_rate, t)
-
-        #     # set to do last flyby by default
-        #     if flyby_a == -999:
-        #         flyby_a = a[-1]
-        #     assert a[0] <= flyby_a <= a[-1], 'Please choose a valid a!'
-        #     # index of the given a value we want
-        #     flyby_n = int(np.round((flyby_a - 1) / (expansion_rate * dt)))
-
-        #     if max_n < int((tlim+dt)/dt) and max_n <= flyby_n:
-        #         raise ValueError('Athena has not output the expected number of .athdf files, and we are trying to access a file that does not exist',
-        #                         'max_n = ' + str(max_n), 'expected max_n = ' + str(int((tlim+dt)/dt)), 'flyby_n = ' + str(flyby_n))
-
-        #     flyby_string = 'flyby_a' + str(flyby_a)
-        #     S[flyby_string] = reinterpolate.flyby(output_dir, flyby_a, flyby_n)
-        #     print(flyby_string + ' done')
-        # except ValueError as ve:
-        #     print(ve.args)
-
         for n in range(max_n):
             if n % 5 == 0:
                 flyby_a = round(S['perp_expand'][n], 2)
@@ -144,7 +123,7 @@ def run_loop(output_dir, athinput_path, steps=10, do_spectrum=0, do_flyby=1, ove
                 S[flyby_string] = reinterpolate.flyby(output_dir, flyby_a, n)
                 print(flyby_string + ' done')
 
-    diag.save_dict(S, output_dir, 'data_dump')
+    diag.save_dict(S, output_dir, dict_name)
 
 
 def spec_hik_energy_frac(S, do_magnetic=1):
