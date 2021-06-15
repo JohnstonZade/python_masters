@@ -349,7 +349,7 @@ def reinterp_from_h5(save_folder, athinput_in_folder, athinput_in, h5name, athdf
     
     h5name += '.h5' if '.h5' not in h5name else ''
     n_hst, n_hdf5 = int(np.ceil(t_f / dt_hst)), int(np.ceil(t_f / dt))
-    start_time = t_f + dt_hst
+    start_time = t_f
     time_lim  = (a_to_finish - 1) / exp_rate 
     athinput_out = edit_athinput(athinput_out, save_folder, new_Ns, X_min, X_max, meshblock, h5name,
                                  time_lim, dt, iso_sound_speed, expand, exp_rate,
