@@ -6,15 +6,19 @@ import numpy.fft as fft
 import matplotlib.pyplot as plt
 import diagnostics as diag
 from sklearn.linear_model import LinearRegression
+import scipy.integrate as integrate
 from matplotlib import rc
 rc('text', usetex=True)  # LaTeX labels
 default_prob = diag.DEFAULT_PROB
 
 
-def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=(10**1.5, 10**2), prob=default_prob,
-                  plot_title='test', dict_name='mhd_spec', do_single_file=0, n=0, a=1, do_isotropic=1,
-                  normalize_energy=1, do_mhd=1, gaussian=0, do_prp_spec=1, do_prl_spec=0, do_title=1,
-                  bmag_and_rho=0):
+def array_avg(arr):
+    return 0.5*(arr[1:] + arr[:-1])
+
+
+def calc_spectrum(output_dir, save_dir, return_dict=0, prob=default_prob,
+                  dict_name='mhd_spec', do_single_file=0, n=0, a=1,
+                  normalize_energy=1, do_mhd=1, bmag_and_rho=0):
 
     # Getting turnover time and converting to file number
     if do_single_file:
@@ -28,24 +32,23 @@ def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=
     if do_full_calc:
         # create grid of K from first time step
         data = diag.load_data(output_dir, n, prob=prob)
-        KZ, KY, KX = diag.ft_grid('data', data=data, prob=prob, make_iso_box=do_isotropic)
+        KZ, KY, KX = diag.ft_grid('data', data=data, prob=prob)
         Kprl = np.maximum(np.abs(KX), 1e-4)
         Kprp = np.maximum(np.sqrt(abs(KY)**2 + abs(KZ)**2), 1e-4)
         Kmag = np.sqrt(Kprl**2+Kprp**2)
+        Npoints = Kmag.size  # needed for FFT normalization
         
-        Kmag_mult, Kmag_bins = get_k_bins(Kmag)
-        Kprl_mult, Kprl_bins = get_k_bins(Kprl)
-        Kprp_mult, Kprp_bins = get_k_bins(Kprp)
-
-        def grid_from_bins(bins):
-            return 0.5*(bins[1:] + bins[:-1])
+        Kmag_mult, Kmag_grid, Kmag_bins = get_k_bins(Kmag, 3)
+        Kprp_mult, Kprp_grid, Kprp_bins = get_k_bins(Kprp, 2)
+        Kprl_mult, Kprl_grid, Kprl_bins = get_k_bins(Kprl, 1)
 
         # Dictionary to hold spectrum information
         S = {}
-        grids, bins = {}, {}
-        grids['Kmag'], grids['Kprl'], grids['Kprp'] = grid_from_bins(Kmag_bins), grid_from_bins(Kprl_bins), grid_from_bins(Kprp_bins)
+        grids, bins, norms = {}, {}, {}
+        grids['Kmag'], grids['Kprl'], grids['Kprp'] = Kmag_grid, Kprl_grid, Kprp_grid
         bins['Kmag'], bins['Kprl'], bins['Kprp'] = Kmag_bins, Kprl_bins, Kprp_bins
-        S['grids'], S['bins'] = grids, bins
+        norms['Kmag'], norms['Kprl'], norms['Kprp'] = Kmag_mult, Kprl_mult, Kprp_mult
+        S['grids'], S['bins'], S['norms'] = grids, bins, norms
 
         ns = 0  # counter
         fields = ['vel1', 'vel2', 'vel3', 'Bcc1', 'Bcc2', 'Bcc3',
@@ -70,10 +73,10 @@ def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=
             # Add to total energy spectrum
             for vel in fields[:3]:
                 v = data[vel]
-                ft = fft.fftn(v)
-                iso = spec1D(ft, ft, Kmag, Kmag_bins, Kmag_mult)
-                prlbox = spec1D(ft, ft, Kprl, Kprl_bins, Kprp_mult)
-                prpbox = spec1D(ft, ft, Kprp, Kprp_bins, Kprp_mult)
+                ft = fft.fftn(v) / Npoints
+                iso = spec1D(ft, Kmag, Kmag_bins, Kmag_mult)
+                prlbox = spec1D(ft, Kprl, Kprl_bins, Kprl_mult)
+                prpbox = spec1D(ft, Kprp, Kprp_bins, Kprp_mult)
                 # Isotropic spectra
                 S[vel] += iso
                 S['EK'] += iso  # Total spectrum is sum of each component
@@ -87,7 +90,7 @@ def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=
                     S['EK_prpfluc_prlbox'] += prlbox
                     S['EK_prpfluc_prpbox'] += prpbox
                     # 2D (k_prl and k_prl) spectrum
-                    S['EK_prpfluc_2D']  += spec2D(ft, ft, Kprp, Kprl, Kprp_bins, Kprl_bins, Kprp_mult)
+                    S['EK_prpfluc_2D']  += spec2D(ft, Kprp, Kprl, Kprp_bins, Kprl_bins, Kprp_mult)
             if normalize_energy:
                 # v_A ~ a^(-1) ⟹ (v_A)^2 ∼ a^(-2), assuming v_A0 = 1
                 for key in S.keys():
@@ -98,10 +101,10 @@ def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=
                 Bmag = 0
                 for Bcc in fields[3:6]:
                     B = data[Bcc]
-                    ft = fft.fftn(B)
-                    iso = spec1D(ft, ft, Kmag, Kmag_bins, Kmag_mult)
-                    prlbox = spec1D(ft, ft, Kprl, Kprl_bins, Kprp_mult)
-                    prpbox = spec1D(ft, ft, Kprp, Kprp_bins, Kprp_mult)
+                    ft = fft.fftn(B) / Npoints
+                    iso = spec1D(ft, Kmag, Kmag_bins, Kmag_mult)
+                    prlbox = spec1D(ft, Kprl, Kprl_bins, Kprl_mult)
+                    prpbox = spec1D(ft, Kprp, Kprp_bins, Kprp_mult)
                     # Isotropic spectra
                     S[Bcc] += iso
                     S['EM'] += iso  # Total spectrum is sum of each component
@@ -115,7 +118,7 @@ def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=
                         S['EM_prpfluc_prlbox'] += prlbox
                         S['EM_prpfluc_prpbox'] += prpbox
                         # 2D (k_prl and k_prl) spectrum
-                        S['EM_prpfluc_2D']  += spec2D(ft, ft, Kprp, Kprl, Kprp_bins, Kprl_bins, Kprp_mult)
+                        S['EM_prpfluc_2D']  += spec2D(ft, Kprp, Kprl, Kprp_bins, Kprl_bins, Kprp_mult)
                     Bmag += B**2
                 if normalize_energy:
                     # B_x ∼ a^(-2) ⟹ (B_x)^2 ∼ a^(-4), assuming ⟨B_x0⟩=1
@@ -146,9 +149,88 @@ def calc_spectrum(output_dir, save_dir, fname='', return_dict=0, inertial_range=
 
     if return_dict:
         return S
-    else:
-        plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_isotropic=do_isotropic, gaussian=gaussian, do_mhd=do_mhd, do_prp_spec=do_prp_spec,
-                      do_prl_spec=do_prl_spec, do_title=do_title)
+
+
+def get_k_bins(k, dim):
+    k_flat = k.reshape(-1)
+    k_min, k_max = 0.5*k[k > 0].min(), k.max()
+    k_bins = np.logspace(np.log10(k_min), np.log10(k_max), 2000)
+    # multiplicity of a mode (number of times we see that wavenumber)
+    k_hist = np.histogram(k_flat, k_bins)[0]
+    
+    # Removing bins that have no modes in them (essentially widening the bins)
+    zero_mask = np.where(k_hist == 0)
+    mode_mult = np.delete(k_hist, zero_mask)
+    k_bins = np.hstack((np.delete(k_bins[:-1], zero_mask), k_bins[-1]))
+    k_grid = array_avg(k_bins)
+    
+    # Normalization
+    mode_mult = mode_mult / k_grid**(dim - 1)  # accounting for number of modes in a shell in kspace
+    mode_mult /= mode_mult[0]
+    return mode_mult, k_grid, k_bins
+
+def spec1D(v, k, k_bins, mode_norm):
+    # Note: Only worried about autocorrelation
+    # need to change v -> v1,v2 for more general spectra
+    # 1-to-1 correspondence in flattening grid
+    # (i.e. FT gets mapped to the same index as its corresponding k-point)
+    k_flat = k.reshape(-1)
+    # v has already been fft normalized
+    energy = 0.5*(np.abs(v)**2).reshape(-1)  # v*conj(v) = |v|^2
+    # Bin energies in a given k_range
+    e_hist = np.histogram(k_flat, k_bins, weights=energy)[0]
+    tot_energy = np.sum(e_hist)
+
+    # mode per bin normalization
+    e_hist /= mode_norm
+
+    # rescaling area to give energy
+    k_grid = array_avg(k_bins)
+    area = integrate.trapezoid(e_hist, k_grid)
+    if area != 0.0:
+        e_hist *= tot_energy / area
+    return e_hist
+
+def spec2D(v, kprp, kprl, kprp_bins, kprl_bins, mode_norm):
+    # 1-to-1 correspondence in flattening grid
+    # (i.e. FT gets mapped to the same index as its corresponding k-point)
+    kprp_flat = kprp.reshape(-1)
+    kprl_flat = kprl.reshape(-1)
+    # number of points in k space (same for both prl and prp), needed to normalize from FFT
+    # Squared as we have two fft'ed arrays
+    energy = 0.5*(np.abs(v)**2).reshape(-1)  # v*conj(v) = |v|^2
+    # Bin energies in a given k_range
+    e_hist = np.histogram2d(kprp_flat, kprl_flat, [kprp_bins, kprl_bins], weights=energy)[0]
+    tot_energy = np.sum(e_hist)
+
+
+    # mode per bin normalization
+    # Only need to normalize by kprp modes as number of kprl modes constant
+    e_hist /= mode_norm.reshape(mode_norm.size, 1)
+
+    # rescaling volume to give energy
+    kprp_grid = array_avg(kprp_bins)
+    kprl_grid = array_avg(kprl_bins)
+    kprl_int = integrate.trapezoid(e_hist, kprl_grid, axis=1)
+    vol = integrate.trapezoid(kprl_int, kprp_grid)
+    if vol != 0.0:
+        e_hist *= tot_energy / vol
+    return e_hist
+
+def get_spectral_slope(kgrid, spectrum, inertial_range):
+    mask = (inertial_range[0] <= kgrid) & (kgrid <= inertial_range[1])
+    while np.all(np.logical_not(mask)):  # if all false, returns true
+        inertial_range *= 2
+        mask = (inertial_range[0] <= kgrid) & (kgrid <= inertial_range[1])
+    kgrid, spectrum = kgrid[mask], spectrum[mask]
+    
+    if len(kgrid.shape) == 1:
+        kgrid = kgrid.reshape((-1,1))  # have to make kgrid 2D
+    
+    log_k, log_spec = np.log(kgrid), np.log(spectrum)
+    model = LinearRegression().fit(log_k, log_spec)
+    slope = model.coef_
+    return slope[0, 0]
 
 
 def plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd=1, do_isotropic=1, gaussian=0, do_prp_spec=1, do_prl_spec=0, do_title=1, normalized=1,
@@ -239,65 +321,6 @@ def plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd=1, do_i
         plt.savefig(save_dir + fname + fig_suffix + '.pdf')
     plt.savefig(save_dir + fname + fig_suffix + '.png')
     plt.close()
-
-def get_k_bins(k):
-    k_flat = k.reshape(-1)
-    k_min, k_max = 0.5*k[k > 0].min(), k.max()
-    # k_min, k_max = k[k > 0].min(), k.max()
-    k_bins = np.logspace(np.log10(k_min), np.log10(k_max), 2000)
-    # multiplicity of a mode (number of times we see that wavenumber)
-    k_hist = np.histogram(k_flat, k_bins)[0]
-    
-    # Removing bins that have no modes in them (essentially widening the bins)
-    zero_mask = np.where(k_hist == 0)
-    mode_mult = np.delete(k_hist, zero_mask)
-    k_bins = np.hstack((np.delete(k_bins[:-1], zero_mask), k_bins[-1]))
-    return mode_mult, k_bins
-
-def spec1D(v1, v2, k, k_bins, mode_mult):
-    # 1-to-1 correspondence in flattening grid
-    # (i.e. FT gets mapped to the same index as its corresponding k-point)
-    k_flat = k.reshape(-1)
-    energy = (0.5*v1*np.conj(v2)).reshape(-1)  # Parseval's theorem
-    # Bin energies in a given k_range
-    e_hist = np.histogram(k_flat, k_bins, weights=np.real(energy))[0]
-    
-    n_modes = mode_mult.sum()
-    e_hist /= n_modes**2
-    return e_hist
-
-def spec2D(v1, v2, kprp, kprl, kprp_bins, kprl_bins, mode_mult):
-    # 1-to-1 correspondence in flattening grid
-    # (i.e. FT gets mapped to the same index as its corresponding k-point)
-    kprp_flat = kprp.reshape(-1)
-    kprl_flat = kprl.reshape(-1)
-    energy = (0.5*v1*np.conj(v2)).reshape(-1)  # Parseval's theorem
-    # Bin energies in a given k_range
-    e_hist = np.histogram2d(kprp_flat, kprl_flat, [kprp_bins, kprl_bins], weights=np.real(energy))[0]
-    
-    # accounting for increase in modes in kspace
-    # as we move further out
-    n_modes = mode_mult.sum()
-    e_hist /= n_modes**2
-    return e_hist
-
-def get_spectral_slope(kgrid, spectrum, inertial_range):
-    mask = (inertial_range[0] <= kgrid) & (kgrid <= inertial_range[1])
-    while np.all(np.logical_not(mask)):  # if all false, returns true
-        inertial_range *= 2
-        mask = (inertial_range[0] <= kgrid) & (kgrid <= inertial_range[1])
-    kgrid, spectrum = kgrid[mask], spectrum[mask]
-    
-    if len(kgrid.shape) == 1:
-        kgrid = kgrid.reshape((-1,1))  # have to make kgrid 2D
-    
-    log_k, log_spec = np.log(kgrid), np.log(spectrum)
-    model = LinearRegression().fit(log_k, log_spec)
-    slope = model.coef_
-    return slope[0, 0]
-
-
-
     
     
 
