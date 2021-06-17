@@ -277,8 +277,8 @@ def reinterp_from_h5(save_folder, athinput_in_folder, athinput_in, h5name, athdf
     # From the final athdf file of the lower resolution simulation:
     # - Get final time and expansion value
     # - Get the old grid as well, as we need this for the reinterpolation
-    n_f = diag.get_maxn(root_path(athdf_input)) - 1
-    athdf_data = diag.load_data(root_path(athdf_input), n_f)
+    n_f = diag.get_maxn(root_path(athdf_input), do_path_format=0) - 1
+    athdf_data = diag.load_data(root_path(athdf_input), n_f, do_path_format=0)
     t_f, a_f = athdf_data['Time'], athdf_data['a_exp']
     old_Xgrid = athdf_data['x1v'], athdf_data['x2v'], athdf_data['x3v']
     athdf_data = None
@@ -319,13 +319,11 @@ def reinterp_from_h5(save_folder, athinput_in_folder, athinput_in, h5name, athdf
     
     # Rescale the resolution in the ⟂ (y, z) directions
     # In (X, Y, Z) format
-    # Note: a need to be an integer as the resolution has to be an integer
-    # If this becomes a viable option, need to make sure we reinterpolate at an integer value of a
     new_Ns, Ls = np.copy(old_Ns), (X_max - X_min)
     if rescale_prl:
-        new_Ns[0] //= cell_aspect 
+        new_Ns[0] = int(new_Ns[0] // cell_aspect)
     else: 
-        new_Ns[1:] *= cell_aspect
+        new_Ns[1:] = new_Ns[1:] * cell_aspect
     
     
     if new_meshblock is not None:

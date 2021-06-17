@@ -14,11 +14,10 @@ folder = ''  # in project folder root
 box_aspect = 10  # Lprl / Lprp
 cell_aspect = 2  # dx / dx_prp
 Nx_init = 64     # initial x resolution
-nodes = 1        # number of nodes
-n_cpus = 40*nodes       
+n_nodes = 1        # number of nodes     
 exp_rate = 0.5
 init_norm_fluc = 0.2
 beta = 0.2
 
-submit.generate_slurm(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_cpus,
+submit.generate_slurm(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_nodes,
                       exp_rate, init_norm_fluc, beta)
