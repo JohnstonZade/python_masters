@@ -136,11 +136,13 @@ def read_athinput(athinput, reinterpolate=0):
     X_max = np.array([ath_dict['mesh']['x1max'], ath_dict['mesh']['x2max'], ath_dict['mesh']['x3max']])
     meshblock = np.array([ath_dict['meshblock']['nx1'], ath_dict['meshblock']['nx2'], ath_dict['meshblock']['nx3']])
     
-
     if reinterpolate:
         dt_hst = ath_dict['output1']['dt']
-
-        return n_X, X_min, X_max, meshblock, dt_hst
+        dt = ath_dict['output2']['dt']
+        expand = ath_dict['problem']['expanding']
+        exp_rate = ath_dict['problem']['expand_rate']
+        iso_sound_speed = ath_dict['hydro']['iso_sound_speed']
+        return n_X, X_min, X_max, meshblock, dt_hst, dt, expand, exp_rate, iso_sound_speed
     else:
         return n_X, X_min, X_max, meshblock 
 

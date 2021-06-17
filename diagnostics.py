@@ -5,7 +5,6 @@ All copied from code written in 2020 for my Honours project with some improvemen
 import glob
 import os
 import pickle
-from re import T
 import numpy as np
 from pathlib import Path
 from itertools import permutations as perm

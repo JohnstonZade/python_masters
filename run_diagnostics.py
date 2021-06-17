@@ -101,7 +101,8 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
     if do_spectrum:
         spec_hik_mag, spec_hik_kin, spec_hik_a = np.array([]), np.array([]), np.array([])
         for n in range(max_n):
-            if n % 5 == 0:  # don't want to run too often
+            spec_step = 1 if max_n <= 11 else 5
+            if n % spec_step == 0:  # don't want to run too often
                 print('Spectrum calculation started at n = ' + str(n))
                 spec_a = round(S['perp_expand'][n], 2)
                 spec_name = 'mhd_spec_a' + str(spec_a)
