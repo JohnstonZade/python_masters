@@ -5,10 +5,9 @@ cdir_root = os.getcwd().split('/')
 if cdir_root[1] == 'Users':
     COMPUTER = 'mac'
 elif cdir_root[1] == 'home':
-    if cdir_root[2] == 'zade':
-        COMPUTER = 'linux'
-    else:
-        COMPUTER = 'nesi'
+    COMPUTER = 'linux'
+else:
+    COMPUTER = 'nesi'
 
 if COMPUTER == 'linux':
     PATH = '/home/zade/masters_2021/'
