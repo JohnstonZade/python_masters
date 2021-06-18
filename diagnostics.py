@@ -47,7 +47,7 @@ def load_data(output_dir, n, prob=DEFAULT_PROB, do_path_format=1):
         the `read_python.py` script in `/athena/vis/python/`.
     '''
     
-    max_n = get_maxn(output_dir)
+    max_n = get_maxn(output_dir, do_path_format=do_path_format)
     assert n in range(0, max_n), 'n must be between 0 and ' + str(max_n)
 
     # '$folder.out$output_id.xxxxx.athdf'
