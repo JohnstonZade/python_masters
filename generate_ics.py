@@ -6,7 +6,7 @@ import diagnostics as diag
 import generate_spectrum as genspec
 import reinterpolate
 from helper_functions import *
-from project_paths import from_array_path, athena_path
+from project_paths import from_array_path
 
 
 # --- GENERATING FUNCTIONS --- #

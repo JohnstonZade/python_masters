@@ -4,7 +4,7 @@ import generate_ics as genics
 import project_paths as paths
 import argparse
 
-folder_root, athena_path = paths.SCRATCH, paths.athena_path
+folder_root = paths.SCRATCH
 
 def expand_to_a(a_final, exp_rate):
     # inverting definition of a to find time limit
