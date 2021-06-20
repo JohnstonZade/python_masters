@@ -185,8 +185,8 @@ def read_mesh_structure(data_fname):
             s = f.readline()
             # Looking for 'location = (%d %d %d)' and obtaining numbers in brackets
             if 'location =' in s:
-                loc = s.split('=')[1].split('(')[1].split(')')[0].replace(' ', '')
-                temp = [int(c) for c in loc]
+                loc = s.split('=')[1].split('(')[1].split(')')[0]
+                temp = [int(c) for c in loc.split() if c.isdigit()]
                 blocks.append(temp)
     return np.array(blocks).T
 
