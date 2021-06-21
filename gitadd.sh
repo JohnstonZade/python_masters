@@ -1,1 +1,1 @@
-git add *.py README.md
+git add *.py
