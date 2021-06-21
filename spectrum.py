@@ -186,7 +186,7 @@ def spec1D(v, k, k_bins, mode_norm):
 
     # rescaling area to give energy
     k_grid = array_avg(k_bins)
-    area = integrate.trapezoid(e_hist, k_grid)
+    area = integrate.trapz(e_hist, k_grid)
     if area != 0.0:
         e_hist *= tot_energy / area
     return e_hist
@@ -211,8 +211,8 @@ def spec2D(v, kprp, kprl, kprp_bins, kprl_bins, mode_norm):
     # rescaling volume to give energy
     kprp_grid = array_avg(kprp_bins)
     kprl_grid = array_avg(kprl_bins)
-    kprl_int = integrate.trapezoid(e_hist, kprl_grid, axis=1)
-    vol = integrate.trapezoid(kprl_int, kprp_grid)
+    kprl_int = integrate.trapz(e_hist, kprl_grid, axis=1)
+    vol = integrate.trapz(kprl_int, kprp_grid)
     if vol != 0.0:
         e_hist *= tot_energy / vol
     return e_hist
