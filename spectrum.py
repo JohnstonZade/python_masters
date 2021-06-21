@@ -16,7 +16,7 @@ def array_avg(arr):
     return 0.5*(arr[1:] + arr[:-1])
 
 
-def calc_spectrum(output_dir, save_dir, return_dict=0, prob=default_prob,
+def calc_spectrum(output_dir, save_dir, return_dict=1, prob=default_prob,
                   dict_name='mhd_spec', do_single_file=0, n=0, a=1,
                   normalize_energy=1, do_mhd=1, bmag_and_rho=0):
 
