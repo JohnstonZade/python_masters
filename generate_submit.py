@@ -63,6 +63,7 @@ def generate_slurm(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_nodes,
     # Add line to genscript_reinterpolate with cmdline arguments before athena
     folder = scratch_path + folder
     for i in range(1, n_reinterp+1):
+        print('Reinterpolating a:' + str(cell_aspect**i) + ' -> ' + str(min(cell_aspect**(i+1), box_aspect)))
         reinterp_sim = sim_name + '_r' + str(i)
 
         if i == 1: 
