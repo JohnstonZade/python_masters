@@ -96,7 +96,7 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
         S['Bprp_norm_fluc_hst'] = Bprp_fluc
         S['kinetic_norm_fluc_hst'] = kinetic_fluc
 
-        diag.save_dict(S, output_dir, 'data_dump')
+        diag.save_dict(S, output_dir, dict_name)
 
     if do_spectrum:
         spec_hik_mag, spec_hik_kin, spec_hik_a = np.array([]), np.array([]), np.array([])
