@@ -30,7 +30,7 @@ args = vars(parser.parse_args())
 
 sim_name = args['sim_name']
 folder = args['folder']
-total_folder = folder + sim_name
+total_folder = folder # + sim_name
 
 save_folder = total_folder
 athinput_in_folder = total_folder
