@@ -22,7 +22,7 @@ def make_slurm_file(job_name, n_nodes, athinput_out, reinterp=0, r_number=0, sim
         f.write('echo ${SLURM_NODELIST}\n\n')
 
         if reinterp:
-            gen_path = 'srun --pty python ' + python_masters_path + 'genscript_reinterpolate.py '
+            gen_path = 'srun python ' + python_masters_path + 'genscript_reinterpolate.py '
             gen_path += sim_name + ' '
             gen_path += folder + ' '
             gen_path += athinput_in + ' '
