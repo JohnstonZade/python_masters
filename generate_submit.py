@@ -22,7 +22,7 @@ def make_slurm_file(job_name, n_nodes, athinput_out, reinterp=0, r_number=0, sim
         f.write('echo ${SLURM_NODELIST}\n\n')
 
         if reinterp:
-            gen_path = 'srun --pty python ' + python_masters_path + 'genscript_reinterpolate.py '
+            gen_path = 'srun python ' + python_masters_path + 'genscript_reinterpolate.py '
             gen_path += sim_name + ' '
             gen_path += folder + ' '
             gen_path += athinput_in + ' '
@@ -63,6 +63,7 @@ def generate_slurm(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_nodes,
     # Add line to genscript_reinterpolate with cmdline arguments before athena
     folder = scratch_path + folder
     for i in range(1, n_reinterp+1):
+        print('Reinterpolating a: ' + str(cell_aspect**i) + ' -> ' + str(min(cell_aspect**(i+1), box_aspect)))
         reinterp_sim = sim_name + '_r' + str(i)
 
         if i == 1: 

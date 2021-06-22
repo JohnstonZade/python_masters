@@ -167,11 +167,9 @@ def generate_mesh_structure(folder, athinput):
     ath_path = athena_path
     cdir = os.getcwd()
     os.chdir(folder)
-    print(folder)
-    print(athinput)
     os.system(ath_path + ' -i ' + athinput + ' -m 1')  # > /dev/null supresses output, remove if need to see meshblock details
     blocks = read_mesh_structure(folder + 'mesh_structure.dat')
-    # os.remove('mesh_structure.dat')
+    os.remove('mesh_structure.dat')
     n_blocks = blocks.shape[1]
     os.chdir(cdir)
     return n_blocks, blocks
