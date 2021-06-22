@@ -1,10 +1,12 @@
-computer = 'local'
-# computer = 'nesi'
+import os
 
-if computer == 'local':
+cdir_root = os.getcwd().split('/')
+
+if cdir_root[1] == 'Users' or cdir_root[1] == 'home':
     python_masters_path = '~/python_masters/'
 else:
     python_masters_path = '/home/johza721/masters_2021/python_masters/'
+  
 import sys
 sys.path.insert(0, python_masters_path)
 submit = __import__('generate_submit')
