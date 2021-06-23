@@ -185,10 +185,10 @@ def spec1D(v, k, k_bins, mode_norm):
     e_hist /= mode_norm
 
     # rescaling area to give energy
-    k_grid = array_avg(k_bins)
-    area = integrate.trapz(e_hist, k_grid)
-    if area != 0.0:
-        e_hist *= tot_energy / area
+    # k_grid = array_avg(k_bins)
+    # area = integrate.trapz(e_hist, k_grid)
+    # if area != 0.0:
+    #     e_hist *= tot_energy / area
     return e_hist
 
 def spec2D(v, kprp, kprl, kprp_bins, kprl_bins, mode_norm):
@@ -209,12 +209,12 @@ def spec2D(v, kprp, kprl, kprp_bins, kprl_bins, mode_norm):
     e_hist /= mode_norm.reshape(mode_norm.size, 1)
 
     # rescaling volume to give energy
-    kprp_grid = array_avg(kprp_bins)
-    kprl_grid = array_avg(kprl_bins)
-    kprl_int = integrate.trapz(e_hist, kprl_grid, axis=1)
-    vol = integrate.trapz(kprl_int, kprp_grid)
-    if vol != 0.0:
-        e_hist *= tot_energy / vol
+    # kprp_grid = array_avg(kprp_bins)
+    # kprl_grid = array_avg(kprl_bins)
+    # kprl_int = integrate.trapz(e_hist, kprl_grid, axis=1)
+    # vol = integrate.trapz(kprl_int, kprp_grid)
+    # if vol != 0.0:
+    #     e_hist *= tot_energy / vol
     return e_hist
 
 def get_spectral_slope(kgrid, spectrum, inertial_range):
