@@ -161,7 +161,8 @@ def create_athena_fromh5(save_folder, athinput_in_folder, athinput_in, h5name, a
 def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
                              time_lim=1, dt=0.2, iso_sound_speed=1.0, expand=0, exp_rate=0.,
                              do_truncation=0, n_cutoff=None, athinput=from_array_path,
-                             perp_energy=0.5, expo=-5/3, expo_prl=-2., kpeak=10., gauss_spec=0, prl_spec=0, do_mode_test=0):
+                             perp_energy=0.5, expo=-5/3, expo_prl=-2., kscale=12., kpeak=0.,
+                             gauss_spec=0, prl_spec=0, do_mode_test=0):
     
     ath_copy = edit_athinput(athinput, folder, n_X, X_min, X_max, meshblock,
                              h5name, time_lim, dt, iso_sound_speed, expand, exp_rate)
@@ -187,8 +188,8 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
 
     dB_y, dB_z = genspec.generate_alfven(n_X, X_min, X_max, np.array([BXcc, BYcc, BZcc]), expo,
                                          do_truncation=do_truncation, n_cutoff=n_cutoff,
-                                         expo_prl=expo_prl, kpeak=kpeak, gauss_spec=gauss_spec,
-                                         prl_spec=prl_spec, run_test=do_mode_test)
+                                         expo_prl=expo_prl, kscale=kscale, kpeak=kpeak, 
+                                         gauss_spec=gauss_spec, prl_spec=prl_spec, run_test=do_mode_test)
 
     BYcc += dB_y
     BZcc += dB_z

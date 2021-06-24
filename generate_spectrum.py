@@ -76,9 +76,9 @@ def run_tests(Ls, KX, KY, KZ):
         z[mask] = wave
         return z
 
-def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=12.0,
-                    gauss_spec=0, prl_spec=0, do_truncation=0, n_cutoff=None,
-                    run_test=0):
+def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, 
+                    kscale=12.0, kpeak=0., gauss_spec=0, 
+                    prl_spec=0, do_truncation=0, n_cutoff=None, run_test=0):
     '''Generate a superposition of random Alfvén waves within a numerical domain
     that follow a given energy spectrum.
 
@@ -125,7 +125,9 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=12.0,
     expo_prl : float, optional
         the exponent to raise kprl by for an anisotropic spectrum, by default -2.0
     kpeak : float, optional
-        the peak k magnitude for the Gaussian distribution, by default 10.0
+        the peak k magnitude for the Gaussian distribution, by default 0.0
+    kscale: float, optional
+        the scale width of the Gaussian distribution
     gauss_spec : boolean, optional
         generate a Gaussian spectrum, by default 0
     prl_spec : boolean, optional
@@ -176,7 +178,7 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, kpeak=12.0,
 
         if gauss_spec:
             # if not isotropic to box, divide kpeak by Lprp
-            Kspec = np.exp(- Kmag**2 / kpeak**2)
+            Kspec = np.exp(-(Kmag - kpeak)**2 / kscale**2)
         elif prl_spec:
             kprp_exp = (expo - 1) / (expo_prl - 1)  # gives 2/3 for expo, expo_prl = -5/3, -2
             kprl_exp = 1.0

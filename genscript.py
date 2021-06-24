@@ -2,7 +2,7 @@ import numpy as np
 import os
 import diagnostics as diag
 import generate_ics as genics
-import spectrum as spec
+import spectrum
 import project_paths as paths
 
 folder_root, athena_path = paths.PATH, paths.athena_path
@@ -19,8 +19,8 @@ def cs_from_beta(init_norm_fluc, beta):
 
 
 def generate(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_cpus, exp_rate, 
-             dt, init_norm_fluc, beta, expand=1, reinterp=0, expo=-5/3, kprl=-2, 
-             spec='iso', a_final=10, gen_ic=1, run_athena=0, run_spec=0):
+             dt, init_norm_fluc, beta, expand=1, expo=-5/3, kprl=-2, 
+             spec='iso', kpeak=0., a_final=10, gen_ic=1, run_athena=0, run_spec=0):
     total_folder =  diag.format_path(folder)
 
     # X, Y, Z
@@ -66,7 +66,8 @@ def generate(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_cpus, exp_rat
         genics.create_athena_alfvenspec(total_folder, h5name, n_X, X_min, X_max, meshblock, 
                                     time_lim=time_lim, dt=dt, iso_sound_speed=iso_sound_speed,
                                     expand=expand, exp_rate=exp_rate, do_truncation=do_truncation, n_cutoff=n_cutoff,
-                                    perp_energy=perp_energy, expo=expo, expo_prl=kprl, prl_spec=prl_spec, gauss_spec=gauss_spec)                      
+                                    perp_energy=perp_energy, expo=expo, expo_prl=kprl, prl_spec=prl_spec,
+                                    gauss_spec=gauss_spec, kpeak=kpeak)                      
 
     if run_athena:
         os.chdir(total_folder)
@@ -74,11 +75,11 @@ def generate(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_cpus, exp_rat
         os.system(command)
 
     if run_spec:
-        do_prp_spec = 1
+        print(folder+output)
         inertial_range = np.array([6*10**1, 3*10**2])
         if do_truncation:
             inertial_range[0] = max(kprp_mag_cutoff[0], inertial_range[0])
             inertial_range[1] = min(kprp_mag_cutoff[1], inertial_range[1])
-        spec.calc_spectrum(folder+output, folder+output, sim_name, do_single_file=1, do_prp_spec=do_prp_spec, prob='from_array', inertial_range=inertial_range)
+        spectrum.calc_spectrum(folder+output, folder+output, sim_name, do_single_file=1, prob='from_array')
 
     return athinput, n_X

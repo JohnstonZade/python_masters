@@ -38,7 +38,8 @@ def make_slurm_file(job_name, n_nodes, athinput_out, reinterp=0, r_number=0, sim
             f.write('#SBATCH --ntasks-per-node=1\n#SBATCH -t 00:30:00\n')
             runout = 'run_genr' + str(r_number) + '.out'
             f.write('#SBATCH --output=' + runout + '\n')
-            # f.write('#SBATCH --account=uoo02637\n#SBATCH --mail-type=begin\n')
+            f.write('#SBATCH --account=uoo02637\n')
+            # f.write('#SBATCH --mail-type=begin\n')
             # f.write('#SBATCH --mail-type=end\n#SBATCH --mail-user=johza721@student.otago.ac.nz\n\n')
             f.write('echo ${SLURM_NODELIST}\n\n')
             
@@ -51,7 +52,7 @@ def make_slurm_file(job_name, n_nodes, athinput_out, reinterp=0, r_number=0, sim
             gen_path += athdf_input + ' '
             gen_path += '"' + str(n_X[0]) + ',' + str(n_X[1]) + ',' + str(n_X[2]) + '" '
             n_cpus = 40*n_nodes
-            gen_path += str(n_cpus) + ' '
+            gen_path += str(int(n_cpus)) + ' '
             gen_path += str(a_final) + ' '
             gen_path += str(a_re) + '\n'
             f.write(gen_path)
@@ -59,7 +60,8 @@ def make_slurm_file(job_name, n_nodes, athinput_out, reinterp=0, r_number=0, sim
 
 def generate_slurm(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_nodes,
                    exp_rate, init_norm_fluc, beta,
-                   gen_init_ic=1, a_re=None, a_end=None, dt=0.2, spec='iso'):
+                   gen_init_ic=1, a_re=None, a_end=None, dt=0.2,
+                   spec='iso', kpeak=0.):
 
     # If the reinterpolation and ending a are not specified,
     # expand the box to a cubic size by default
@@ -71,7 +73,8 @@ def generate_slurm(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_nodes,
     # Generate initial athinput and ICs.h5 files in folder
     n_cpus = 40*n_nodes
     athinput_orig, n_X = gen.generate(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_cpus, exp_rate,
-                                      dt, init_norm_fluc, beta, reinterp=1, spec=spec, a_final=a_re, gen_ic=gen_init_ic)
+                                      dt, init_norm_fluc, beta, spec=spec, a_final=a_re, 
+                                      kpeak=kpeak, gen_ic=gen_init_ic)
 
     # Generate initial slurm file (just modify job name, Ncpus, athinput name)
     make_slurm_file(sim_name, n_nodes, athinput_orig)
