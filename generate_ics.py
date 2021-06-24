@@ -262,7 +262,7 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
     print('Hydro Saved Succesfully')
 
 def reinterp_from_h5(save_folder, athinput_in_folder, athinput_in, h5name, athdf_input, athinput_out=from_array_path,
-                     a_to_finish=8, cell_aspect=2, new_meshblock=None, rescale_prl=1):
+                     a_finish=8, a_re=2, new_meshblock=None, rescale_prl=1):
     N_HYDRO = 4
     def root_path(path):
         split = path.split('/')[:-1]
@@ -279,7 +279,7 @@ def reinterp_from_h5(save_folder, athinput_in_folder, athinput_in, h5name, athdf
     # - Get the old grid as well, as we need this for the reinterpolation
     n_f = diag.get_maxn(root_path(athdf_input), do_path_format=0) - 1
     athdf_data = diag.load_data(root_path(athdf_input), n_f, do_path_format=0)
-    t_f, a_f = athdf_data['Time'], athdf_data['a_exp']
+    t_f = athdf_data['Time']
     old_Xgrid = athdf_data['x1v'], athdf_data['x2v'], athdf_data['x3v']
     athdf_data = None
 
@@ -321,18 +321,18 @@ def reinterp_from_h5(save_folder, athinput_in_folder, athinput_in, h5name, athdf
     # In (X, Y, Z) format
     new_Ns, Ls = np.copy(old_Ns), (X_max - X_min)
     if rescale_prl:
-        new_Ns[0] = int(new_Ns[0] // cell_aspect)
+        new_Ns[0] = int(new_Ns[0] // a_re)
     else: 
-        new_Ns[1:] = new_Ns[1:] * cell_aspect
+        new_Ns[1:] = new_Ns[1:] * a_re
     
     
     if new_meshblock is not None:
         meshblock = new_meshblock
     else:
         if rescale_prl:
-            meshblock[0] //= cell_aspect
+            meshblock[0] //= a_re
         else:
-            meshblock[1:] *= cell_aspect  # rescale meshblocks too (this is in X, Y, Z format)
+            meshblock[1:] *= a_re  # rescale meshblocks too (this is in X, Y, Z format)
     dx, dy, dz = generate_grid(X_min, X_max, new_Ns)[1]
 
     # Reinterpolate the data to the new high resolution grid
@@ -348,7 +348,7 @@ def reinterp_from_h5(save_folder, athinput_in_folder, athinput_in, h5name, athdf
     h5name += '.h5' if '.h5' not in h5name else ''
     n_hst, n_hdf5 = int(np.ceil(t_f / dt_hst)), int(np.ceil(t_f / dt))
     start_time = t_f
-    time_lim  = (a_to_finish - 1) / exp_rate 
+    time_lim  = (a_finish - 1) / exp_rate 
     athinput_out = edit_athinput(athinput_out, save_folder, new_Ns, X_min, X_max, meshblock, h5name,
                                  time_lim, dt, iso_sound_speed, expand, exp_rate,
                                  start_time=start_time, n_hst=n_hst, n_hdf5=n_hdf5)

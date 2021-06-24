@@ -19,8 +19,8 @@ def cs_from_beta(init_norm_fluc, beta):
 
 
 def generate(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_cpus, exp_rate, 
-             dt, init_norm_fluc, beta, expand=1, reinterp=0, expo=-5/3, kprl=-2, spec='iso',
-             gen_ic=1, run_athena=0, run_spec=0):
+             dt, init_norm_fluc, beta, expand=1, reinterp=0, expo=-5/3, kprl=-2, 
+             spec='iso', a_final=10, gen_ic=1, run_athena=0, run_spec=0):
     total_folder =  diag.format_path(folder)
 
     # X, Y, Z
@@ -36,10 +36,6 @@ def generate(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_cpus, exp_rat
     meshblock = diag.get_meshblocks(n_X, n_cpus)[0]
 
     # for editing athinput.from_array file
-    if reinterp:
-        a_final = cell_aspect
-    else:
-        a_final = box_aspect
     time_lim = expand_to_a(a_final, exp_rate)
     # time_lim = 6  # use this to manually set t_lim
 
@@ -52,6 +48,7 @@ def generate(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_cpus, exp_rat
     # kprl aniostropic parallel spectrum power law
     prl_spec = spec == 'gs'    # generate anisotropic GS spectrum
     gauss_spec = spec == 'gauss'  # generate gaussian spectrum
+    # TODO: add peak for Gauss spectrum
     do_truncation = 0  # cut off wave vectors above given mode numbers
     n_low, n_high = 0, 20 # modes to keep (0 <= n_low < n_high <= max(n_X)/2)
 

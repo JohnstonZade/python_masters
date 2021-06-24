@@ -10,8 +10,8 @@ else:
     COMPUTER = 'nesi'
 
 if COMPUTER == 'linux':
-    # PATH = '/home/zade/masters_2021/'
-    PATH = '/home/zade/GoogleDrive/masters_2021/'
+    PATH = '/home/zade/masters_2021/'
+    # PATH = '/home/zade/GoogleDrive/masters_2021/'
     SCRATCH = PATH
     python_masters_path = '/home/zade/python_masters/'
     from_array_path = PATH + 'templates_athinput/athinput.from_array'
