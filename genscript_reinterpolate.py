@@ -40,8 +40,8 @@ h5name = 'ICs_' + sim_name + '.h5'
 resolution = np.array(args['resolution'])
 new_meshblock = diag.get_meshblocks(resolution, args['n_cpus'])[0]
 
-a_finish = args['a_final']
-a_re = args['cell_aspect']
+a_finish = args['a_finish']
+a_re = args['a_re']
 
 print('Reinterpolating ' + sim_name)
 
