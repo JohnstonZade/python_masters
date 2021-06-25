@@ -18,10 +18,10 @@ cell_aspect = 2  # dx / dx_prp
 Nx_init = 64     # initial x resolution
 n_nodes = 1        # number of nodes     
 exp_rate = 0.5
-init_norm_fluc = 0.2
-beta = 0.2
-spectrum = 'gauss'
-kpeak = 0.
+init_norm_fluc = 0.2  # amplitude squared
+beta = 0.2  # approximate beta
+spectrum = 'gauss' 
+kpeak = 0.  # peak of gaussian spectrum
 # spectrum = 'gs'
 
 submit.generate_slurm(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_nodes,
