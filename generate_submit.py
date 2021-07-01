@@ -86,6 +86,7 @@ def generate_slurm(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_nodes,
     if a_re**n_reinterp == a_end:
         n_reinterp -= 1  # don't need to reinterpolate at final a
     n_output = (a_re - 1) / (exp_rate * dt)  # file number of last athdf output
+    n_diff = n_output
 
     # Generate slurm files for each additional interpolation
     # Add line to genscript_reinterpolate with cmdline arguments before athena
@@ -102,7 +103,8 @@ def generate_slurm(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_nodes,
         athinput_out = athinput_orig + '_r' + str(i)
 
         last_athdf = folder + 'output/from_array.out2' + '.%05d' % int(n_output) + '.athdf'
-        n_output += a_re * n_output
+        n_diff *= a_re
+        n_output += n_diff
 
         n_X[0] //= a_re
         make_slurm_file(reinterp_sim, n_nodes, athinput_out, reinterp=1,
