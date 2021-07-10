@@ -130,10 +130,7 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
 def spec_hik_energy_frac(S, do_magnetic=1):
     k = S['grids']['Kmag']
     kmax = max(k)
-    if do_magnetic:
-        E = S['EM']
-    else:
-        E = S['EK']
+    E = S['EM'] if do_magnetic else S['EK']
     hik_E = E[k > (kmax/6)].sum()
     tot_E = E.sum()
     return hik_E / tot_E
