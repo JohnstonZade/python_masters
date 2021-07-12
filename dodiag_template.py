@@ -1,4 +1,3 @@
-from athena_read import athinput
 import os
 
 cdir_root = os.getcwd().split('/')
