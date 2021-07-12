@@ -1,4 +1,3 @@
-from h5py import run_tests
 import numpy as np
 import diagnostics as diag
 import spectrum as spec
