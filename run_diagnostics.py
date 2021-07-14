@@ -98,13 +98,14 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
 
         diag.save_dict(S, output_dir, dict_name)
 
+    a_step = 1 if (1 + expansion_rate*(max_n-1)*dt > 2) else 0.1
+    spec_step = int(a_step / (expansion_rate*dt))  # eg if delta_a = 1, adot=0.5, dt=0.2 then spec_step = 10
     if do_spectrum:
         spec_hik_mag, spec_hik_kin, spec_hik_a = np.array([]), np.array([]), np.array([])
         for n in range(max_n):
-            spec_step = 1 if max_n <= 11 else 5
             if n % spec_step == 0:  # don't want to run too often
                 print('Spectrum calculation started at n = ' + str(n))
-                spec_a = round(S['perp_expand'][n], 2)
+                spec_a = round(S['perp_expand'][n], 1)
                 spec_name = 'mhd_spec_a' + str(spec_a)
                 S[spec_name] = spec.calc_spectrum(output_dir, output_dir, prob='from_array', dict_name=spec_name,
                                                   do_single_file=1, n=n, a=spec_a)
@@ -118,8 +119,8 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
 
     if do_flyby:
         for n in range(max_n):
-            if n % 5 == 0:
-                flyby_a = round(S['perp_expand'][n], 2)
+            if n % spec_step == 0:
+                flyby_a = round(S['perp_expand'][n], 1)
                 flyby_string = 'flyby_a' + str(flyby_a)
                 S[flyby_string] = reinterpolate.flyby(output_dir, flyby_a, n)
                 print(flyby_string + ' done')
