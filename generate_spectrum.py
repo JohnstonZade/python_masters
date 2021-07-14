@@ -22,59 +22,57 @@ def decompose_k(KX, KY, KZ, B0_x, B0_y, B0_z):
 
     return Kprl, Kprp
 
-def run_tests(Ls, KX, KY, KZ):
-    # no weighting of amplitudes by spectrum
-        # just want to test if it generates modes correctly
 
-        # parallel wavenumbers
-        kx, ky, kz = 2*np.pi / Ls[2], 2*np.pi / Ls[1], 2*np.pi / Ls[0]  
+def get_kpow(expo, expo_prl, prl_spec):
+    # accounting for how volume in k space changes
+    # for expo_prl = -2 (i.e. k_prl ∝ (k_prp)^(2/3)) second term is equivalent to expo + 1 + 2/3
+    # for isotropic expo_prl = expo (k_prl ∝ k_prp) second term is zero
+    kpow = expo + 2.0
+    kpow += (expo - expo_prl) / (expo_prl - 1.) if expo_prl != 1. else 0.
+    kpow /= 2  # initialising B not B^2
+    return kpow
 
-        # 2D Waves along y=x: works
-        # k_x = k_y = 1, k_z = 0, amp = 2, phase shift = 0
-        nx, ny, nz = 1., 1., 0.
-        kx *= nx; ky *= ny; kz *= nz
-        amp, theta = 1., 0.
+def get_kspec(expo, expo_prl, Kprl, Kprp, Kmag, prl_spec, gauss_spec, kpeak, kscale):
+    kpow = get_kpow(expo, expo_prl, prl_spec)
 
-        # 2D phase shift: works
-        # k_x = 1, k_y = 1, k_z = 0, amp = 2, phase shift = pi/2
-        # nx, ny, nz = 0., 1., 0.
-        # kx *= nx; ky *= ny; kz *= nz
-        # amp, theta = 2., np.pi / 2
+    if gauss_spec:
+        # if not isotropic to box, divide kscale by Lprp
+        return np.exp(-(Kmag - kpeak)**2 / kscale**2)
+    # elif prl_spec:
+    #     kprp_exp = (expo - 1) / (expo_prl - 1)  # gives 2/3 for expo, expo_prl = -5/3, -2
+    #     kprl_exp = 1.0
+    #     # see Cho2002, Maron2001 for explaination
+    #     return 1 / (1 + Kprp**kpow) * np.exp(-(Kprl**kprl_exp) / (Kprp**kprp_exp))
+    # else:
+    #     return 1 / (1 + Kmag**kpow)
+    factor = 1.0
+    if prl_spec:
+        # gives 2/3 for expo, expo_prl = -5/3, -2
+        kprp_exp = (expo - 1) / (expo_prl - 1) 
+        # kprl_exp = 1.0  # always 1
+        factor *= np.exp(-Kprl / (Kprp**kprp_exp))
+    spec = Kprp if prl_spec else Kmag
+    return 1 / (1 + spec**kpow) * factor
 
-        # 2D parallel: works
-        # k_x = 0, k_y = 1, k_z = 0, amp = 2, phase shift = 0
-        # nx, ny, nz = 1., 0., 0.
-        # kx *= nx; ky *= ny; kz *= nz
-        # amp, theta = 2., 0. 
-        # wave = amp*np.exp(1j*theta)
-        # mask = (np.imag(KX) == kx) & (np.imag(KY) == ky) & (np.imag(KZ) == kz) 
-        # z = np.zeros_like(KX)
-        # z[mask] = wave
-        # ft_dB_x = np.zeros_like(KX)
-        # ft_dB_y = np.zeros_like(KX)
-        # ft_dB_z = -z*KX*B_0x
-        # dB_x = np.real(fft.ifftn(ft_dB_x))
-        # dB_y = np.real(fft.ifftn(ft_dB_y))
-        # dB_z = np.real(fft.ifftn(ft_dB_z))
-        # return dB_x, dB_y, dB_z
+def truncate_r(r, n_X, Ls, KX, KY, KZ, n_cutoff):
+    # Just a check in case I forget to add specific parameters
+    n_low, n_high = (0, n_X[2]/2) if n_cutoff is None else n_cutoff
 
-        # 2D perpendicular: works
-        # # k_x = 0, k_y = 1, k_z = 0, amp = 2, phase shift = 0
-        # nx, ny, nz = 0., 1., 0.
-        # kx *= nx; ky *= ny; kz *= nz
-        # amp, theta = 2., 0. 
+    NX = Ls[2]*np.imag(KX) / (2*np.pi)
+    NY = Ls[1]*np.imag(KY) / (2*np.pi)
+    NZ = Ls[0]*np.imag(KZ) / (2*np.pi)
+    Nsqr = NX**2 + NY**2 + NZ**2
 
-        # 3D Waves: works
-        # k_x = 0, k_y = k_z = 1, amp = 2, phase shift = 0
-        # nx, ny, nz = 1., 1., 2.
-        # kx *= nx; ky *= ny; kz *= nz
-        # amp, theta = 2., 0.
-        
-        wave = amp*np.exp(1j*theta)
-        mask = (np.imag(KX) == kx) & (np.imag(KY) == ky) & (np.imag(KZ) == kz) 
-        z = np.zeros_like(KX)
-        z[mask] = wave
-        return z
+    # using same conditionals as used in alfven_wave_spectrum problem gen
+    c1 = (abs(NX) >= n_low) & (abs(NY) >= n_low) & (abs(NZ) >= n_low)
+    c2 = (abs(NX) <= n_high) & (abs(NY) <= n_high) & (abs(NZ) <= n_high)
+    c3 = Nsqr < n_high**2
+    # cut off all wavevectors that DON'T satisfy c1, c2, and c3
+    mode_mask = np.logical_not(c1 & c2 & c3)
+    r[mode_mask] = 0.0
+    c1, c2, c3 = None, None, None
+    NX, NY, NZ, Nsqr = None, None, None, None
+    return r
 
 def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, 
                     kscale=12.0, kpeak=0., gauss_spec=0, 
@@ -168,24 +166,8 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0,
         # will always interpret as a spectrum of the form k^(-expo)
         expo = abs(expo)
         expo_prl = expo if not prl_spec else abs(expo_prl)
-
-        # accounting for how volume in k space changes
-        # for expo_prl = -2 (i.e. k_prl ∝ (k_prp)^(2/3)) second term is equivalent to expo + 1 + 2/3
-        # for isotropic expo_prl = expo (k_prl ∝ k_prp) second term is zero
-        kpow = expo + 2.0
-        kpow += (expo - expo_prl) / (expo_prl - 1.) if expo_prl != 1. else 0.
-        kpow /= 2  # initialising B not B^2
-
-        if gauss_spec:
-            # if not isotropic to box, divide kpeak by Lprp
-            Kspec = np.exp(-(Kmag - kpeak)**2 / kscale**2)
-        elif prl_spec:
-            kprp_exp = (expo - 1) / (expo_prl - 1)  # gives 2/3 for expo, expo_prl = -5/3, -2
-            kprl_exp = 1.0
-            # see Cho2002, Maron2001 for explaination
-            Kspec = 1 / (1 + Kprp**kpow) * np.exp(-(Kprl**kprl_exp) / (Kprp**kprp_exp))
-        else:
-            Kspec = 1 / (1 + Kmag**kpow)
+        Kspec = get_kspec(expo, expo_prl, Kprl, Kprp, Kmag,
+                          prl_spec, gauss_spec, kpeak, kscale)
 
         # generate random complex numbers on the grid and weight by spectrum
         # these complex numbers represent the amplitude (r) and phase (theta) of the corresponding
@@ -193,23 +175,7 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0,
         r = random.normal(size=n_X)*Kspec
         Kspec, Kmag = None, None
         if do_truncation:
-            # Just a check in case I forget to add specific parameters
-            n_low, n_high = (0, n_X[2]/2) if n_cutoff is None else n_cutoff
-
-            NX = Ls[2]*np.imag(KX) / (2*np.pi)
-            NY = Ls[1]*np.imag(KY) / (2*np.pi)
-            NZ = Ls[0]*np.imag(KZ) / (2*np.pi)
-            Nsqr = NX**2 + NY**2 + NZ**2
-
-            # using same conditionals as used in alfven_wave_spectrum problem gen
-            c1 = (abs(NX) >= n_low) & (abs(NY) >= n_low) & (abs(NZ) >= n_low)
-            c2 = (abs(NX) <= n_high) & (abs(NY) <= n_high) & (abs(NZ) <= n_high)
-            c3 = Nsqr < n_high**2
-            # cut off all wavevectors that DON'T satisfy c1, c2, and c3
-            mode_mask = np.logical_not(c1 & c2 & c3)
-            r[mode_mask] = 0.0
-            c1, c2, c3 = None, None, None
-            NX, NY, NZ, Nsqr = None, None, None, None
+            r = truncate_r(r, n_X, Ls, KX, KY, KZ, n_cutoff)
 
         theta = random.uniform(0, 2*np.pi, size=n_X)
         z = r*np.exp(1j*theta)
@@ -264,3 +230,57 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0,
 
     # return dB_x, dB_y, dB_z
     return dB_y, dB_z
+
+
+def run_tests(Ls, KX, KY, KZ, n=0, B_0x=1.0):
+    # no weighting of amplitudes by spectrum
+    # just want to test if it generates modes correctly
+    # parallel wavenumbers
+    kx, ky, kz = 2*np.pi / Ls[2], 2*np.pi / Ls[1], 2*np.pi / Ls[0]  
+    if n == 0:
+        # 2D Waves along y=x: works
+        # k_x = k_y = 1, k_z = 0, amp = 2, phase shift = 0
+        nx, ny, nz = 1., 1., 0.
+        kx *= nx; ky *= ny; kz *= nz
+        amp, theta = 1., 0.
+    elif n == 1:
+        # 2D phase shift: works
+        # k_x = 1, k_y = 1, k_z = 0, amp = 2, phase shift = pi/2
+        nx, ny, nz = 0., 1., 0.
+        kx *= nx; ky *= ny; kz *= nz
+        amp, theta = 2., np.pi / 2
+    elif n == 2:
+        # 2D parallel: works
+        # k_x = 0, k_y = 1, k_z = 0, amp = 2, phase shift = 0
+        nx, ny, nz = 1., 0., 0.
+        kx *= nx; ky *= ny; kz *= nz
+        amp, theta = 2., 0. 
+        wave = amp*np.exp(1j*theta)
+        mask = (np.imag(KX) == kx) & (np.imag(KY) == ky) & (np.imag(KZ) == kz) 
+        z = np.zeros_like(KX)
+        z[mask] = wave
+        ft_dB_x = np.zeros_like(KX)
+        ft_dB_y = np.zeros_like(KX)
+        ft_dB_z = -z*KX*B_0x
+        dB_x = np.real(fft.ifftn(ft_dB_x))
+        dB_y = np.real(fft.ifftn(ft_dB_y))
+        dB_z = np.real(fft.ifftn(ft_dB_z))
+        return dB_x, dB_y, dB_z
+    elif n == 3:
+        # 2D perpendicular: works
+        # # k_x = 0, k_y = 1, k_z = 0, amp = 2, phase shift = 0
+        nx, ny, nz = 0., 1., 0.
+        kx *= nx; ky *= ny; kz *= nz
+        amp, theta = 2., 0. 
+    elif n == 4:
+        # 3D Waves: works
+        # k_x = 0, k_y = k_z = 1, amp = 2, phase shift = 0
+        nx, ny, nz = 1., 1., 2.
+        kx *= nx; ky *= ny; kz *= nz
+        amp, theta = 2., 0.
+    
+    wave = amp*np.exp(1j*theta)
+    mask = (np.imag(KX) == kx) & (np.imag(KY) == ky) & (np.imag(KZ) == kz) 
+    z = np.zeros_like(KX)
+    z[mask] = wave
+    return z
