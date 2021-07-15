@@ -2,11 +2,11 @@ import os
 
 cdir_root = os.getcwd().split('/')
 
-if cdir_root[1] == 'Users' or cdir_root[1] == 'home':
+if cdir_root[1] in ['Users', 'home']:
     python_masters_path = '~/python_masters/'
 else:
     python_masters_path = '/home/johza721/masters_2021/python_masters/'
-  
+
 import sys
 sys.path.insert(0, python_masters_path)
 submit = __import__('generate_submit')
@@ -22,7 +22,7 @@ n_nodes = 1        # number of nodes
 exp_rate = 0.5
 init_norm_fluc = 0.2  # amplitude squared
 beta = 0.2  # approximate beta
-spectrum = 'gauss' 
+spectrum = 'gauss'
 kpeak = 0.  # peak of gaussian spectrum
 # spectrum = 'gs'
 
