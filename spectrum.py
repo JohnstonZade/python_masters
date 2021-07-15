@@ -143,12 +143,14 @@ def calc_spectrum(output_dir, save_dir, return_dict=1, prob=default_prob,
                 S[var] /= ns
             S['nums'] = nums
 
-        diag.save_dict(S, save_dir, dict_name)
+        if return_dict:
+            return S
+        else:
+            diag.save_dict(S, save_dir, dict_name)
     else:
         S = diag.load_dict(save_dir, dict_name)
 
-    if return_dict:
-        return S
+    
 
 
 def get_k_bins(k, dim):

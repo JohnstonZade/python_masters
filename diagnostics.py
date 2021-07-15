@@ -23,9 +23,7 @@ def format_path(output_dir, format=1):
             output_dir = PATH + output_dir
         if output_dir[-1] != '/':
             output_dir += '/'
-        return output_dir
-    else:
-        return output_dir
+    return output_dir
 
 
 def load_data(output_dir, n, prob=DEFAULT_PROB, do_path_format=1):
@@ -101,9 +99,8 @@ def load_dict(output_dir, fname='', do_path_format=1):
     if fname != '':
         file = fname + '_' + file
 
-    pkl_file = open(format_path(output_dir, do_path_format)+file, 'rb')
-    dict = pickle.load(pkl_file)
-    pkl_file.close()
+    with open(format_path(output_dir, do_path_format)+file, 'rb') as pkl_file:
+        dict = pickle.load(pkl_file)
     return dict
 
 
@@ -112,9 +109,8 @@ def save_dict(dict, output_dir, fname='', do_path_format=1):
     if fname != '':
         file = fname + '_' + file
 
-    output = open(format_path(output_dir, do_path_format)+file, 'wb')
-    pickle.dump(dict, output)
-    output.close()
+    with open(format_path(output_dir, do_path_format)+file, 'wb') as output:
+        pickle.dump(dict, output)
 
 
 def check_dict(output_dir, fname='', do_path_format=1):
@@ -146,10 +142,10 @@ def get_meshblocks(n_X, n_cpus):
     def get_divs(n_points, n_dir, mesh, min_divs=10):
         if n_dir == 1:
             return [1], n_points
-        else:
-            n = n_points // mesh
-            divs = divisors(n)
-            return divs[(min_divs <= divs) & (divs <= n_dir) & (n_dir % divs == 0)], n
+        n = n_points // mesh
+        divs = divisors(n)
+        return divs[(min_divs <= divs) & (divs <= n_dir) & (n_dir % divs == 0)], n
+
     possible, sa_to_v = [], []
     nx, ny, nz = n_X
     MX, n = get_divs(np.prod(n_X), nx, n_cpus, min_divs=(nx//10))
@@ -176,10 +172,9 @@ def get_est_cputime(dx, resolution, n_cpus, a_start, a_end, a_dot, cputime=0):
     tlim = (a_end - a_start) / a_dot
     n_steps = tlim / dt_cfl
     if cputime:
-        est_time = avg_time_per_stepres * resolution * n_steps
+        return avg_time_per_stepres * resolution * n_steps
     else:
-        est_time = avg_time_per_stepres * resolution * n_steps / n_cpus
-    return est_time
+        return avg_time_per_stepres * resolution * n_steps / n_cpus
 
 def format_cputime(est_time, n_cpus, cputime=0, add_suffix=0, day_format=1):
     est_time_hrs = est_time / (60*60)
@@ -199,10 +194,7 @@ def get_split_cputime(dx, resolution, n_cpus_list, a_list, a_dot, total_time=1, 
     for idx, a in enumerate(a_list[1:]):
         a_start = a_list[idx]
         a_end = a
-        if n_cpus_list.size > 1:
-            n_cpus = n_cpus_list[idx]
-        else:
-            n_cpus = n_cpus_list[0]
+        n_cpus = n_cpus_list[idx] if n_cpus_list.size > 1 else n_cpus_list[0]
         print(str(a_start) + '->' + str(a_end))
         print(res)
         cpu_time.append(get_est_cputime(dx, res.prod(), n_cpus, a_start, a_end, a_dot, cputime=1))
@@ -212,15 +204,15 @@ def get_split_cputime(dx, resolution, n_cpus_list, a_list, a_dot, total_time=1, 
             dx *= (a / a_list[idx])
         else:
             res[1:] *= a_start
-        
+
     cpu_time, phys_time = np.array(cpu_time), np.array(phys_time)
-    if total_time:
-        tot_cpu = cpu_time.sum()
-        tot_phys = phys_time.sum()
-        return format_cputime(tot_cpu, n_cpus, cputime=1, day_format=0), format_cputime(tot_phys, n_cpus, day_format=0)
-    else:
+    if not total_time:
         return (['a = ' + str(a_list[i]) + '->' + str(a_list[i+1]) + ': ' + format_cputime(t, n_cpus, cputime=1, day_format=0) for i, t in enumerate(cpu_time)],
                ['a = ' + str(a_list[i]) + '->' + str(a_list[i+1]) + ': ' + format_cputime(t, n_cpus, day_format=0) for i, t in enumerate(phys_time)])
+
+    tot_cpu = cpu_time.sum()
+    tot_phys = phys_time.sum()
+    return format_cputime(tot_cpu, n_cpus, cputime=1, day_format=0), format_cputime(tot_phys, n_cpus, day_format=0)
             
             
         
@@ -366,8 +358,7 @@ def ft_grid(input_type, data=None, output_dir=None, Ls=None,
         else:
             K[k] = 2j*np.pi/Ls[k]*ft_array(Ns[k])
 
-    Ks = np.meshgrid(K[0], K[1], K[2], indexing='ij')
-    return Ks
+    return np.meshgrid(K[0], K[1], K[2], indexing='ij')
 
 
 # --- MHD TURBULENCE DIAGNOSTICS --- #
@@ -472,12 +463,11 @@ def load_time_series(output_dir, n_start=0, n_end=-1, conserved=0, just_time=0, 
         t.append(data_n['Time'])
         a.append(data_n['a_exp'])
         if not just_time:
+            B.append((data_n['Bcc1'], data_n['Bcc2'], data_n['Bcc3']))
             if conserved:
-                B.append((data_n['Bcc1'], data_n['Bcc2'], data_n['Bcc3']))
                 u.append((data_n['mom1'], data_n['mom2'], data_n['mom3']))
                 rho.append(data_n['dens'])
             else:
-                B.append((data_n['Bcc1'], data_n['Bcc2'], data_n['Bcc3']))
                 u.append((data_n['vel1'], data_n['vel2'], data_n['vel3']))
                 rho.append(data_n['rho'])
     

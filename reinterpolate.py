@@ -12,8 +12,7 @@ def reinterp_to_grid(data, old_Xgrid, new_Ns, Ls):
 
     Zg_hires, Yg_hires, Xg_hires = reinterp_generate_grid(new_Ns, Ls, return_mesh=1, pad=0)
     pts = np.array([Zg_hires.ravel(), Yg_hires.ravel(), Xg_hires.ravel()]).T
-    data_hires = data_interp(pts).reshape(*new_Ns)
-    return data_hires
+    return data_interp(pts).reshape(*new_Ns)
 
 def flyby(output_dir, flyby_a, flyby_n, do_rand_start=1, l_start=None,
           l_dir=np.array([np.pi/8, np.sqrt(0.5), 1.]), norm_Bx=1):
