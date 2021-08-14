@@ -45,6 +45,19 @@ def load_data(output_dir, n, prob=DEFAULT_PROB, do_path_format=1):
         the `read_python.py` script in `/athena/vis/python/`.
     '''
     
+    def change_coords(data, a, matts_method=1):
+        # Using primed to unprimed transformation
+        # from Matt Kunz's notes
+        Λ = np.array([1, a, a])  # diagonal matrix
+        λ = np.prod(Λ)  # determinant of Λ = a^2
+
+        data['rho'] /= λ if matts_method else 1
+        for i in range(1, 4):
+            B_string = 'Bcc' + str(i)
+            u_string = 'vel' + str(i)
+            data[u_string] *= Λ[i]
+            data[B_string] *= Λ[i] / λ if matts_method else Λ[i]
+    
     max_n = get_maxn(output_dir, do_path_format=do_path_format)
     assert n in range(0, max_n), 'n must be between 0 and ' + str(max_n)
 
@@ -60,12 +73,11 @@ def load_data(output_dir, n, prob=DEFAULT_PROB, do_path_format=1):
     # Rescale perpendicular components automatically
     data = athdf(filename)
     current_a = data['a_exp']
-    data['Bcc2'] *= current_a
-    data['Bcc3'] *= current_a
-    data['vel2'] *= current_a
-    data['vel3'] *= current_a
+    # set Matt's method = 0 if using Jono's original code
+    # where u_⟂ = a*u'_⟂
+    change_coords(data, current_a)
     return data
-
+        
 
 def load_hst(output_dir, adot, prob=DEFAULT_PROB, do_path_format=1):
     '''Loads data from .hst files output from Athena++.

@@ -11,11 +11,7 @@ def get_energy_data(output_dir, adot,
     hstData = diag.load_hst(output_dir, adot, prob)
 
     # Volume to calculate energy density
-    if vol_norm:
-        vol = diag.get_vol(output_dir, prob)
-    else:
-        vol = 1
-
+    vol = diag.get_vol(output_dir, prob) if vol_norm else 1
     t_A = Lx  # true when v_A = 1 and B0 along the x axis
     t = hstData['time'] / t_A  # scale by Alfven period
     a = hstData['a']
