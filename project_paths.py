@@ -1,6 +1,7 @@
 import os
 
 cdir_root = os.getcwd().split('/')
+# push test
 
 if cdir_root[1] == 'Users':
     COMPUTER = 'mac'
