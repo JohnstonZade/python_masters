@@ -52,9 +52,9 @@ def load_data(output_dir, n, prob=DEFAULT_PROB, do_path_format=1):
         λ = np.prod(Λ)  # determinant of Λ = a^2
 
         data['rho'] /= λ if matts_method else 1
-        for i in range(1, 4):
-            B_string = 'Bcc' + str(i)
-            u_string = 'vel' + str(i)
+        for i in range(3):
+            B_string = 'Bcc' + str(i+1)
+            u_string = 'vel' + str(i+1)
             data[u_string] *= Λ[i]
             data[B_string] *= Λ[i] / λ if matts_method else Λ[i]
     
