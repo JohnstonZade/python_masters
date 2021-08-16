@@ -26,6 +26,8 @@ def format_path(output_dir, format=1):
     return output_dir
 
 
+# mac PAT test
+
 def load_data(output_dir, n, prob=DEFAULT_PROB, do_path_format=1):
     '''Loads data from .athdf files output from Athena++.
 
