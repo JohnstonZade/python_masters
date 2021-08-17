@@ -6,8 +6,8 @@ import numpy as np
 def get_energy_data(output_dir, adot,
                     vol_norm=0,
                     B0=1.0,
-                    Lx=1.0):
-    prob = diag.DEFAULT_PROB
+                    Lx=1.0,
+                    prob=''):
     hstData = diag.load_hst(output_dir, adot, prob)
 
     # Volume to calculate energy density

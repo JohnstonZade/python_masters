@@ -26,7 +26,7 @@ def format_path(output_dir, format=1):
     return output_dir
 
 
-def load_data(output_dir, n, prob=DEFAULT_PROB, do_path_format=1):
+def load_data(output_dir, n, prob=DEFAULT_PROB, do_path_format=1, matts_method=1):
     '''Loads data from .athdf files output from Athena++.
 
     Parameters
@@ -45,7 +45,7 @@ def load_data(output_dir, n, prob=DEFAULT_PROB, do_path_format=1):
         the `read_python.py` script in `/athena/vis/python/`.
     '''
     
-    def change_coords(data, a, matts_method=1):
+    def change_coords(data, a, matts_method):
         # Using primed to unprimed transformation
         # from Matt Kunz's notes
         Λ = np.array([1, a, a])  # diagonal matrix
@@ -75,13 +75,15 @@ def load_data(output_dir, n, prob=DEFAULT_PROB, do_path_format=1):
     current_a = data['a_exp']
     # set Matt's method = 0 if using Jono's original code
     # where u_⟂ = a*u'_⟂
-    change_coords(data, current_a)
+    change_coords(data, current_a, matts_method)
     return data
         
 
-def load_hst(output_dir, adot, prob=DEFAULT_PROB, do_path_format=1):
+def load_hst(output_dir, adot, prob=DEFAULT_PROB, do_path_format=1, matts_method=1):
     '''Loads data from .hst files output from Athena++.
     '''
+    
+    
     hstLoc = format_path(output_dir, do_path_format) + prob + '.hst'
     hst_data = hst(hstLoc)
 
@@ -90,12 +92,22 @@ def load_hst(output_dir, adot, prob=DEFAULT_PROB, do_path_format=1):
         hst_data['a'] = 1.0 + adot*t_hst
     
     a_hst = hst_data['a']
-    hst_data['2-mom'] *= a_hst  # perp momenta ~ u_perp
-    hst_data['3-mom'] *= a_hst
-    hst_data['2-KE'] *= a_hst**2  # perp energies ~ u_perp^2 and B_perp^2
-    hst_data['3-KE'] *= a_hst**2
-    hst_data['2-ME'] *= a_hst**2
-    hst_data['3-ME'] *= a_hst**2
+    if matts_method:
+        hst_data['mass'] /= a_hst**2
+        hst_data['1-mom'] /= a_hst**2
+        hst_data['2-mom'] /= a_hst
+        hst_data['3-mom'] /= a_hst
+        hst_data['1-KE'] /= a_hst
+        hst_data['1-ME'] /= a_hst**4
+        hst_data['2-ME'] /= a_hst**2
+        hst_data['3-ME'] /= a_hst**2
+    else:
+        hst_data['2-mom'] *= a_hst  # perp momenta ~ u_perp
+        hst_data['3-mom'] *= a_hst
+        hst_data['2-KE'] *= a_hst**2  # perp energies ~ u_perp^2 and B_perp^2
+        hst_data['3-KE'] *= a_hst**2
+        hst_data['2-ME'] *= a_hst**2
+        hst_data['3-ME'] *= a_hst**2
 
     return hst_data
 
@@ -411,8 +423,8 @@ def norm_fluc_amp(fluc, background):
     mean_bg_sqr = box_avg(background)**2
     return mean_fluc / mean_bg_sqr
 
-def norm_fluc_amp_hst(output_dir, adot):
-    a, EKprp, EMprp, EBx_init = energy.get_energy_data(output_dir, adot)[1:]
+def norm_fluc_amp_hst(output_dir, adot, prob=DEFAULT_PROB):
+    a, EKprp, EMprp, EBx_init = energy.get_energy_data(output_dir, adot, prob=prob)[1:]
     Bx2 = EBx_init*a**(-4) # mean field energy (Bx_0 = 1) * <Bx>^2 evolution 
     Bprp_fluc = EMprp / Bx2
     uprp_fluc = EKprp / Bx2
@@ -458,7 +470,7 @@ def expand_variables(a, vector):
     return vector
 
 
-def load_time_series(output_dir, n_start=0, n_end=-1, conserved=0, just_time=0, prob=DEFAULT_PROB):
+def load_time_series(output_dir, n_start=0, n_end=-1, conserved=0, just_time=0, prob=DEFAULT_PROB, matts_method=1):
     # By default load all snapshots
     # Otherwise load all snapshots n_start...(n_end - 1)
     max_n = get_maxn(output_dir)
@@ -471,7 +483,7 @@ def load_time_series(output_dir, n_start=0, n_end=-1, conserved=0, just_time=0, 
     t, a, B, u, rho = [], [], [], [], []
 
     for n in range(n_start, n_end):
-        data_n = load_data(output_dir, n, prob)
+        data_n = load_data(output_dir, n, prob, matts_method=matts_method)
         t.append(data_n['Time'])
         a.append(data_n['a_exp'])
         if not just_time:

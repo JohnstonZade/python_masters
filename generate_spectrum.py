@@ -242,7 +242,7 @@ def run_tests(Ls, KX, KY, KZ, n=0, B_0x=1.0):
         # k_x = k_y = 1, k_z = 0, amp = 2, phase shift = 0
         nx, ny, nz = 1., 1., 0.
         kx *= nx; ky *= ny; kz *= nz
-        amp, theta = 1., 0.
+        amp, theta = 0.01, 0.
     elif n == 1:
         # 2D phase shift: works
         # k_x = 1, k_y = 1, k_z = 0, amp = 2, phase shift = pi/2
