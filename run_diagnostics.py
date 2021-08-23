@@ -40,7 +40,7 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
     if do_full_calc:
         t_full, a_full = np.array([]), np.array([])
         Bx_mean_full, beta_full, sb_frac_full = np.array([]), np.array([]), np.array([])
-        cross_h_full = np.array([])
+        cross_h_full, z_p_full, z_m_full = np.array([]), np.array([]), np.array([])
         Bprp_fluc_full, uprp_fluc_full, kinetic_fluc_full = np.array([]), np.array([]), np.array([])
         magcomp_sq_full = np.array([])
         # magcomp_sh_full = np.array([])
@@ -59,6 +59,7 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
                 B0_x = B_x[0, 0, 0, 0]  # initial B0_x
             B_mag = np.sqrt(diag.dot_prod(B, B, 1))
             rho_avg = diag.box_avg(rho)
+            z_p_rms, z_m_rms = diag.z_waves_evo(rho, u_prp, B_prp, a)
 
             t_full = np.append(t_full, t)
             a_full = np.append(a_full, a)
@@ -67,6 +68,8 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
             beta_full = np.append(beta_full, diag.beta(rho, B_mag, c_s_init, expansion_rate, t))
             sb_frac_full = np.append(sb_frac_full, diag.switchback_fraction(B_x, B_mag, B0_x))
             cross_h_full = np.append(cross_h_full, diag.cross_helicity(rho, u_prp, B_prp))
+            z_p_full = np.append(z_p_full, z_p_rms)
+            z_m_full = np.append(z_m_full, z_m_rms)
             Bprp_fluc_full = np.append(Bprp_fluc_full, diag.norm_fluc_amp(diag.dot_prod(B_prp, B_prp, 1), B_x))
             uprp_fluc_full = np.append(uprp_fluc_full, diag.norm_fluc_amp(diag.dot_prod(u_prp, u_prp, 1), B_x / np.sqrt(rho_avg)))
             kinetic_fluc_full = np.append(kinetic_fluc_full, diag.norm_fluc_amp(rho*diag.dot_prod(u_prp, u_prp, 1), B_x))
@@ -87,6 +90,8 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
         S['uprp_norm_fluc'] = uprp_fluc_full
         S['kinetic_norm_fluc'] = kinetic_fluc_full
         S['cross_helicity'] = cross_h_full
+        S['z_plus'] = z_p_full
+        S['z_minus'] = z_m_full
         S['C_B2_Squire'] = magcomp_sq_full
         # S['C_B2_Shoda'] = magcomp_sh_full
         

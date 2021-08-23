@@ -394,6 +394,15 @@ def cross_helicity(rho, u_perp, B_perp):
     return 2 * box_avg(np.sqrt(rho) * udotB) / box_avg(rho*u2 + B2)
 
 
+def z_waves_evo(rho, u_perp, B_perp, a):
+    # magnetic field in velocity units
+    b_perp = B_perp / np.sqrt(rho)
+    v_a = 1 / a  # B_0 = 1 initially
+    z_p = u_perp + b_perp
+    z_m = u_perp - b_perp
+    z_p_rms, z_m_rms = rms(z_p) / v_a, rms(z_m) / v_a
+    return z_p_rms, z_m_rms
+
 def beta(rho, B_mag, c_s_init, expansion_rate, t):
     # rho and B_mag should be of the form rho[time, x, y, z]
     # from Squire2020, line before Eq. 4
