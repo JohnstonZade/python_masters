@@ -26,7 +26,7 @@ def format_path(output_dir, format=1):
     return output_dir
 
 
-def load_data(output_dir, n, prob=DEFAULT_PROB, do_path_format=1, matts_method=1):
+def load_data(output_dir, n, prob=DEFAULT_PROB, do_path_format=1, method='matt'):
     '''Loads data from .athdf files output from Athena++.
 
     Parameters
@@ -42,21 +42,21 @@ def load_data(output_dir, n, prob=DEFAULT_PROB, do_path_format=1, matts_method=1
     -------
     dict
         a dictionary containing information on all data in the simulation. Using 
-        the `read_python.py` script in `/athena/vis/python/`.
+        the `athena_read.py` script in `/athena/vis/python/`.
     '''
     
-    def change_coords(data, a, matts_method):
+    def change_coords(data, a, method):
         # Using primed to unprimed transformation
         # from Matt Kunz's notes
         Λ = np.array([1, a, a])  # diagonal matrix
-        λ = np.prod(Λ)  # determinant of Λ = a^2
-
+        λ = a**2  # determinant of Λ = a^2
+        matts_method = method == 'matt'
         data['rho'] /= λ if matts_method else 1
         for i in range(3):
             B_string = 'Bcc' + str(i+1)
             u_string = 'vel' + str(i+1)
             data[u_string] *= Λ[i]
-            data[B_string] *= Λ[i] / λ if matts_method else Λ[i]
+            data[B_string] *= Λ[i] / λ if matts_method else Λ[i]    
     
     max_n = get_maxn(output_dir, do_path_format=do_path_format)
     assert n in range(0, max_n), 'n must be between 0 and ' + str(max_n)
@@ -70,20 +70,20 @@ def load_data(output_dir, n, prob=DEFAULT_PROB, do_path_format=1, matts_method=1
     output_id = '2'  # Output ID (set in input file)
     filename = f(n)
 
-    # Rescale perpendicular components automatically
     data = athdf(filename)
-    current_a = data['a_exp']
-    # set Matt's method = 0 if using Jono's original code
-    # where u_⟂ = a*u'_⟂
-    change_coords(data, current_a, matts_method)
+    if method != 'nothing':
+        # Rescale perpendicular components automatically
+        current_a = data['a_exp']
+        # use method = 'matt' for Matt's equations
+        # else method = 'jono' for Jono's equations
+        # where u_⟂ = a*u'_⟂ and same for B_⟂
+        change_coords(data, current_a, method)
     return data
         
 
-def load_hst(output_dir, adot, prob=DEFAULT_PROB, do_path_format=1, matts_method=1):
+def load_hst(output_dir, adot, prob=DEFAULT_PROB, do_path_format=1, method='matt'):
     '''Loads data from .hst files output from Athena++.
     '''
-    
-    
     hstLoc = format_path(output_dir, do_path_format) + prob + '.hst'
     hst_data = hst(hstLoc)
 
@@ -92,16 +92,18 @@ def load_hst(output_dir, adot, prob=DEFAULT_PROB, do_path_format=1, matts_method
         hst_data['a'] = 1.0 + adot*t_hst
     
     a_hst = hst_data['a']
-    if matts_method:
+    if method == 'nothing':
+        return hst_data
+    elif method == 'matt':
         hst_data['mass'] /= a_hst**2
         hst_data['1-mom'] /= a_hst**2
         hst_data['2-mom'] /= a_hst
         hst_data['3-mom'] /= a_hst
-        hst_data['1-KE'] /= a_hst
+        hst_data['1-KE'] /= a_hst**2  # Perp kinetic energies have same scaling
         hst_data['1-ME'] /= a_hst**4
         hst_data['2-ME'] /= a_hst**2
         hst_data['3-ME'] /= a_hst**2
-    else:
+    elif method == 'jono':
         hst_data['2-mom'] *= a_hst  # perp momenta ~ u_perp
         hst_data['3-mom'] *= a_hst
         hst_data['2-KE'] *= a_hst**2  # perp energies ~ u_perp^2 and B_perp^2
@@ -479,7 +481,7 @@ def expand_variables(a, vector):
     return vector
 
 
-def load_time_series(output_dir, n_start=0, n_end=-1, conserved=0, just_time=0, prob=DEFAULT_PROB, matts_method=1):
+def load_time_series(output_dir, n_start=0, n_end=-1, conserved=0, just_time=0, prob=DEFAULT_PROB, method='matt'):
     # By default load all snapshots
     # Otherwise load all snapshots n_start...(n_end - 1)
     max_n = get_maxn(output_dir)
@@ -492,7 +494,7 @@ def load_time_series(output_dir, n_start=0, n_end=-1, conserved=0, just_time=0, 
     t, a, B, u, rho = [], [], [], [], []
 
     for n in range(n_start, n_end):
-        data_n = load_data(output_dir, n, prob, matts_method=matts_method)
+        data_n = load_data(output_dir, n, prob, method=method)
         t.append(data_n['Time'])
         a.append(data_n['a_exp'])
         if not just_time:

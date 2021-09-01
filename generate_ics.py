@@ -266,11 +266,7 @@ def reinterp_from_h5(save_folder, athinput_in_folder, athinput_in, h5name, athdf
                      a_finish=8, a_re=2, new_meshblock=None, rescale_prl=1):
     N_HYDRO = 4
     def root_path(path):
-        split = path.split('/')[:-1]
-        s = ''
-        for sub in split:
-            s += sub + '/'
-        return s
+        return ''.join(sub + '/' for sub in path.split('/')[:-1])
     
     if athinput_in_folder not in athinput_in:
         athinput_in = athinput_in_folder + athinput_in
