@@ -16,10 +16,10 @@ def reinterp_to_grid(data, old_Xgrid, new_Ns, Ls):
 
 def flyby(output_dir, flyby_a, flyby_n, do_rand_start=1, l_start=None,
           l_dir=np.array([np.pi/8, np.sqrt(0.5), 1.]), norm_Bx=1):
-    
+    # TODO: #3 will need to modify for new equation implementation in Athena; maybe make a separate function in diagnostics?
     # assuming always from_array
     data = diag.load_data(output_dir, flyby_n, prob='from_array')
-    Ns, Ls = get_grid_info(data, flyby_a)
+    Ns, Ls = get_grid_info(data)
     
     zg, yg, xg = reinterp_generate_grid(Ns, Ls)
     # Zg, Yg, Xg = np.meshgrid(zg, yg, xg, indexing='ij')  # only needed if defining a function on grid

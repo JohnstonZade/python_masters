@@ -52,14 +52,12 @@ def reinterp_generate_grid(Ns, Ls, return_mesh=0, return_edges=0, pad=1):
     else:
         return Xs
 
-def get_grid_info(data, a):
+def get_grid_info(data):
     Ns = data['RootGridSize'][::-1]
     Ls = []
     for i in range(1, 4):
         string = 'RootGridX' + str(i)
         L = data[string][1] - data[string][0]
-        # Expand y and z lengths
-        L *= 1 if i == 1 else a
         Ls.append(L)
     Ls = np.array(Ls[::-1])
     return Ns, Ls
