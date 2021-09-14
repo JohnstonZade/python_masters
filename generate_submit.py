@@ -60,15 +60,13 @@ def make_slurm_file(job_name, n_nodes, athinput_out, reinterp=0, r_number=0, sim
 
 def generate_slurm(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_nodes,
                    exp_rate, init_norm_fluc, beta,
-                   gen_init_ic=1, a_re=None, a_end=None, dt=0.2,
+                   gen_init_ic=1, a_re=None, a_end=4, dt=0.2,
                    spec='iso', kpeak=0.):
 
     # If the reinterpolation and ending a are not specified,
     # expand the box to a cubic size by default
     if a_re is None:
-        a_re = cell_aspect
-    if a_end is None:
-        a_end = box_aspect
+        a_re = a_end
     
     # Generate initial athinput and ICs.h5 files in folder
     n_cpus = 40*n_nodes

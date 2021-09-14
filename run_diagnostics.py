@@ -17,7 +17,8 @@ def read_athinput(athinput_path):
     return expansion_rate, iso_sound_speed, tlim, dt
  
 
-def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spectrum=0, do_flyby=1, override_not_full_calc=0):
+def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spectrum=0, do_flyby=1, override_not_full_calc=0,
+             method='matt'):
     
     max_n = diag.get_maxn(output_dir)
     # overestimate the number of steps needed; edge case is handled when loading data
@@ -50,7 +51,7 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
             n_start = i*steps
             n_end = (i+1)*steps
             print(' Analysing n = ' + str(i*steps) + ' to ' + str((i+1)*steps - 1))
-            t, a, B, u, rho = diag.load_time_series(output_dir, n_start, n_end)
+            t, a, B, u, rho = diag.load_time_series(output_dir, n_start, n_end, method=method)
             print('     Data loaded')
             
             u_prp, B_prp = u[:, 1:], B[:, 1:]
@@ -95,7 +96,7 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
         S['C_B2_Squire'] = magcomp_sq_full
         # S['C_B2_Shoda'] = magcomp_sh_full
         
-        a_normfluc, Bprp_fluc, kinetic_fluc = diag.norm_fluc_amp_hst(output_dir, expansion_rate)
+        a_normfluc, Bprp_fluc, kinetic_fluc = diag.norm_fluc_amp_hst(output_dir, expansion_rate, method)
         S['a_norm_fluc_hst'] = a_normfluc
         S['Bprp_norm_fluc_hst'] = Bprp_fluc
         S['kinetic_norm_fluc_hst'] = kinetic_fluc

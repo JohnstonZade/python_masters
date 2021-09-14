@@ -7,8 +7,9 @@ def get_energy_data(output_dir, adot,
                     vol_norm=0,
                     B0=1.0,
                     Lx=1.0,
-                    prob=''):
-    hstData = diag.load_hst(output_dir, adot, prob)
+                    prob='',
+                    method='matt'):
+    hstData = diag.load_hst(output_dir, adot, prob, method=method)
 
     # Volume to calculate energy density
     vol = diag.get_vol(output_dir, prob) if vol_norm else 1
