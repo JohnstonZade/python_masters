@@ -127,7 +127,7 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
             if n % spec_step == 0:
                 flyby_a = round(S['perp_expand'][n], 1)
                 flyby_string = 'flyby_a' + str(flyby_a)
-                S[flyby_string] = reinterpolate.flyby(output_dir, flyby_a, n)
+                S[flyby_string] = reinterpolate.flyby(output_dir, flyby_a, n, method=method)
                 print(flyby_string + ' done')
 
     diag.save_dict(S, output_dir, dict_name)
