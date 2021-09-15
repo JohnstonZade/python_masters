@@ -7,10 +7,8 @@ if cdir_root[1] == 'Users':
     COMPUTER = 'mac'
 elif cdir_root[1] == 'home':
     COMPUTER = 'linux'
-elif cdir_root[1] == 'nesi':
-    COMPUTER = 'nesi'
 else:
-    COMPUTER = 'linux'
+    COMPUTER = 'nesi'
 
 if COMPUTER == 'linux':
     PATH = '/home/zade/masters_2021/'
