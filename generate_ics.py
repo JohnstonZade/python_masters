@@ -263,7 +263,7 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
     print('Hydro Saved Succesfully')
 
 def reinterp_from_h5(save_folder, athinput_in_folder, athinput_in, h5name, athdf_input, athinput_out=from_array_path,
-                     a_finish=8, a_re=2, new_meshblock=None, rescale_prl=1):
+                     a_finish=8, a_re=2, new_meshblock=None, rescale_prl=1, method='matt'):
     N_HYDRO = 4
     def root_path(path):
         return ''.join(sub + '/' for sub in path.split('/')[:-1])
@@ -275,7 +275,7 @@ def reinterp_from_h5(save_folder, athinput_in_folder, athinput_in, h5name, athdf
     # - Get final time and expansion value
     # - Get the old grid as well, as we need this for the reinterpolation
     n_f = diag.get_maxn(root_path(athdf_input), do_path_format=0) - 1
-    athdf_data = diag.load_data(root_path(athdf_input), n_f, do_path_format=0)
+    athdf_data = diag.load_data(root_path(athdf_input), n_f, do_path_format=0, method=method)
     t_f = athdf_data['Time']
     old_Xgrid = athdf_data['x1v'], athdf_data['x2v'], athdf_data['x3v']
     athdf_data = None

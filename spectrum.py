@@ -18,7 +18,8 @@ def array_avg(arr):
 
 def calc_spectrum(output_dir, save_dir, return_dict=1, prob=default_prob,
                   dict_name='mhd_spec', do_single_file=0, n=0, a=1,
-                  normalize_energy=1, do_mhd=1, bmag_and_rho=0):
+                  normalize_energy=1, do_mhd=1, bmag_and_rho=0,
+                  method='matt'):
 
     # Getting turnover time and converting to file number
     if do_single_file:
@@ -31,7 +32,7 @@ def calc_spectrum(output_dir, save_dir, return_dict=1, prob=default_prob,
     do_full_calc = not diag.check_dict(save_dir, dict_name)
     if do_full_calc:
         # create grid of K from first time step
-        data = diag.load_data(output_dir, n, prob=prob)
+        data = diag.load_data(output_dir, n, prob=prob, method=method)
         KZ, KY, KX = diag.ft_grid('data', data=data, prob=prob)
         Kprl = np.maximum(np.abs(KX), 1e-4)
         Kprp = np.maximum(np.sqrt(abs(KY)**2 + abs(KZ)**2), 1e-4)
@@ -63,7 +64,7 @@ def calc_spectrum(output_dir, save_dir, return_dict=1, prob=default_prob,
 
         for n in nums:
             try:
-                data = diag.load_data(output_dir, n, prob=prob)
+                data = diag.load_data(output_dir, n, prob=prob, method=method)
             except IOError:
                 print('Could not load file', n)
                 break
