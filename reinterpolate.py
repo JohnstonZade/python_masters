@@ -16,8 +16,7 @@ def reinterp_to_grid(data, old_Xgrid, new_Ns, Ls):
 
 def flyby(output_dir, flyby_a, flyby_n, do_rand_start=1, l_start=None,
           l_dir=np.array([np.pi/8, np.sqrt(0.5), 1.]), norm_Bx=1, method='matt'):
-    # TODO: #3 will need to modify for new equation implementation in Athena; maybe make a separate function in diagnostics?
-    # assuming always from_array
+    # Loading data with the correct method scales the data to the physical variables
     data = diag.load_data(output_dir, flyby_n, prob='from_array', method=method)
     Ns, Ls = get_grid_info(data)
     
@@ -52,7 +51,8 @@ def flyby(output_dir, flyby_a, flyby_n, do_rand_start=1, l_start=None,
     # N_loop = 25  # number of times along an axis?
     # lvec = np.linspace(0, N_loop, N_linepts).reshape(N_linepts, 1)    
     N_y = Ns[1]
-    total_length = flyby_a*N_y**2 if N_y <= 256 else flyby_a*N_y
+    total_length = 10*flyby_a*N_y
+    # total_length = flyby_a*N_y**2 if N_y <= 256 else flyby_a*N_y
     dl = yg[1] - yg[0]
     N_dl = int(total_length / dl)
     lvec = np.linspace(-total_length/2, total_length/2, N_dl).reshape(N_dl, 1)
