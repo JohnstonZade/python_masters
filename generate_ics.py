@@ -1,6 +1,7 @@
 # --- IMPORTS --- #
 import h5py
 import numpy as np
+from numpy.core.numeric import ones_like
 
 import diagnostics as diag
 import generate_spectrum as genspec
@@ -229,7 +230,10 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
 
     # Setting z^- waves = 0
     rho = Hy_grid[0]
-    dB_y, dB_z = Bcc_unpacked  # no mean field along y and z axes
+    dB_y, dB_z = Bcc_unpacked  
+    # ensuring no mean
+    dB_y += -np.mean(dB_y)*np.ones_like(dB_y)
+    dB_z += -np.mean(dB_z)*np.ones_like(dB_z)
     du_y, du_z = dB_y / np.sqrt(rho), dB_z / np.sqrt(rho)
 
     # total volume weighted energy = sum(0.5*dV*B^2) = 0.5*(V/N)sum(B^2) = 0.5*V*mean(B^2)
