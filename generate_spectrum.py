@@ -54,6 +54,19 @@ def get_kspec(expo, expo_prl, Kprl, Kprp, Kmag, prl_spec, gauss_spec, kpeak, ksc
     spec = Kprp if prl_spec else Kmag
     return 1 / (1 + spec**kpow) * factor
 
+def hosking_spec(Kprp, D=3, k_c=25, a=7):
+    # Spectrum from Hosking_2020
+    # For comparison with Romain's RMHD simulartions
+    # k_c is initial peak of spectrum
+    # D is spatial dimensions
+    # a is initial spectral exponent
+    
+    Kprp_mask = Kprp > k_c
+    spec = Kprp**(0.5*(a-D+1))
+    spec[Kprp_mask] *= np.exp(1 - Kprp[Kprp_mask]**2 / k_c**2)
+    return spec
+    
+
 def truncate_r(r, n_X, Ls, KX, KY, KZ, n_cutoff):
     # Just a check in case I forget to add specific parameters
     n_low, n_high = (0, n_X[2]/2) if n_cutoff is None else n_cutoff
@@ -76,7 +89,7 @@ def truncate_r(r, n_X, Ls, KX, KY, KZ, n_cutoff):
 
 def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, 
                     kscale=12.0, kpeak=0., gauss_spec=0, 
-                    prl_spec=0, do_truncation=0, n_cutoff=None, run_test=0):
+                    prl_spec=0, run_hoskingspec=0, do_truncation=0, n_cutoff=None, run_test=0):
     '''Generate a superposition of random Alfvén waves within a numerical domain
     that follow a given energy spectrum.
 
@@ -166,8 +179,11 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0,
         # will always interpret as a spectrum of the form k^(-expo)
         expo = abs(expo)
         expo_prl = expo if not prl_spec else abs(expo_prl)
-        Kspec = get_kspec(expo, expo_prl, Kprl, Kprp, Kmag,
-                          prl_spec, gauss_spec, kpeak, kscale)
+        if run_hoskingspec:
+            Kspec = hosking_spec(Kprp)
+        else:
+            Kspec = get_kspec(expo, expo_prl, Kprl, Kprp, Kmag,
+                              prl_spec, gauss_spec, kpeak, kscale)
 
         # generate random complex numbers on the grid and weight by spectrum
         # these complex numbers represent the amplitude (r) and phase (theta) of the corresponding

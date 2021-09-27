@@ -26,7 +26,7 @@ def calc_spectrum(output_dir, save_dir, return_dict=1, prob=default_prob,
         nums = range(n, n+1)
     else:
         max_n = diag.get_maxn(output_dir) // 2
-        nums = range(0, max_n)  # average over first 2 alfven periods
+        nums = range(max_n)
     # nums = range(tau_file, max_n) # average over last 2 alfven periods
 
     do_full_calc = not diag.check_dict(save_dir, dict_name)
@@ -38,7 +38,7 @@ def calc_spectrum(output_dir, save_dir, return_dict=1, prob=default_prob,
         Kprp = np.maximum(np.sqrt(abs(KY)**2 + abs(KZ)**2), 1e-4)
         Kmag = np.sqrt(Kprl**2+Kprp**2)
         Npoints = Kmag.size  # needed for FFT normalization
-        
+
         Kmag_mult, Kmag_grid, Kmag_bins = get_k_bins(Kmag, 3)
         Kprp_mult, Kprp_grid, Kprp_bins = get_k_bins(Kprp, 2)
         Kprl_mult, Kprl_grid, Kprl_bins = get_k_bins(Kprl, 1)
@@ -94,7 +94,7 @@ def calc_spectrum(output_dir, save_dir, return_dict=1, prob=default_prob,
                     S['EK_prpfluc_2D']  += spec2D(ft, Kprp, Kprl, Kprp_bins, Kprl_bins, Kprp_mult)
             if normalize_energy:
                 # v_A ~ a^(-1) ⟹ (v_A)^2 ∼ a^(-2), assuming v_A0 = 1
-                for key in S.keys():
+                for key in S:
                     if 'EK' in key:
                         S[key] /= a**(-2)
 
@@ -123,7 +123,7 @@ def calc_spectrum(output_dir, save_dir, return_dict=1, prob=default_prob,
                     Bmag += B**2
                 if normalize_energy:
                     # B_x ∼ a^(-2) ⟹ (B_x)^2 ∼ a^(-4), assuming ⟨B_x0⟩=1
-                    for key in S.keys():
+                    for key in S:
                         if 'EM' in key:
                             S[key] /= a**(-4)
 

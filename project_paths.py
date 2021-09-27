@@ -23,7 +23,7 @@ elif COMPUTER == 'mac':
     SCRATCH = PATH
     python_masters_path = '/Users/johza22p/python_masters/'
     from_array_path = PATH + 'templates_athinput/athinput.from_array'
-    athena_path = '/Users/johza22p/athena/athena_masters/bin/from_array/athena'
+    athena_path = '/Users/johza22p/athena/athena_expanding_zade/bin/testing/athena_fromarray_hlld'
 elif COMPUTER == 'nesi':
     PATH = '/nesi/project/uoo02637/zade/masters_2021/' # project directory
     SCRATCH = '/nesi/nobackup/uoo02637/zade/masters_2021/'
