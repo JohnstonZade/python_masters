@@ -19,7 +19,7 @@ def cs_from_beta(init_norm_fluc, beta):
 
 
 def generate(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_cpus, exp_rate, 
-             dt, init_norm_fluc, beta, expand=1, expo=-5/3, kprl=-2, 
+             dt, init_norm_fluc, beta, expand=1, expo=-5/3, kprl=-2, iso_res=0, 
              spec='iso', kpeak=0., a_final=10, gen_ic=1, run_athena=0, run_spec=0, run_hoskingspec=0):
     total_folder =  diag.format_path(folder)
 
@@ -27,7 +27,7 @@ def generate(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_cpus, exp_rat
     # box_aspect L_prl / L_prp
     L_prp = 1 / box_aspect
     # cell_aspect dx / dx_perp
-    res_aspect = box_aspect / cell_aspect  # N_prl / N_prp
+    res_aspect = 1 if iso_res else box_aspect / cell_aspect  # N_prl / N_prp
     N_prp = int(Nx_init // res_aspect)
     
     n_X = np.array([Nx_init, N_prp, N_prp])
