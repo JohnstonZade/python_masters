@@ -5,6 +5,8 @@ cdir_root = os.getcwd().split('/')
 
 if cdir_root[1] == 'Users':
     COMPUTER = 'mac'
+elif cdir_root[1] == 'Volumes':
+    COMPUTER = 'mac_gdrive'
 elif cdir_root[1] == 'home':
     COMPUTER = 'linux'
 else:
@@ -17,9 +19,9 @@ if COMPUTER == 'linux':
     python_masters_path = '/home/zade/python_masters/'
     from_array_path = PATH + 'templates_athinput/athinput.from_array'
     athena_path = '/home/zade/athena/athena_masters/bin/from_array/athena'
-elif COMPUTER == 'mac':
-    PATH = '/Users/johza22p/masters_2021/'
-    # PATH = '/Users/johza22p/GoogleDrive/masters_2021/'
+elif 'mac' in COMPUTER:
+    # PATH = '/Users/johza22p/masters_2021/'
+    PATH = '/Users/johza22p/GoogleDrive/My Drive/masters_2021/' if COMPUTER == 'mac' else '/Volumes/GoogleDrive/My Drive/masters_2021/'
     SCRATCH = PATH
     python_masters_path = '/Users/johza22p/python_masters/'
     from_array_path = PATH + 'templates_athinput/athinput.from_array'

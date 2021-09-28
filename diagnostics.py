@@ -361,28 +361,28 @@ def ft_grid(input_type, data=None, output_dir=None, Ls=None,
         X1 = data['RootGridX1'][1] - data['RootGridX1'][0]
         X2 = data['RootGridX2'][1] - data['RootGridX2'][0]
         X3 = data['RootGridX3'][1] - data['RootGridX3'][0]
-        
+
         Ls = (X3, X2, X1)
         Ns = data['RootGridSize'][::-1]
-    
+
     elif input_type == 'output':
         assert (output_dir is not None), 'Must have a valid directory path!'
         Ls = get_lengths(output_dir, prob, zyx=1)  # box side lengths
         Ns = get_rootgrid(output_dir, prob, zyx=1) # number of grid points
-    
+
     elif input_type == 'array':
         assert (Ls is not None and Ns is not None), 'Must have valid lengths and grid information!'
-    
+
     else:
         raise ValueError('Please enter a valid input type')
 
     # Corresponds to Athena++ standard k=0 ⟺ Z, 1 ⟺ Y, 2 ⟺ X
-    K = {}
-    for k in range(3):
-        if make_iso_box:
-            K[k] = 2j*np.pi*ft_array(Ns[k])
-        else:
-            K[k] = 2j*np.pi/Ls[k]*ft_array(Ns[k])
+    K = {
+        k: 2j * np.pi * ft_array(Ns[k])
+        if make_iso_box
+        else 2j * np.pi / Ls[k] * ft_array(Ns[k])
+        for k in range(3)
+    }
 
     return np.meshgrid(K[0], K[1], K[2], indexing='ij')
 
