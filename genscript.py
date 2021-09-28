@@ -2,7 +2,7 @@ import numpy as np
 import os
 import diagnostics as diag
 import generate_ics as genics
-import spectrum
+import spectrum as spec
 import project_paths as paths
 
 folder_root, athena_path = paths.PATH, paths.athena_path
@@ -19,8 +19,8 @@ def cs_from_beta(init_norm_fluc, beta):
 
 
 def generate(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_cpus, exp_rate, 
-             dt, init_norm_fluc, beta, expand=1, expo=-5/3, kprl=-2, iso_res=0, 
-             spec='iso', kpeak=0., a_final=10, gen_ic=1, run_athena=0, run_spec=0, run_hoskingspec=0):
+             dt, init_norm_fluc, beta, expand=1, expo=-5/3, expo_prl=-2, iso_res=0, 
+             spectrum='isotropic', κ_prl=2, κ_prp=2, a_end=10, gen_ic=1, run_athena=0, run_spec=0):
     total_folder =  diag.format_path(folder)
 
     # X, Y, Z
@@ -36,19 +36,16 @@ def generate(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_cpus, exp_rat
     meshblock = diag.get_meshblocks(n_X, n_cpus)[0]
 
     # for editing athinput.from_array file
-    time_lim = expand_to_a(a_final, exp_rate)
+    time_lim = expand_to_a(a_end, exp_rate)
     # time_lim = 6  # use this to manually set t_lim
 
     # init_norm_fluc <B^2_⟂0> / B^2_x0 = initial perp energy / initial parallel energy
     perp_energy = 0.5*init_norm_fluc    # initial energy of Alfvénic fluctuation components (assuming Bx0=1)
 
     iso_sound_speed = cs_from_beta(init_norm_fluc, beta)  # initial sound speed
-
-    # expo spectrum power law 
-    # kprl aniostropic parallel spectrum power law
-    prl_spec = spec == 'gs'    # generate anisotropic GS spectrum
-    gauss_spec = spec == 'gauss'  # generate gaussian spectrum
-    # TODO: add peak for Gauss spectrum
+    
+    kpeak = (κ_prl, κ_prp)  # center of Gaussian spectrum peak
+ 
     do_truncation = 0  # cut off wave vectors above given mode numbers
     n_low, n_high = 0, 20 # modes to keep (0 <= n_low < n_high <= max(n_X)/2)
 
@@ -63,11 +60,11 @@ def generate(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_cpus, exp_rat
     output = 'output_' + sim_name
 
     if gen_ic:
-        genics.create_athena_alfvenspec(total_folder, h5name, n_X, X_min, X_max, meshblock, 
-                                    time_lim=time_lim, dt=dt, iso_sound_speed=iso_sound_speed,
-                                    expand=expand, exp_rate=exp_rate, do_truncation=do_truncation, n_cutoff=n_cutoff,
-                                    perp_energy=perp_energy, expo=expo, expo_prl=kprl, prl_spec=prl_spec,
-                                    gauss_spec=gauss_spec, kpeak=kpeak, run_hoskingspec=run_hoskingspec)                      
+        genics.create_athena_alfvenspec(total_folder, h5name, n_X, X_min, X_max, meshblock,
+                                        time_lim=time_lim, dt=dt, expand=expand, exp_rate=exp_rate,
+                                        iso_sound_speed=iso_sound_speed, perp_energy=perp_energy,
+                                        spectrum=spectrum, expo=expo, expo_prl=expo_prl, kpeak=kpeak,
+                                        do_truncation=do_truncation, n_cutoff=n_cutoff)                      
 
     if run_athena:
         os.chdir(total_folder)
@@ -80,6 +77,6 @@ def generate(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_cpus, exp_rat
         if do_truncation:
             inertial_range[0] = max(kprp_mag_cutoff[0], inertial_range[0])
             inertial_range[1] = min(kprp_mag_cutoff[1], inertial_range[1])
-        spectrum.calc_spectrum(folder+output, folder+output, do_single_file=1, prob='from_array', return_dict=0)
+        spec.calc_spectrum(folder+output, folder+output, do_single_file=1, prob='from_array', return_dict=0)
 
     return athinput, n_X

@@ -59,20 +59,19 @@ def make_slurm_file(job_name, n_nodes, athinput_out, reinterp=0, r_number=0, sim
 
 
 def generate_slurm(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_nodes,
-                   exp_rate, init_norm_fluc, beta,
-                   gen_init_ic=1, a_re=None, a_end=4, dt=0.2,
-                   spec='iso', kpeak=0.):
+                   exp_rate, init_norm_fluc, beta, gen_init_ic=1, a_re=None, a_end=4, 
+                   dt=0.2, spectrum='isotropic', κ_prl=2, κ_prp=2):
 
     # If the reinterpolation and ending a are not specified,
     # expand the box to a cubic size by default
     if a_re is None:
         a_re = a_end
-    
+
     # Generate initial athinput and ICs.h5 files in folder
     n_cpus = 40*n_nodes
     athinput_orig, n_X = gen.generate(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_cpus, exp_rate,
-                                      dt, init_norm_fluc, beta, spec=spec, a_final=a_re, 
-                                      kpeak=kpeak, gen_ic=gen_init_ic)
+                                      dt, init_norm_fluc, beta, spectrum=spectrum, 
+                                      κ_prl=κ_prl, κ_prp=κ_prp, a_end=a_re, gen_ic=gen_init_ic)
 
     # Generate initial slurm file (just modify job name, Ncpus, athinput name)
     make_slurm_file(sim_name, n_nodes, athinput_orig)
@@ -94,10 +93,7 @@ def generate_slurm(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_nodes,
         print('Reinterpolating a: ' + str(a_re**i) + ' -> ' + str(a_final))
         reinterp_sim = sim_name + '_r' + str(i)
 
-        if i == 1: 
-            athinput_in = athinput_orig
-        else:
-            athinput_in = athinput_out
+        athinput_in = athinput_orig if i == 1 else athinput_out
         athinput_out = athinput_orig + '_r' + str(i)
 
         last_athdf = folder + 'output/from_array.out2' + '.%05d' % int(n_output) + '.athdf'

@@ -23,7 +23,7 @@ def decompose_k(KX, KY, KZ, B0_x, B0_y, B0_z):
     return Kprl, Kprp
 
 
-def get_kpow(expo, expo_prl, prl_spec):
+def get_kpow(expo, expo_prl):
     # accounting for how volume in k space changes
     # for expo_prl = -2 (i.e. k_prl ∝ (k_prp)^(2/3)) second term is equivalent to expo + 1 + 2/3
     # for isotropic expo_prl = expo (k_prl ∝ k_prp) second term is zero
@@ -32,39 +32,23 @@ def get_kpow(expo, expo_prl, prl_spec):
     kpow /= 2  # initialising B not B^2
     return kpow
 
-def get_kspec(expo, expo_prl, Kprl, Kprp, Kmag, prl_spec, gauss_spec, kpeak, kscale):
-    kpow = get_kpow(expo, expo_prl, prl_spec)
+def gaussian_spec(Kprl, Kprp, kprl0, kprp0, kwidth):
+    # A Gaussian spectrum of the form
+    # exp[(-(kprp - kprp0)^2 - (kprl - kprl0)^2) / kwidth]
+    # i.e. a Gaussian peak centred at (kprp0, kprl0) in kprp,kprl space
+    # with isotropic width
+    return np.exp( -((Kprl - kprl0)**2 + (Kprp - kprp0)**2) / kwidth**2)
 
-    if gauss_spec:
-        # if not isotropic to box, divide kscale by Lprp
-        return np.exp(-(Kmag - kpeak)**2 / kscale**2)
-    # elif prl_spec:
-    #     kprp_exp = (expo - 1) / (expo_prl - 1)  # gives 2/3 for expo, expo_prl = -5/3, -2
-    #     kprl_exp = 1.0
-    #     # see Cho2002, Maron2001 for explaination
-    #     return 1 / (1 + Kprp**kpow) * np.exp(-(Kprl**kprl_exp) / (Kprp**kprp_exp))
-    # else:
-    #     return 1 / (1 + Kmag**kpow)
+def powerlaw_spec(expo, expo_prl, Kprl, Kprp, Kmag, spectrum):
+    kpow = get_kpow(expo, expo_prl)
     factor = 1.0
-    if prl_spec:
+    if spectrum == 'anisotropic':
         # gives 2/3 for expo, expo_prl = -5/3, -2
         kprp_exp = (expo - 1) / (expo_prl - 1) 
         # kprl_exp = 1.0  # always 1
-        factor *= np.exp(-Kprl / (Kprp**kprp_exp))
-    spec = Kprp if prl_spec else Kmag
+        factor *= np.exp(-Kprl / (Kprp**kprp_exp)) # see Cho2002, Maron2001 for explaination
+    spec = Kprp if spectrum == 'anisotropic' else Kmag
     return 1 / (1 + spec**kpow) * factor
-
-def hosking_spec(Kprp, D=3, k_c=25, a=7):
-    # Spectrum from Hosking_2020
-    # For comparison with Romain's RMHD simulartions
-    # k_c is initial peak of spectrum
-    # D is spatial dimensions
-    # a is initial spectral exponent
-    
-    Kprp_mask = Kprp > k_c
-    spec = Kprp**(0.5*(a-D+1))
-    spec[Kprp_mask] *= np.exp(1 - Kprp[Kprp_mask]**2 / k_c**2)
-    return spec
     
 
 def truncate_r(r, n_X, Ls, KX, KY, KZ, n_cutoff):
@@ -87,9 +71,8 @@ def truncate_r(r, n_X, Ls, KX, KY, KZ, n_cutoff):
     NX, NY, NZ, Nsqr = None, None, None, None
     return r
 
-def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0, 
-                    kscale=12.0, kpeak=0., gauss_spec=0, 
-                    prl_spec=0, run_hoskingspec=0, do_truncation=0, n_cutoff=None, run_test=0):
+def generate_alfven_spectrum(n_X, X_min, X_max, B_0, spectrum, expo=-5/3, expo_prl=-2.0, 
+                             kpeak=(2, 2), kwidth=12.0, do_truncation=0, n_cutoff=None, run_test=0):
     '''Generate a superposition of random Alfvén waves within a numerical domain
     that follow a given energy spectrum.
 
@@ -114,7 +97,7 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0,
            kprl ∝ kprp^[(|α| - |β|)/(|β| - 1)], which can be derived from
            the 3D energy spectrum.
 
-    - Gaussian: generates an isotropic spectrum of the form E(k) ~ e^(-k^2 / kpeak^2)
+    - Gaussian: generates an isotropic spectrum of the form E(k) ~ e^(-k^2 / kwidth^2)
 
     Note: The exponent for all power laws are always assumed to be negative as a positive power law is unphysical
     as it would mean that smaller scales have much more energy than large scales.
@@ -135,14 +118,16 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0,
         (or E(kprp)~kprp^(expo) for anisotropic spectrum)
     expo_prl : float, optional
         the exponent to raise kprl by for an anisotropic spectrum, by default -2.0
-    kpeak : float, optional
-        the peak k magnitude for the Gaussian distribution, by default 0.0
-    kscale: float, optional
-        the scale width of the Gaussian distribution
-    gauss_spec : boolean, optional
-        generate a Gaussian spectrum, by default 0
-    prl_spec : boolean, optional
-        generate anisotropic spectrum, by default 0
+    spectrum : string, optional
+        the spectrum to be generated, by default isotropic
+    kpeak : tuple, optional
+        the modes that the Gaussian spectrum peaks at in k_⟂k||-space, by default (2, 2)
+    width: float, optional
+        the scale width of the Gaussian distribution, by default 12.0
+    do_truncation: boolean, optional
+        setting to truncate modes outside of n_cutoff, by default 0
+    n_cutoff: tuple, optional
+        tuple of modes to keep, with all outside modes being cutoff, by default None
     run_test : boolean, optional
         run tests to check mode generation, by default 0
 
@@ -152,7 +137,9 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0,
         Returns the 3 components of the superposed Alfvén waves dB_x, dB_y, dB_z
         which have the same size as the original grid.
     '''
-
+    if spectrum not in ['gaussian', 'isotropic', 'anisotropic']:
+        raise ValueError(spectrum + ' is not a valid spectrum')
+    
     # want in form Z, Y, X conforming to Athena++
     n_X = n_X[::-1]
     Ls = (X_max - X_min)[::-1]
@@ -175,15 +162,17 @@ def generate_alfven(n_X, X_min, X_max, B_0, expo, expo_prl=-2.0,
     if run_test:
         z = run_tests(Ls, KX, KY, KZ)
     else:
-        # making it easier to compare to Jono's/Athena's code
-        # will always interpret as a spectrum of the form k^(-expo)
-        expo = abs(expo)
-        expo_prl = expo if not prl_spec else abs(expo_prl)
-        if run_hoskingspec:
-            Kspec = hosking_spec(Kprp)
+        if spectrum == 'gaussian':
+            κ_prl, κ_prp = kpeak
+            kprl0 = κ_prl * 2*np.pi / Ls[0]
+            kprp0 = κ_prp * 2*np.pi / Ls[1]  # assuming L_y=L_z
+            Kspec = gaussian_spec(Kprl, Kprp, kprl0, kprp0, kwidth)
         else:
-            Kspec = get_kspec(expo, expo_prl, Kprl, Kprp, Kmag,
-                              prl_spec, gauss_spec, kpeak, kscale)
+            # making it easier to compare to Jono's/Athena's code
+            # will always interpret as a spectrum of the form k^(-expo)
+            expo = abs(expo)
+            expo_prl = expo if spectrum == 'isotropic' else abs(expo_prl)
+            Kspec = powerlaw_spec(expo, expo_prl, Kprl, Kprp, Kmag, spectrum)
 
         # generate random complex numbers on the grid and weight by spectrum
         # these complex numbers represent the amplitude (r) and phase (theta) of the corresponding

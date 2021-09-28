@@ -159,11 +159,10 @@ def create_athena_fromh5(save_folder, athinput_in_folder, athinput_in, h5name, a
     BXcc, BYcc, BZcc = B_unpacked
     calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_blocks, blocks, dx, dy, dz)
 
-def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
-                             time_lim=1, dt=0.2, iso_sound_speed=1.0, expand=0, exp_rate=0.,
-                             do_truncation=0, n_cutoff=None, athinput=from_array_path,
-                             perp_energy=0.5, expo=-5/3, expo_prl=-2., kscale=12., kpeak=0.,
-                             gauss_spec=0, prl_spec=0, do_mode_test=0, run_hoskingspec=0):
+def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock, athinput=from_array_path,
+                             time_lim=1, dt=0.2, expand=0, exp_rate=0., iso_sound_speed=1.0,
+                             perp_energy=0.5, spectrum='isotropic', expo=-5/3, expo_prl=-2., kpeak=(2,2), kwidth=12.0,
+                             do_truncation=0, n_cutoff=None, do_mode_test=0):
     
     ath_copy = edit_athinput(athinput, folder, n_X, X_min, X_max, meshblock,
                              h5name, time_lim, dt, iso_sound_speed, expand, exp_rate)
@@ -187,10 +186,19 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock,
 
     X_grid = None
 
-    dB_y, dB_z = genspec.generate_alfven(n_X, X_min, X_max, np.array([BXcc, BYcc, BZcc]), expo,
-                                         do_truncation=do_truncation, n_cutoff=n_cutoff,
-                                         expo_prl=expo_prl, kscale=kscale, kpeak=kpeak, 
-                                         gauss_spec=gauss_spec, prl_spec=prl_spec, run_test=do_mode_test, run_hoskingspec=run_hoskingspec)
+    if do_mode_test:
+        # Generate a single mode for testing
+        dB_y, dB_z = genspec.generate_alfven_spectrum(n_X, X_min, X_max, np.array([BXcc, BYcc, BZcc]), spectrum,
+                                                      run_test=True)
+    elif spectrum == 'gaussian': 
+        dB_y, dB_z = genspec.generate_alfven_spectrum(n_X, X_min, X_max, np.array([BXcc, BYcc, BZcc]),
+                                                      spectrum, kpeak=kpeak, kwidth=kwidth, 
+                                                      do_truncation=do_truncation, n_cutoff=n_cutoff)
+    else:
+        # Generate isotropic or GS spectrum
+        dB_y, dB_z = genspec.generate_alfven_spectrum(n_X, X_min, X_max, np.array([BXcc, BYcc, BZcc]), spectrum,
+                                                      expo=expo, expo_prl=expo_prl,
+                                                      do_truncation=do_truncation, n_cutoff=n_cutoff,)
 
     BYcc += dB_y
     BZcc += dB_z
