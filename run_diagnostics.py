@@ -104,10 +104,10 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
         diag.save_dict(S, output_dir, dict_name)
 
     a_step = 1 if (1 + expansion_rate*(max_n-1)*dt > 2) else 0.1
-    t_step = dt
     if expansion_rate != 0:
-        t_step *= expansion_rate
-    spec_step = int(a_step / t_step)  # eg if delta_a = 1, adot=0.5, dt=0.2 then spec_step = 10
+        spec_step = 1
+    else:
+        spec_step = int(a_step / (expansion_rate*dt))  # eg if delta_a = 1, adot=0.5, dt=0.2 then spec_step = 10
     if do_spectrum:
         spec_hik_mag, spec_hik_kin, spec_hik_a = np.array([]), np.array([]), np.array([])
         for n in range(max_n):
