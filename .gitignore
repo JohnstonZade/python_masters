@@ -2,3 +2,4 @@ __pycache__/*
 .vscode/*
 workspace.code-workspace
 .DS_Store
+run_diagnostics.pyc

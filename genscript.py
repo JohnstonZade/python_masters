@@ -19,7 +19,7 @@ def cs_from_beta(init_norm_fluc, beta):
 
 
 def generate(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_cpus, exp_rate, 
-             dt, init_norm_fluc, beta, expand=1, expo=-5/3, expo_prl=-2, iso_res=0, 
+             dt, init_norm_fluc, beta, tlim=2., expand=1, expo=-5/3, expo_prl=-2, iso_res=0, 
              spectrum='isotropic', κ_prl=2, κ_prp=2, a_end=10, gen_ic=1, run_athena=0, run_spec=0):
     total_folder =  diag.format_path(folder)
 
@@ -36,7 +36,7 @@ def generate(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_cpus, exp_rat
     meshblock = diag.get_meshblocks(n_X, n_cpus)[0]
 
     # for editing athinput.from_array file
-    time_lim = expand_to_a(a_end, exp_rate)
+    time_lim = tlim if exp_rate == 0.0 else expand_to_a(a_end, exp_rate)
     # time_lim = 6  # use this to manually set t_lim
 
     # init_norm_fluc <B^2_⟂0> / B^2_x0 = initial perp energy / initial parallel energy

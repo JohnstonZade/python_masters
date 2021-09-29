@@ -5,6 +5,7 @@ All copied from code written in 2020 for my Honours project with some improvemen
 import glob
 import os
 import pickle
+import h5py
 import numpy as np
 from pathlib import Path
 from itertools import permutations as perm
@@ -24,6 +25,8 @@ def format_path(output_dir, format=1):
         if output_dir[-1] != '/':
             output_dir += '/'
     return output_dir
+
+
 
 
 def load_data(output_dir, n, prob=DEFAULT_PROB, do_path_format=1, method='matt'):
@@ -56,7 +59,7 @@ def load_data(output_dir, n, prob=DEFAULT_PROB, do_path_format=1, method='matt')
             B_string = 'Bcc' + str(i+1)
             u_string = 'vel' + str(i+1)
             data[u_string] *= Λ[i]
-            data[B_string] *= Λ[i] / λ if matts_method else Λ[i]    
+            data[B_string] *= Λ[i] / λ if matts_method else Λ[i]
     
     max_n = get_maxn(output_dir, do_path_format=do_path_format)
     assert n in range(0, max_n), 'n must be between 0 and ' + str(max_n)
@@ -79,7 +82,54 @@ def load_data(output_dir, n, prob=DEFAULT_PROB, do_path_format=1, method='matt')
         # where u_⟂ = a*u'_⟂ and same for B_⟂
         change_coords(data, current_a, method)
     return data
-        
+
+
+def load_and_scale_h5(output_dir, prob=DEFAULT_PROB, do_path_format=1, method='matt', undo=0):
+    # Assumes output is in primitive form
+    # Rescaling by factors of a to allow for correct plotting in Paraview
+    # Need to check if it works properly
+    max_n = get_maxn(output_dir, do_path_format=do_path_format)
+    
+    # '$folder.out$output_id.xxxxx.athdf'
+    def filename(n):
+        return folder + '.out' + output_id + '.%05d' % n + '.athdf'
+
+    for n in range(max_n):
+        # Input
+        folder = format_path(output_dir, do_path_format) + prob  # Name of output
+        output_id = '2'  # Output ID (set in input file)
+        h5name = filename(n)
+        a = athdf(h5name)['a_exp']
+        Λ = np.array([1, a, a])  # diagonal matrix
+        λ = a**2  # determinant of Λ = a^2
+        matts_method = method == 'matt'
+        with h5py.File(h5name, 'w') as f:
+            if undo:
+                f['prim'][0] *= λ if matts_method else 1
+                f['prim'][1] /= Λ[0]
+                f['prim'][2] /= Λ[1]
+                f['prim'][3] /= Λ[2]
+                f['B'][0] /= Λ[0] / λ if matts_method else Λ[0]
+                f['B'][1] /= Λ[1] / λ if matts_method else Λ[1]
+                f['B'][2] /= Λ[2] / λ if matts_method else Λ[2]
+                f['x2f'] /= a
+                f['x2v'] /= a
+                f['x3f'] /= a
+                f['x3v'] /= a
+            else:
+                f['prim'][0] /= λ if matts_method else 1
+                f['prim'][1] *= Λ[0]
+                f['prim'][2] *= Λ[1]
+                f['prim'][3] *= Λ[2]
+                f['B'][0] *= Λ[0] / λ if matts_method else Λ[0]
+                f['B'][1] *= Λ[1] / λ if matts_method else Λ[1]
+                f['B'][2] *= Λ[2] / λ if matts_method else Λ[2]
+                f['x2f'] *= a
+                f['x2v'] *= a
+                f['x3f'] *= a
+                f['x3v'] *= a
+            
+            
 
 def load_hst(output_dir, adot, prob=DEFAULT_PROB, do_path_format=1, method='matt'):
     '''Loads data from .hst files output from Athena++.
