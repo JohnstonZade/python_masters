@@ -31,4 +31,4 @@ elif COMPUTER == 'nesi':
     SCRATCH = '/nesi/nobackup/uoo02637/zade/masters_2021/'
     python_masters_path = '/home/johza721/masters_2021/python_masters/'
     from_array_path = '/home/johza721/masters_2021/templates_athinput/athinput.from_array'
-    athena_path = '/home/johza721/masters_2021/athena/bin/athena_maui/athena_nompi'
+    athena_path = '/home/johza721/masters_2021/athena/bin/athena_nompi'
