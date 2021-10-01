@@ -24,7 +24,8 @@ a_end = 10       # final expansion
 exp_rate = 0.5
 tlim = 2  # used if exp_rate = 0
 Nx_init = 64     # initial x resolution
-iso_res = False  # override resolution aspect ratio
+N_prp = 64       # perpendicular resolution if overriden
+choose_res = False  # override resolution aspect ratio
 
 n_nodes = 1      # number of nodes
 n_cpus = 40*n_nodes  
@@ -42,5 +43,5 @@ if reinterpolate:
                         a_re=a_re, a_end=a_end, κ_prl=κ_prl, κ_prp=κ_prp)
 else:
     gen.generate(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_cpus, exp_rate,
-                 dt, init_norm_fluc, beta, tlim=tlim, spectrum=spectrum, κ_prl=κ_prl, κ_prp=κ_prp,
-                 a_end=a_end)
+                 dt, init_norm_fluc, beta, tlim=tlim, choose_res=choose_res, N_prp=N_prp,
+                 spectrum=spectrum, κ_prl=κ_prl, κ_prp=κ_prp, a_end=a_end)
