@@ -37,6 +37,7 @@ def generate(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_cpus, exp_rat
 
     # for editing athinput.from_array file
     time_lim = tlim if exp_rate == 0.0 else expand_to_a(a_end, exp_rate)
+    expand = exp_rate != 0.0
     # time_lim = 6  # use this to manually set t_lim
 
     # init_norm_fluc <B^2_⟂0> / B^2_x0 = initial perp energy / initial parallel energy

@@ -187,7 +187,7 @@ def generate_alfven_spectrum(n_X, X_min, X_max, B_0, spectrum, expo=-5/3, expo_p
         r, theta = None, None
 
         # excluding purely parallel waves
-        prl_mask = (Kprp == 0.)
+        prl_mask = (Kprp == 0.) | (KY == 0.) | (KZ == 0.)
         z[prl_mask] = 0j
         # exclude purely perpendicular waves as they don't propagate
         # remember ω_A = k_prl * v_A
