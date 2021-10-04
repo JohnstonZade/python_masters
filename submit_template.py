@@ -2,7 +2,9 @@ import os
 
 cdir_root = os.getcwd().split('/')
 
-if cdir_root[1] in ['Users', 'home']:
+if cdir_root[1] in ['Users', 'Volumes']:
+    python_masters_path = '/Users/johza22p/python_masters/'
+elif cdir_root[1] == 'home':
     python_masters_path = '~/python_masters/'
 else:
     python_masters_path = '/home/johza721/masters_2021/python_masters/'
