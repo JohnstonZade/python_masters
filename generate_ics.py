@@ -128,17 +128,17 @@ def create_athena_fromh5(save_folder, athinput_in_folder, athinput_in, h5name, a
     if athinput_in_folder not in athinput_in:
         athinput_in = athinput_in_folder + athinput_in
 
-    with h5py.File(athdf_input, 'r') as f_athdf:
-        if 'cons' in list(f_athdf.keys()):  # conserved variables if 1, primitive if 0
-            with h5py.File(h5name, 'a') as f:
-                f['cons'] = np.array(f_athdf['cons'])  # no need to unwrap meshblocks
-        else:
-            hydro_prim = np.copy(f_athdf['prim'])  # don't want to modify the original data set
-            for i in range(3):
-                hydro_prim[i] *= hydro_prim[0]  # getting momentum variables (vel * density)
-            with h5py.File(h5name, 'a') as f:
-                f['cons'] = hydro_prim
-            hydro_prim = None
+    f_athdf = h5py.File(athdf_input, 'r')
+    if 'cons' in list(f_athdf.keys()):  # conserved variables if 1, primitive if 0
+        with h5py.File(h5name, 'a') as f:
+            f['cons'] = np.array(f_athdf['cons'])  # no need to unwrap meshblocks
+    else:
+        hydro_prim = np.copy(f_athdf['prim'])  # don't want to modify the original data set
+        for i in range(3):
+            hydro_prim[i] *= hydro_prim[0]  # getting momentum variables (vel * density)
+        with h5py.File(h5name, 'a') as f:
+            f['cons'] = hydro_prim
+        hydro_prim = None
     
     n_X, X_min, X_max, meshblock = read_athinput(athinput_in)
     athinput_out = edit_athinput(athinput_out, save_folder, n_X, X_min, X_max, meshblock,
