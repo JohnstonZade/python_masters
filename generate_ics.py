@@ -102,7 +102,7 @@ def create_athena_fromics(folder, h5name, n_X, X_min, X_max, meshblock,
     print('Done!')
 
 def create_athena_fromh5(save_folder, athinput_in_folder, athinput_in, h5name, athdf_input,
-                         athinput_out=from_array_path):
+                         time_lim, dt, iso_sound_speed, expand=1, exp_rate=0.5, athinput_out=from_array_path):
     '''Similar function to `create_athena_fromics` but instead of user-set ICs,
     reads in an initial .athdf file and obtains the initial conditions from there.
 
@@ -141,7 +141,9 @@ def create_athena_fromh5(save_folder, athinput_in_folder, athinput_in, h5name, a
             hydro_prim = None
     
     n_X, X_min, X_max, meshblock = read_athinput(athinput_in)
-    athinput_out = edit_athinput(athinput_out, save_folder, n_X, X_min, X_max, meshblock, h5name)
+    athinput_out = edit_athinput(athinput_out, save_folder, n_X, X_min, X_max, meshblock,
+                                 h5name, time_lim=time_lim, dt=dt, iso_sound_speed=iso_sound_speed,
+                                 expand=expand, exp_rate=exp_rate)
 
     dx, dy, dz = generate_grid(X_min, X_max, n_X)[1]
     
