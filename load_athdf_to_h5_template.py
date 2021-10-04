@@ -19,4 +19,4 @@ athinput_in = ''  # name of athinput file
 h5name = ''  # name of h5 file to be saved
 athdf_input = ''  # full path to athdf input to be read
 
-genics.create_athena_fromh5(folder, athinput_in_folder, athinput_in, h5name)
+genics.create_athena_fromh5(folder, athinput_in_folder, athinput_in, h5name, athdf_input)
