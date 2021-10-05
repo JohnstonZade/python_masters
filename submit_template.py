@@ -30,7 +30,7 @@ N_prp = 64       # perpendicular resolution if overriden
 a_end = 10       # final expansion
 exp_rate = 0.5
 
-init_norm_fluc = 0.2  # amplitude squared
+init_norm_amp = 0.2  # initial normalized amplitude
 beta = 0.2  # initial beta
 spectrum_n = 2 # 0 for isotropic, 1 for GS, 2 for Gaussian
 spectrum = spectra[spectrum_n]
@@ -59,12 +59,12 @@ n_cpus = 40*n_nodes
 
 if reinterpolate:   
     submit.generate_slurm(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_nodes,
-                        exp_rate, init_norm_fluc, beta, spectrum=spectrum, dt=dt,
+                        exp_rate, init_norm_amp, beta, spectrum=spectrum, dt=dt,
                         a_re=a_re, a_end=a_end, κ_prl=κ_prl, κ_prp=κ_prp)
 elif athdf_to_h5:
     genics.create_athena_fromh5(folder, athinput_in_folder, athinput_in, h5name, athdf_input,
                                 tlim, dt, beta_multiplier, exp_rate=exp_rate)
 else:
     gen.generate(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_cpus, exp_rate,
-                 dt, init_norm_fluc, beta, tlim=tlim, choose_res=choose_res, N_prp=N_prp,
+                 dt, init_norm_amp, beta, tlim=tlim, choose_res=choose_res, N_prp=N_prp,
                  spectrum=spectrum, κ_prl=κ_prl, κ_prp=κ_prp, a_end=a_end)
