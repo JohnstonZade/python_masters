@@ -48,7 +48,7 @@ if athdf_to_h5:
     athinput_in = ''  # name of athinput file
     h5name = ''  # name of h5 file to be saved
     athdf_input = ''  # full path to athdf input to be read
-    iso_sound_speed = 1  # set to 1 to use beta of simulation
+    beta_multiplier = 1  # set to 1 to use beta of simulation
 
 
 
@@ -63,7 +63,7 @@ if reinterpolate:
                         a_re=a_re, a_end=a_end, κ_prl=κ_prl, κ_prp=κ_prp)
 elif athdf_to_h5:
     genics.create_athena_fromh5(folder, athinput_in_folder, athinput_in, h5name, athdf_input,
-                                tlim, dt, iso_sound_speed, exp_rate=exp_rate)
+                                tlim, dt, beta_multiplier, exp_rate=exp_rate)
 else:
     gen.generate(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_cpus, exp_rate,
                  dt, init_norm_fluc, beta, tlim=tlim, choose_res=choose_res, N_prp=N_prp,
