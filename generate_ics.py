@@ -2,6 +2,7 @@
 import h5py
 import numpy as np
 from numpy.core.numeric import ones_like
+from numpy.lib.npyio import save
 
 import diagnostics as diag
 import generate_spectrum as genspec
@@ -122,6 +123,7 @@ def create_athena_fromh5(save_folder, athinput_in_folder, athinput_in, h5name, a
         Path to from_array athinput to be copied and editied.
     '''
     
+    save_folder = diag.format_path(save_folder)
     h5name = save_folder + h5name
     h5name += '.h5' if '.h5' not in h5name else ''
     remove_prev_h5file(h5name)
@@ -165,6 +167,7 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock, athin
                              perp_energy=0.5, spectrum='isotropic', expo=-5/3, expo_prl=-2., kpeak=(2,2), kwidth=12.0,
                              do_truncation=0, n_cutoff=None, do_mode_test=0, do_parker=0, final_bybx_ratio=1.5):
     
+    folder = diag.format_path(folder)
     ath_copy = edit_athinput(athinput, folder, n_X, X_min, X_max, meshblock,
                              h5name, time_lim, dt, iso_sound_speed, expand, exp_rate)
     h5name = folder + h5name  # eg 'ICs_template.h5'                             
