@@ -19,7 +19,7 @@ def cs_from_beta(init_norm_fluc, beta):
 
 
 def generate(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_cpus, exp_rate, 
-             dt, init_norm_fluc, beta, tlim=2., expand=1, expo=-5/3, expo_prl=-2, iso_res=0, 
+             dt, init_norm_amp, beta, tlim=2., expand=1, expo=-5/3, expo_prl=-2, choose_res=0, N_prp=200,
              spectrum='isotropic', κ_prl=2, κ_prp=2, a_end=10, gen_ic=1, run_athena=0, run_spec=0):
     total_folder =  diag.format_path(folder)
 
@@ -27,8 +27,9 @@ def generate(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_cpus, exp_rat
     # box_aspect L_prl / L_prp
     L_prp = 1 / box_aspect
     # cell_aspect dx / dx_perp
-    res_aspect = 1 if iso_res else box_aspect / cell_aspect  # N_prl / N_prp
-    N_prp = int(Nx_init // res_aspect)
+    if not choose_res:
+        res_aspect = box_aspect / cell_aspect  # N_prl / N_prp
+        N_prp = int(Nx_init // res_aspect)
     
     n_X = np.array([Nx_init, N_prp, N_prp])
     X_min = np.array([0., 0., 0.])
@@ -37,9 +38,11 @@ def generate(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_cpus, exp_rat
 
     # for editing athinput.from_array file
     time_lim = tlim if exp_rate == 0.0 else expand_to_a(a_end, exp_rate)
+    expand = exp_rate != 0.0
     # time_lim = 6  # use this to manually set t_lim
 
     # init_norm_fluc <B^2_⟂0> / B^2_x0 = initial perp energy / initial parallel energy
+    init_norm_fluc = init_norm_amp ** 2
     perp_energy = 0.5*init_norm_fluc    # initial energy of Alfvénic fluctuation components (assuming Bx0=1)
 
     iso_sound_speed = cs_from_beta(init_norm_fluc, beta)  # initial sound speed

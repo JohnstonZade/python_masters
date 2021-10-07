@@ -102,7 +102,7 @@ def create_athena_fromics(folder, h5name, n_X, X_min, X_max, meshblock,
     print('Done!')
 
 def create_athena_fromh5(save_folder, athinput_in_folder, athinput_in, h5name, athdf_input,
-                         athinput_out=from_array_path):
+                         time_lim, dt, beta_multiplier, expand=1, exp_rate=0.5, athinput_out=from_array_path):
     '''Similar function to `create_athena_fromics` but instead of user-set ICs,
     reads in an initial .athdf file and obtains the initial conditions from there.
 
@@ -129,7 +129,6 @@ def create_athena_fromh5(save_folder, athinput_in_folder, athinput_in, h5name, a
         athinput_in = athinput_in_folder + athinput_in
 
     f_athdf = h5py.File(athdf_input, 'r')
-
     if 'cons' in list(f_athdf.keys()):  # conserved variables if 1, primitive if 0
         with h5py.File(h5name, 'a') as f:
             f['cons'] = np.array(f_athdf['cons'])  # no need to unwrap meshblocks
@@ -141,8 +140,10 @@ def create_athena_fromh5(save_folder, athinput_in_folder, athinput_in, h5name, a
             f['cons'] = hydro_prim
         hydro_prim = None
     
-    n_X, X_min, X_max, meshblock = read_athinput(athinput_in)
-    athinput_out = edit_athinput(athinput_out, save_folder, n_X, X_min, X_max, meshblock, h5name)
+    n_X, X_min, X_max, meshblock, dt_hst, dt, expand, exp_rate, iso_sound_speed = read_athinput(athinput_in, reinterpolate=1)
+    athinput_out = edit_athinput(athinput_out, save_folder, n_X, X_min, X_max, meshblock,
+                                 h5name, time_lim=time_lim, dt=dt, iso_sound_speed=np.sqrt(beta_multiplier)*iso_sound_speed,
+                                 expand=expand, exp_rate=exp_rate)
 
     dx, dy, dz = generate_grid(X_min, X_max, n_X)[1]
     
@@ -162,7 +163,7 @@ def create_athena_fromh5(save_folder, athinput_in_folder, athinput_in, h5name, a
 def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock, athinput=from_array_path,
                              time_lim=1, dt=0.2, expand=0, exp_rate=0., iso_sound_speed=1.0,
                              perp_energy=0.5, spectrum='isotropic', expo=-5/3, expo_prl=-2., kpeak=(2,2), kwidth=12.0,
-                             do_truncation=0, n_cutoff=None, do_mode_test=0):
+                             do_truncation=0, n_cutoff=None, do_mode_test=0, do_parker=0, final_bybx_ratio=1.5):
     
     ath_copy = edit_athinput(athinput, folder, n_X, X_min, X_max, meshblock,
                              h5name, time_lim, dt, iso_sound_speed, expand, exp_rate)
@@ -171,6 +172,11 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock, athin
     # Dimension setting: 1D if only x has more than one gridpoint
     one_D = 1 if np.all(n_X[1:] == 1) else 0
 
+    By_0 = 0.0  # mean By
+    if do_parker:
+        a_f = 1 + exp_rate*time_lim
+        By_0 = final_bybx_ratio / a_f
+    
     # Generate mean fields
     # Density
     Dnf = lambda X, Y, Z: np.ones(X.shape)
@@ -178,7 +184,7 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock, athin
     UYf = lambda X, Y, Z: np.zeros(X.shape)
     UZf = lambda X, Y, Z: np.zeros(X.shape)
     BXf = lambda X, Y, Z: np.ones(X.shape)
-    BYf = lambda X, Y, Z: np.zeros(X.shape)
+    BYf = lambda X, Y, Z: By_0*np.ones(X.shape)
     BZf = lambda X, Y, Z: np.zeros(X.shape)
 
     X_grid, (dx, dy, dz) = generate_grid(X_min, X_max, n_X)

@@ -164,8 +164,9 @@ def generate_alfven_spectrum(n_X, X_min, X_max, B_0, spectrum, expo=-5/3, expo_p
     else:
         if spectrum == 'gaussian':
             κ_prl, κ_prp = kpeak
-            kprl0 = κ_prl * 2*np.pi / Ls[0]
-            kprp0 = κ_prp * 2*np.pi / Ls[1]  # assuming L_y=L_z
+            # Assuming box normalized spectra here
+            kprl0 = κ_prl * 2*np.pi
+            kprp0 = κ_prp * 2*np.pi
             Kspec = gaussian_spec(Kprl, Kprp, kprl0, kprp0, kwidth)
         else:
             # making it easier to compare to Jono's/Athena's code
@@ -187,7 +188,7 @@ def generate_alfven_spectrum(n_X, X_min, X_max, B_0, spectrum, expo=-5/3, expo_p
         r, theta = None, None
 
         # excluding purely parallel waves
-        prl_mask = (Kprp == 0.)
+        prl_mask = (KY == 0.) | (KZ == 0.)
         z[prl_mask] = 0j
         # exclude purely perpendicular waves as they don't propagate
         # remember ω_A = k_prl * v_A

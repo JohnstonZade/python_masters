@@ -12,7 +12,7 @@ def expand_to_a(a_final, exp_rate):
 
 
 def cs_from_beta(init_norm_fluc, beta):
-    return np.sqrt((1 + init_norm_fluc) * beta)
+    return np.sqrt(2*(1 + init_norm_fluc) * beta)
 
 parser = argparse.ArgumentParser()
 

@@ -59,7 +59,7 @@ def make_slurm_file(job_name, n_nodes, athinput_out, reinterp=0, r_number=0, sim
 
 
 def generate_slurm(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_nodes,
-                   exp_rate, init_norm_fluc, beta, gen_init_ic=1, a_re=None, a_end=4, 
+                   exp_rate, init_norm_amp, beta, gen_init_ic=1, a_re=None, a_end=4, 
                    dt=0.2, spectrum='isotropic', κ_prl=2, κ_prp=2):
 
     # If the reinterpolation and ending a are not specified,
@@ -70,7 +70,7 @@ def generate_slurm(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_nodes,
     # Generate initial athinput and ICs.h5 files in folder
     n_cpus = 40*n_nodes
     athinput_orig, n_X = gen.generate(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_cpus, exp_rate,
-                                      dt, init_norm_fluc, beta, spectrum=spectrum, 
+                                      dt, init_norm_amp, beta, spectrum=spectrum, 
                                       κ_prl=κ_prl, κ_prp=κ_prp, a_end=a_re, gen_ic=gen_init_ic)
 
     # Generate initial slurm file (just modify job name, Ncpus, athinput name)

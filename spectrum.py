@@ -39,9 +39,10 @@ def calc_spectrum(output_dir, save_dir, return_dict=1, prob=default_prob,
         Kmag = np.sqrt(Kprl**2+Kprp**2)
         Npoints = Kmag.size  # needed for FFT normalization
 
-        Kmag_mult, Kmag_grid, Kmag_bins = get_k_bins(Kmag, 3)
-        Kprp_mult, Kprp_grid, Kprp_bins = get_k_bins(Kprp, 2)
-        Kprl_mult, Kprl_grid, Kprl_bins = get_k_bins(Kprl, 1)
+        abs_KY, abs_KZ = abs(KY), abs(KZ)
+        Kmag_mult, Kmag_grid, Kmag_bins = get_k_bins(Kmag, abs_KY, abs_KZ, 3)
+        Kprp_mult, Kprp_grid, Kprp_bins = get_k_bins(Kprp, abs_KY, abs_KZ, 2)
+        Kprl_mult, Kprl_grid, Kprl_bins = get_k_bins(Kprl, abs_KY, abs_KZ, 1)
 
         # Dictionary to hold spectrum information
         S = {}
@@ -154,15 +155,16 @@ def calc_spectrum(output_dir, save_dir, return_dict=1, prob=default_prob,
     
 
 
-def get_k_bins(k, dim):
-    k_flat = k.reshape(-1)
+def get_k_bins(k, ky, kz, dim):
+    k_flat, ky_flat, kz_flat = k.reshape(-1), ky.reshape(-1), kz.reshape(-1)
+    k_flat = k_flat[(ky_flat != 0.) & (kz_flat != 0.)]
     k_min, k_max = 0.5*k[k > 0].min(), k.max()
     k_bins = np.logspace(np.log10(k_min), np.log10(k_max), 2000)
     # multiplicity of a mode (number of times we see that wavenumber)
     k_hist = np.histogram(k_flat, k_bins)[0]
     
     # Removing bins that have no modes in them (essentially widening the bins)
-    zero_mask = np.where(k_hist == 0)
+    zero_mask = np.where((k_hist == 0))
     mode_mult = np.delete(k_hist, zero_mask)
     k_bins = np.hstack((np.delete(k_bins[:-1], zero_mask), k_bins[-1]))
     k_grid = array_avg(k_bins)
@@ -182,16 +184,10 @@ def spec1D(v, k, k_bins, mode_norm):
     energy = 0.5*(np.abs(v)**2).reshape(-1)  # v*conj(v) = |v|^2
     # Bin energies in a given k_range
     e_hist = np.histogram(k_flat, k_bins, weights=energy)[0]
-    tot_energy = np.sum(e_hist)
 
     # mode per bin normalization
     e_hist /= mode_norm
-
-    # rescaling area to give energy
-    # k_grid = array_avg(k_bins)
-    # area = integrate.trapz(e_hist, k_grid)
-    # if area != 0.0:
-    #     e_hist *= tot_energy / area
+    
     return e_hist
 
 def spec2D(v, kprp, kprl, kprp_bins, kprl_bins, mode_norm):
@@ -199,25 +195,14 @@ def spec2D(v, kprp, kprl, kprp_bins, kprl_bins, mode_norm):
     # (i.e. FT gets mapped to the same index as its corresponding k-point)
     kprp_flat = kprp.reshape(-1)
     kprl_flat = kprl.reshape(-1)
-    # number of points in k space (same for both prl and prp), needed to normalize from FFT
-    # Squared as we have two fft'ed arrays
     energy = 0.5*(np.abs(v)**2).reshape(-1)  # v*conj(v) = |v|^2
     # Bin energies in a given k_range
     e_hist = np.histogram2d(kprp_flat, kprl_flat, [kprp_bins, kprl_bins], weights=energy)[0]
-    tot_energy = np.sum(e_hist)
-
 
     # mode per bin normalization
     # Only need to normalize by kprp modes as number of kprl modes constant
     e_hist /= mode_norm.reshape(mode_norm.size, 1)
-
-    # rescaling volume to give energy
-    # kprp_grid = array_avg(kprp_bins)
-    # kprl_grid = array_avg(kprl_bins)
-    # kprl_int = integrate.trapz(e_hist, kprl_grid, axis=1)
-    # vol = integrate.trapz(kprl_int, kprp_grid)
-    # if vol != 0.0:
-    #     e_hist *= tot_energy / vol
+    
     return e_hist
 
 def get_spectral_slope(kgrid, spectrum, inertial_range):
