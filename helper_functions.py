@@ -70,7 +70,7 @@ def get_grid_info(data):
 def edit_athinput(athinput, save_folder, n_X, X_min, X_max, meshblock, h5name,
                   time_lim, dt, iso_sound_speed, expand, exp_rate,
                   exp_init=1, start_time=0.0, n_hst=0, n_hdf5=0):
-    ath_path = save_folder + athinput.split('/')[-1] + '_' + h5name.split('/')[-1].split('.')[0]
+    ath_path = save_folder + athinput.split('/')[-1] + '_' + h5name.split('/')[-1].split('.h5')[0]
     copy(athinput, ath_path)
     ath_dict = athinput_dict(athinput)
     
