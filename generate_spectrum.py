@@ -199,7 +199,7 @@ def generate_alfven_spectrum(n_X, X_min, X_max, B_0, spectrum, expo=-5/3, expo_p
 
     # Alfvén wave definition performed in k-space: δB = k × B
     # don't need to Fourier transform B0 as it is constant
-    # ft_dB_x = (KY*B0_z - KZ*B0_y)
+    ft_dB_x = (KY*B0_z - KZ*B0_y)
     ft_dB_y = (KZ*B0_x - KX*B0_z)
     ft_dB_z = (KX*B0_y - KY*B0_x)
     KX, KY, KZ = None, None, None
@@ -212,7 +212,7 @@ def generate_alfven_spectrum(n_X, X_min, X_max, B_0, spectrum, expo=-5/3, expo_p
     # ft_dB_mag = np.sqrt(abs(ft_dB_x)**2 + abs(ft_dB_y)**2 + abs(ft_dB_z)**2)
     ft_dB_mag = np.sqrt(abs(ft_dB_y)**2 + abs(ft_dB_z)**2)
     ft_dB_mag[ft_dB_mag == 0.] = 1e-15
-    # ft_dB_x *= z / ft_dB_mag
+    ft_dB_x *= z / ft_dB_mag
     ft_dB_y *= z / ft_dB_mag
     ft_dB_z *= z / ft_dB_mag
     ft_dB_mag, z = None, None
@@ -223,19 +223,19 @@ def generate_alfven_spectrum(n_X, X_min, X_max, B_0, spectrum, expo=-5/3, expo_p
     # i.e. 256^3 box has smaller amplitude than 32^3 box on the order of 10^-3 (using 2^(3x)~10^x)
     # Just inverting this process.
     N_points = np.prod(n_X)
-    # ft_dB_x *= N_points
+    ft_dB_x *= N_points
     ft_dB_y *= N_points
     ft_dB_z *= N_points
 
     # this generates a sum of waves of the form r*sin(k⋅x + theta)
     # for each point k in k-space
-    # dB_x = np.real(fft.ifftn(ft_dB_x))
+    dB_x = np.real(fft.ifftn(ft_dB_x))
     dB_y = np.real(fft.ifftn(ft_dB_y))
     dB_z = np.real(fft.ifftn(ft_dB_z))
     ft_dB_y, ft_dB_z = None, None
 
-    # return dB_x, dB_y, dB_z
-    return dB_y, dB_z
+    return dB_x, dB_y, dB_z
+    #return dB_y, dB_z
 
 
 def run_tests(Ls, KX, KY, KZ, n=0, B_0x=1.0):
