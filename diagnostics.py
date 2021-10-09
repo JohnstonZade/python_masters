@@ -200,7 +200,7 @@ def save_dict(dict, output_dir, fname='', do_path_format=1):
         file = fname + '_' + file
 
     with open(format_path(output_dir, do_path_format)+file, 'wb') as output:
-        pickle.dump(dict, output)
+        pickle.dump(dict, output, pickle.HIGHEST_PROTOCOL)
 
 
 def check_dict(output_dir, fname='', do_path_format=1):
