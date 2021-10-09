@@ -17,8 +17,8 @@ def read_athinput(athinput_path):
     return expansion_rate, iso_sound_speed, tlim, dt
  
 
-def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spectrum=0, do_flyby=1, override_not_full_calc=0,
-             method='matt'):
+def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spectrum=0, do_flyby=1, 
+             override_not_full_calc=0, method='matt', theta_threshold=90):
     
     max_n = diag.get_maxn(output_dir)
     # overestimate the number of steps needed; edge case is handled when loading data
@@ -40,7 +40,8 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
 
     if do_full_calc:
         t_full, a_full = np.array([]), np.array([])
-        Bx_mean_full, beta_full, sb_frac_full = np.array([]), np.array([]), np.array([])
+        Bx_mean_full, By_mean_full, beta_full = np.array([]), np.array([]), np.array([])
+        sb_mask_full, sb_frac_full = np.array([]), np.array([])
         cross_h_full, z_p_full, z_m_full = np.array([]), np.array([]), np.array([])
         Bprp_fluc_full, uprp_fluc_full, kinetic_fluc_full = np.array([]), np.array([]), np.array([])
         magcomp_sq_full = np.array([])
@@ -54,26 +55,34 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
             t, a, B, u, rho = diag.load_time_series(output_dir, n_start, n_end, method=method)
             print('     Data loaded')
             
-            u_prp, B_prp = u[:, 1:], B[:, 1:]
+            B_mag = np.sqrt(diag.dot_prod(B, B, 1))  # full field magnitude
+            B_0 = diag.box_avg(B)  # mean field
+            b_0 = diag.get_unit(B_0).reshape(*B.shape[:2], 1, 1, 1)
+            B_prp = B - diag.dot_prod(B, b_0, 1)*b_0
+            u_prp = u - diag.dot_prod(u, b_0, 1)*b_0
+            
             B_x = B[:, 0]
-            if i == 0:
-                B0_x = B_x[0, 0, 0, 0]  # initial B0_x
-            B_mag = np.sqrt(diag.dot_prod(B, B, 1))
+            B_y = B[:, 1]
+            
             rho_avg = diag.box_avg(rho)
             z_p_rms, z_m_rms = diag.z_waves_evo(rho, u_prp, B_prp, a)
 
             t_full = np.append(t_full, t)
             a_full = np.append(a_full, a)
             Bx_mean_full = np.append(Bx_mean_full, diag.box_avg(B_x))
+            By_mean_full = np.append(By_mean_full, diag.box_avg(B_y))
 
             beta_full = np.append(beta_full, diag.beta(rho, B_mag, c_s_init, expansion_rate, t))
-            sb_frac_full = np.append(sb_frac_full, diag.switchback_fraction(B_x, B_mag, B0_x))
+            sb_mask, sb_frac = diag.switchback_finder(B, theta_threshold=theta_threshold)
+            sb_mask_full = np.append(sb_mask_full, sb_mask)
+            sb_frac_full = np.append(sb_frac_full, sb_frac)
+            sb_mask, sb_frac = None, None
             cross_h_full = np.append(cross_h_full, diag.cross_helicity(rho, u_prp, B_prp))
             z_p_full = np.append(z_p_full, z_p_rms)
             z_m_full = np.append(z_m_full, z_m_rms)
-            Bprp_fluc_full = np.append(Bprp_fluc_full, diag.norm_fluc_amp(diag.dot_prod(B_prp, B_prp, 1), B_x))
-            uprp_fluc_full = np.append(uprp_fluc_full, diag.norm_fluc_amp(diag.dot_prod(u_prp, u_prp, 1), B_x / np.sqrt(rho_avg)))
-            kinetic_fluc_full = np.append(kinetic_fluc_full, diag.norm_fluc_amp(rho*diag.dot_prod(u_prp, u_prp, 1), B_x))
+            Bprp_fluc_full = np.append(Bprp_fluc_full, diag.norm_fluc_amp(diag.dot_prod(B_prp, B_prp, 1), B_0))
+            uprp_fluc_full = np.append(uprp_fluc_full, diag.norm_fluc_amp(diag.dot_prod(u_prp, u_prp, 1), B_0 / np.sqrt(rho_avg)))
+            kinetic_fluc_full = np.append(kinetic_fluc_full, diag.norm_fluc_amp(rho*diag.dot_prod(u_prp, u_prp, 1), B_0))
             magcomp_sq_full = np.append(magcomp_sq_full, diag.mag_compress_Squire2020(B))
             # magcomp_sh_full = np.append(magcomp_sh_full, diag.mag_compress_Shoda2021(B))
 
@@ -83,9 +92,11 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
             print('     Data cleared')
 
         S['time'] = t_full
-        S['perp_expand'] = a_full
+        S['a'] = a_full
         S['Bx_mean'] = Bx_mean_full
+        S['By_mean'] = By_mean_full
         S['beta'] = beta_full
+        S['sb_mask'] = sb_mask_full
         S['sb_frac'] = sb_frac_full
         S['Bprp_norm_fluc'] = Bprp_fluc_full
         S['uprp_norm_fluc'] = uprp_fluc_full

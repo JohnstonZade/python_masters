@@ -102,32 +102,46 @@ def load_and_scale_h5(output_dir, prob=DEFAULT_PROB, do_path_format=1, method='m
         a = athdf(h5name)['a_exp']
         Λ = np.array([1, a, a])  # diagonal matrix
         λ = a**2  # determinant of Λ = a^2
+        print('n = ' + str(n))
         matts_method = method == 'matt'
-        with h5py.File(h5name, 'w') as f:
+        with h5py.File(h5name, 'a') as f:
+            prim = f['prim'][...]
+            B = f['B'][...]
+            # grid_x2_f = f['x2f'][...]
+            # grid_x2_v = f['x2v'][...]
+            # grid_x3_f = f['x3f'][...]
+            # grid_x3_v = f['x3v'][...]
             if undo:
-                f['prim'][0] *= λ if matts_method else 1
-                f['prim'][1] /= Λ[0]
-                f['prim'][2] /= Λ[1]
-                f['prim'][3] /= Λ[2]
-                f['B'][0] /= Λ[0] / λ if matts_method else Λ[0]
-                f['B'][1] /= Λ[1] / λ if matts_method else Λ[1]
-                f['B'][2] /= Λ[2] / λ if matts_method else Λ[2]
-                f['x2f'] /= a
-                f['x2v'] /= a
-                f['x3f'] /= a
-                f['x3v'] /= a
+                prim[0] *= λ if matts_method else 1
+                prim[1] /= Λ[0]
+                prim[2] /= Λ[1]
+                prim[3] /= Λ[2]
+                B[0] /= Λ[0] / λ if matts_method else Λ[0]
+                B[1] /= Λ[1] / λ if matts_method else Λ[1]
+                B[2] /= Λ[2] / λ if matts_method else Λ[2]
+                # grid_x2_f /= a
+                # grid_x2_v /= a
+                # grid_x3_f /= a
+                # grid_x3_v /= a
             else:
-                f['prim'][0] /= λ if matts_method else 1
-                f['prim'][1] *= Λ[0]
-                f['prim'][2] *= Λ[1]
-                f['prim'][3] *= Λ[2]
-                f['B'][0] *= Λ[0] / λ if matts_method else Λ[0]
-                f['B'][1] *= Λ[1] / λ if matts_method else Λ[1]
-                f['B'][2] *= Λ[2] / λ if matts_method else Λ[2]
-                f['x2f'] *= a
-                f['x2v'] *= a
-                f['x3f'] *= a
-                f['x3v'] *= a
+                prim[0] /= λ if matts_method else 1
+                prim[1] *= Λ[0]
+                prim[2] *= Λ[1]
+                prim[3] *= Λ[2]
+                B[0] *= Λ[0] / λ if matts_method else Λ[0]
+                B[1] *= Λ[1] / λ if matts_method else Λ[1]
+                B[2] *= Λ[2] / λ if matts_method else Λ[2]
+                # grid_x2_f *= a
+                # grid_x2_v *= a
+                # grid_x3_f *= a
+                # grid_x3_v *= a
+            
+            f['prim'][...] = prim
+            f['B'][...] = B
+            # f['x2f'][...] = grid_x2_f
+            # f['x2v'][...] = grid_x2_v
+            # f['x3f'][...] = grid_x3_f
+            # f['x3v'][...] = grid_x3_v
             
             
 
@@ -343,7 +357,11 @@ def get_mag(x):
 def get_unit(x):
     '''Calculates unit vector.'''
     x_mag = get_mag(x)
-    return x / x_mag.reshape(*x_mag.shape, 1)
+    if len(x.shape) == 5:
+        x_mag = x_mag.reshape(x.shape[0], 1, *x.shape[2:])
+    else:
+        x_mag = x_mag.reshape(x.shape[0], 1)
+    return x / x_mag
 
 
 def get_vec(x, ps):
@@ -495,17 +513,20 @@ def norm_fluc_amp_hst(output_dir, adot, method, prob=DEFAULT_PROB):
 
 # def time_to_dist
 
-def switchback_fraction(B_x, B_mag, B0_x):
-    b_x = B_x / B_mag  # unit vector in x direction
-    N_cells = b_x[0].size 
-    # if B0_x is positive, switchbacks are in negative direction
-    # and vice versa
-    sb_frac = []
-    for i in range(b_x.shape[0]):
-        b_x_temp = b_x[i]
-        N_flipped_b = b_x_temp[np.sign(B0_x)*b_x_temp < 0.0].size
-        sb_frac.append(N_flipped_b / N_cells)
-    return np.array(sb_frac)
+def switchback_finder(B, theta_threshold=90):
+    # finding magnetic field reversals with an deviation greater
+    # than theta_threshold from the mean magnetic field/Parker spiral
+    # theta_threshold is input in degrees
+
+    theta_threshold *= np.pi / 180
+    N_cells = B[0, 0].size  # number of cells in the box
+    B_0 = box_avg(B) # mean field in box = Parker spiral
+    b, b_0 = get_unit(B), get_unit(B_0).reshape(*B.shape[:2], 1, 1, 1)
+    dev_from_mean = np.arccos(np.clip(dot_prod(b, b_0, 1), -1., 1.))
+    SB_mask = dev_from_mean >= theta_threshold
+    # fraction of SBs in box: number of cells with SBs / total cells in box
+    SB_frac = np.array([B[n, 0][SB_mask[n]].size / N_cells for n in range(B.shape[0])])
+    return SB_mask, SB_frac
 
 def a(expansion_rate, t):
     """
@@ -517,18 +538,6 @@ def a(expansion_rate, t):
 def expand_sound_speed(init_c_s, expansion_rate, t):
     # tempurature evolution is adiabatic
     return init_c_s * (a(expansion_rate, t))**(-2/3)
-
-# 12/4/21: This should be redundant now as this is meant to be done automatically
-#          when the data is loaded.
-def expand_variables(a, vector):
-    """
-    Takes in a time series of a vector component over the whole box and
-    scales by a(t).
-    """
-    for i in range(1, 3): # i = 1 ⟺ y, i = 2 ⟺ z
-        vector[:, i, :] *= a.reshape(*a.shape, 1, 1, 1)
-
-    return vector
 
 
 def load_time_series(output_dir, n_start=0, n_end=-1, conserved=0, just_time=0, prob=DEFAULT_PROB, method='matt'):

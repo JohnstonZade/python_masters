@@ -41,6 +41,10 @@ tlim = 2 if exp_rate == 0.0 else (a_end - 1) / exp_rate
 # Reinterpolation
 if reinterpolate:
     a_re = 2         # factor to reinterpolate (e.g a -> 2a then reinterp)
+    
+# Add Parker Sprial
+do_parker = False
+final_bybx_ratio = 1.5
 
 # Athdf to H5 Generation
 if athdf_to_h5:
@@ -67,4 +71,5 @@ elif athdf_to_h5:
 else:
     gen.generate(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_cpus, exp_rate,
                  dt, init_norm_amp, beta, tlim=tlim, choose_res=choose_res, N_prp=N_prp,
-                 spectrum=spectrum, κ_prl=κ_prl, κ_prp=κ_prp, a_end=a_end)
+                 spectrum=spectrum, κ_prl=κ_prl, κ_prp=κ_prp, a_end=a_end, do_parker=do_parker,
+                 final_bybx_ratio=final_bybx_ratio)

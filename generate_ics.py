@@ -1,8 +1,6 @@
 # --- IMPORTS --- #
 import h5py
 import numpy as np
-from numpy.core.numeric import ones_like
-from numpy.lib.npyio import save
 
 import diagnostics as diag
 import generate_spectrum as genspec
@@ -175,10 +173,14 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock, athin
     # Dimension setting: 1D if only x has more than one gridpoint
     one_D = 1 if np.all(n_X[1:] == 1) else 0
 
-    By_0 = 0.0  # mean By
+    B0_x = 1.0  # mean Bx
+    B0_y = 0.0  # mean By
     if do_parker:
         a_f = 1 + exp_rate*time_lim
-        By_0 = final_bybx_ratio / a_f
+        initial_bybx_ratio = final_bybx_ratio / a_f
+        # we want B0_mag = 1.0 always
+        B0_x /= np.sqrt(1.0 + initial_bybx_ratio**2)
+        B0_y = initial_bybx_ratio*B0_x
     
     # Generate mean fields
     # Density
@@ -186,33 +188,46 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock, athin
     UXf = lambda X, Y, Z: np.zeros(X.shape)
     UYf = lambda X, Y, Z: np.zeros(X.shape)
     UZf = lambda X, Y, Z: np.zeros(X.shape)
-    BXf = lambda X, Y, Z: np.ones(X.shape)
-    BYf = lambda X, Y, Z: By_0*np.ones(X.shape)
+    BXf = lambda X, Y, Z: B0_x*np.ones(X.shape)
+    BYf = lambda X, Y, Z: B0_y*np.ones(X.shape)
     BZf = lambda X, Y, Z: np.zeros(X.shape)
 
     X_grid, (dx, dy, dz) = generate_grid(X_min, X_max, n_X)
     Hy_grid, BXcc, BYcc, BZcc = setup_hydro_grid(n_X, X_grid, N_HYDRO, Dnf, UXf, UYf, UZf, BXf, BYf, BZf)
-
+    B0 = np.array([BXcc, BYcc, BZcc])  # mean field
+    
     X_grid = None
 
     if do_mode_test:
         # Generate a single mode for testing
-        dB_x, dB_y, dB_z = genspec.generate_alfven_spectrum(n_X, X_min, X_max, np.array([BXcc, BYcc, BZcc]), spectrum,
+        dB_x, dB_y, dB_z = genspec.generate_alfven_spectrum(n_X, X_min, X_max, B0, spectrum,
                                                       run_test=True)
     elif spectrum == 'gaussian': 
-        dB_x, dB_y, dB_z = genspec.generate_alfven_spectrum(n_X, X_min, X_max, np.array([BXcc, BYcc, BZcc]),
+        dB_x, dB_y, dB_z = genspec.generate_alfven_spectrum(n_X, X_min, X_max, B0,
                                                       spectrum, kpeak=kpeak, kwidth=kwidth, 
                                                       do_truncation=do_truncation, n_cutoff=n_cutoff)
     else:
         # Generate isotropic or GS spectrum
-        dB_x, dB_y, dB_z = genspec.generate_alfven_spectrum(n_X, X_min, X_max, np.array([BXcc, BYcc, BZcc]), spectrum,
+        dB_x, dB_y, dB_z = genspec.generate_alfven_spectrum(n_X, X_min, X_max, B0, spectrum,
                                                       expo=expo, expo_prl=expo_prl,
                                                       do_truncation=do_truncation, n_cutoff=n_cutoff,)
+    
+    # Setting z^- waves = 0
+    rho = Hy_grid[0] 
+    # total volume weighted energy = sum(0.5*dV*B^2) = 0.5*(V/N)sum(B^2) = 0.5*V*mean(B^2)
+    total_perp_energy = 0.5*np.mean(dB_x**2 + dB_y**2 + dB_z**2)
+    norm_perp_energy = np.sqrt(perp_energy / total_perp_energy)
+    
+    du_x, du_y, du_z = dB_x / np.sqrt(rho), dB_y / np.sqrt(rho), dB_z / np.sqrt(rho)
 
-    BXcc += dB_x
-    BYcc += dB_y
-    BZcc += dB_z
-    dB_x, dB_y, dB_z = None, None, None
+    Hy_grid[1] += rho*norm_perp_energy*du_x
+    Hy_grid[2] += rho*norm_perp_energy*du_y
+    Hy_grid[3] += rho*norm_perp_energy*du_z
+
+    BXcc += norm_perp_energy*dB_x
+    BYcc += norm_perp_energy*dB_y
+    BZcc += norm_perp_energy*dB_z
+    dB_x, dB_y, dB_z, du_x, du_y, du_z = None, None, None, None, None, None
 
     # --- MESHBLOCK STRUCTURE --- #
 
@@ -227,60 +242,6 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock, athin
     print('Magnetic Saved Successfully')
     BXcc, BYcc, BZcc = None, None, None
     dx, dy, dz = None, None, None
-
-    # Only looking at perturbations perpendicular to B_0, assumed to be along x-axis initially.
-    # Will add perturation after t=0 corresponding to Parker spiral?
-    Bcc_unpacked = np.zeros(shape=(3, *n_X[::-1]))
-    with h5py.File(h5name, 'a') as f:
-        for idx, b in enumerate(['bf1', 'bf2', 'bf3']):
-            for m in range(n_blocks):  # save from each meshblock individually
-                    off = blocks[:, m]
-                    ind_s = (meshblock*off)[::-1]
-                    ind_e = (meshblock*off + meshblock)[::-1]
-                    B_fc = f[b][ m, :, :, :]
-
-                    # linearly interpolate face centered fields to get cell-centered fields
-                    # assumes evenly spaced grid points
-                    # idx = 0 ⟺ y-component; idx = 1 ⟺ z-component
-                    B_cc = 0.5*(B_fc[:, 1:, :] + B_fc[:, :-1, :]) if idx == 0 else 0.5*(B_fc[1:, :, :] + B_fc[:-1, :, :])
-
-                    Bcc_unpacked[idx, ind_s[0]:ind_e[0], ind_s[1]:ind_e[1], ind_s[2]:ind_e[2]] = B_cc
-
-    # Setting z^- waves = 0
-    rho = Hy_grid[0]
-    dB_x, dB_y, dB_z = Bcc_unpacked  
-    # ensuring no mean
-    dB_x += -np.mean(dB_x)*np.ones_like(dB_x)
-    dB_y += -np.mean(dB_y)*np.ones_like(dB_y)
-    dB_z += -np.mean(dB_z)*np.ones_like(dB_z)
-    du_x, du_y, du_z = dB_x / np.sqrt(rho), dB_y / np.sqrt(rho), dB_z / np.sqrt(rho)
-
-    # total volume weighted energy = sum(0.5*dV*B^2) = 0.5*(V/N)sum(B^2) = 0.5*V*mean(B^2)
-    total_perp_energy = 0.5*np.mean(dB_x**2 + dB_y**2 + dB_z**2)
-    norm_perp_energy = np.sqrt(perp_energy / total_perp_energy)
-
-    Hy_grid[1] += rho*norm_perp_energy*du_x
-    Hy_grid[2] += rho*norm_perp_energy*du_y
-    Hy_grid[3] += rho*norm_perp_energy*du_z
-
-    dB_x, dB_y, dB_z, du_x, du_y, du_z = None, None, None, None, None, None
-
-    with h5py.File(h5name, 'a') as f:
-        B_x = f['bf1'][...]
-        B_y = f['bf2'][...]
-        B_z = f['bf3'][...]
-        # assuming B_0 is spatially homogenous ⟹ B_0 = mean(B)
-        dB_x = B_x - np.mean(B_x)*np.ones_like(B_x)
-        dB_y = B_y - np.mean(B_y)*np.ones_like(B_y)
-        dB_z = B_z - np.mean(B_z)*np.ones_like(B_z)
-
-        # remove all fluctuations parallel to B_0: these are not Alfvénic and are a result of numerical errors
-        # otherwise rescale Alfvénic fluctations to desiered energy
-        # B_y,z = B0_y,z + dB_y,z + (norm_energy - 1)*dB_y,z = B0_y,z + norm_energy*dB_y,z
-        f['bf1'][...] += dB_x*(norm_perp_energy-1)
-        f['bf2'][...] += dB_y*(norm_perp_energy-1)
-        f['bf3'][...] += dB_z*(norm_perp_energy-1)
-
 
     # - HYDRO
     save_hydro_grid(h5name, Hy_grid, N_HYDRO, n_blocks, blocks, meshblock, remove_h5=0)

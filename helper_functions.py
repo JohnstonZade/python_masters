@@ -285,13 +285,12 @@ def calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_bl
     B_mean = np.array([BXcc.mean(), BYcc.mean(), BZcc.mean()])
 
     # Calculate A from B using Fourier space by inverting the curl
-    K = {}
-    for k in range(3):
-        if n_X[k] > 1:
-            K[k] = 2j*np.pi/(X_max[k] - X_min[k])*diag.ft_array(n_X[k])
-        else:
-            K[k] = np.array(0j)
-
+    K = {
+        k: 2j * np.pi / (X_max[k] - X_min[k]) * diag.ft_array(n_X[k])
+        if n_X[k] > 1
+        else np.array(0j)
+        for k in range(3)
+    }
 
     K_z, K_y, K_x = np.meshgrid(K[2], K[1], K[0], indexing='ij')
     K_2 = abs(K_x)**2 + abs(K_y)**2 + abs(K_z)**2
@@ -323,11 +322,12 @@ def calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_bl
         off = blocks[:, m]
         ind_s = (meshblock*off)[::-1]
         ind_e = (meshblock*off + meshblock)[::-1]
-        B_h5[m, :, :, :] = B_mean[0] + \
-                        ((A_z[ind_s[0]:ind_e[0], ind_s[1]+1:ind_e[1]+1, ind_s[2]:ind_e[2]+1] - \
-                            A_z[ind_s[0]:ind_e[0], ind_s[1]:ind_e[1], ind_s[2]:ind_e[2]+1]) / dy - \
-                        (A_y[ind_s[0]+1:ind_e[0]+1, ind_s[1]:ind_e[1], ind_s[2]:ind_e[2]+1] - \
-                            A_y[ind_s[0]:ind_e[0], ind_s[1]:ind_e[1], ind_s[2]:ind_e[2]+1]) / dz)
+        A_z_slice = A_z[ind_s[0]:ind_e[0], ind_s[1]:ind_e[1]+1, ind_s[2]:ind_e[2]+1] / dy
+        A_y_slice = A_y[ind_s[0]:ind_e[0]+1, ind_s[1]:ind_e[1], ind_s[2]:ind_e[2]+1] / dz
+        curlA_x = np.diff(A_z_slice, axis=1) - np.diff(A_y_slice, axis=0)
+        if np.all(abs(curlA_x) < 1e-2):
+            curlA_x *= 0.0
+        B_h5[m, :, :, :] = B_mean[0] + curlA_x
     with h5py.File(h5name, 'a') as f:
         f['bf1'] = B_h5
 
@@ -338,11 +338,12 @@ def calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_bl
         off = blocks[:, m]
         ind_s = (meshblock*off)[::-1]
         ind_e = (meshblock*off + meshblock)[::-1]
-        B_h5[m, :, :, :] = B_mean[1] + \
-                        ((A_x[ind_s[0]+1:ind_e[0]+1, ind_s[1]:ind_e[1]+1, ind_s[2]:ind_e[2]] - \
-                            A_x[ind_s[0]:ind_e[0], ind_s[1]:ind_e[1]+1, ind_s[2]:ind_e[2]]) / dz - \
-                        (A_z[ind_s[0]:ind_e[0], ind_s[1]:ind_e[1]+1, ind_s[2]+1:ind_e[2]+1] - \
-                            A_z[ind_s[0]:ind_e[0], ind_s[1]:ind_e[1]+1, ind_s[2]:ind_e[2]]) / dx)
+        A_x_slice = A_x[ind_s[0]:ind_e[0]+1, ind_s[1]:ind_e[1]+1, ind_s[2]:ind_e[2]] / dz
+        A_z_slice = A_z[ind_s[0]:ind_e[0], ind_s[1]:ind_e[1]+1, ind_s[2]:ind_e[2]+1] / dx
+        curlA_y = np.diff(A_x_slice, axis=0) - np.diff(A_z_slice, axis=2)
+        if np.all(abs(curlA_y) < 1e-2):
+            curlA_y *= 0.0
+        B_h5[m, :, :, :] = B_mean[1] + curlA_y
     with h5py.File(h5name, 'a') as f:
         f['bf2'] = B_h5
 
@@ -353,11 +354,12 @@ def calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_bl
         off = blocks[:, m]
         ind_s = (meshblock*off)[::-1]
         ind_e = (meshblock*off + meshblock)[::-1]
-        B_h5[m, :, :, :] = B_mean[2] + \
-                        ((A_y[ind_s[0]:ind_e[0]+1, ind_s[1]:ind_e[1], ind_s[2]+1:ind_e[2]+1] - \
-                            A_y[ind_s[0]:ind_e[0]+1, ind_s[1]:ind_e[1], ind_s[2]:ind_e[2]]) / dx - \
-                        (A_x[ind_s[0]:ind_e[0]+1, ind_s[1]+1:ind_e[1]+1, ind_s[2]:ind_e[2]] - \
-                            A_x[ind_s[0]:ind_e[0]+1, ind_s[1]:ind_e[1], ind_s[2]:ind_e[2]]) / dy)
+        A_y_slice = A_y[ind_s[0]:ind_e[0]+1, ind_s[1]:ind_e[1], ind_s[2]:ind_e[2]+1] / dx
+        A_x_slice = A_x[ind_s[0]:ind_e[0]+1, ind_s[1]:ind_e[1]+1, ind_s[2]:ind_e[2]] / dy
+        curlA_z = np.diff(A_y_slice, axis=2) - np.diff(A_x_slice, axis=1)
+        if np.all(abs(curlA_z) < 1e-2):
+            curlA_z *= 0.0
+        B_h5[m, :, :, :] = B_mean[2] + curlA_z
     with h5py.File(h5name, 'a') as f:
         f['bf3'] = B_h5
 
@@ -417,3 +419,103 @@ def constB2_faceinterp(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n
         B_h5[m, :, :, :] = B_faces[2][ind_s[0]:ind_e[0], ind_s[1]:ind_e[1], ind_s[2]:ind_e[2]]
     with h5py.File(h5name, 'a') as f:
         f['bf3'] = B_h5
+        
+def remove_fluc_prl_B0(norm_perp_energy, h5name,
+                       n_X, X_min, X_max, meshblock, n_blocks, blocks):
+    Ns, Ls = n_X[::-1], (X_max - X_min)[::-1]
+    ze, ye, xe = reinterp_generate_grid(Ns, Ls, return_edges=1, pad=0) 
+    zg, yg, xg = reinterp_generate_grid(Ns, Ls, pad=0) 
+
+    Bcc_unpacked = np.zeros(shape=(3, *n_X[::-1]))
+    with h5py.File(h5name, 'a') as f:
+        for idx, b in enumerate(['bf1', 'bf2', 'bf3']):
+            for m in range(n_blocks):  # save from each meshblock individually
+                    off = blocks[:, m]
+                    ind_s = (meshblock*off)[::-1]
+                    ind_e = (meshblock*off + meshblock)[::-1]
+                    B_fc = f[b][ m, :, :, :]
+
+                    # # linearly interpolate face centered fields to get cell-centered fields
+                    # # assumes evenly spaced grid points
+                    # # idx = 0 ⟺ x-component; idx = 1 ⟺ y-component
+                    if idx == 0:
+                        B_cc = 0.5*(B_fc[:, :, 1:] + B_fc[:, :, :-1])
+                    else:
+                        B_cc = 0.5*(B_fc[:, 1:, :] + B_fc[:, :-1, :]) if idx == 1 else 0.5*(B_fc[1:, :, :] + B_fc[:-1, :, :])
+
+                    Bcc_unpacked[idx, ind_s[0]:ind_e[0], ind_s[1]:ind_e[1], ind_s[2]:ind_e[2]] = B_cc
+    
+    B_x, B_y, B_z = Bcc_unpacked  # this is the full magnetic field
+    
+    # assuming B_0 is spatially homogenous ⟹ B_0 = mean(B)
+    B0_x = 0.0 if abs(np.mean(B_x)) < 1e-15 else np.mean(B_x)
+    B0_y = 0.0 if abs(np.mean(B_y)) < 1e-15 else np.mean(B_y)
+    B0_z = 0.0 if abs(np.mean(B_z)) < 1e-15 else np.mean(B_z)
+    B0_mag = np.sqrt(B0_x**2 + B0_y**2 + B0_z**2)
+    b0_x   = B0_x / B0_mag
+    b0_y   = B0_y / B0_mag
+    b0_z   = B0_z / B0_mag
+    dB_x = B_x - B0_x
+    dB_y = B_y - B0_y
+    dB_z = B_z - B0_z
+    
+    dB_prl = dB_x*b0_x + dB_y*b0_y + dB_z*b0_z
+    dB_prp_x = dB_x - dB_prl*b0_x
+    dB_prp_y = dB_y - dB_prl*b0_y
+    dB_prp_z = dB_z - dB_prl*b0_z
+    
+    Bx_add = norm_perp_energy*dB_prp_x - dB_x
+    By_add = norm_perp_energy*dB_prp_y - dB_y
+    Bz_add = norm_perp_energy*dB_prp_z - dB_z
+    
+    BX_interp = rgi((pad_grid(zg), pad_grid(yg), pad_grid(xg)), pad_array(Bx_add))
+    BY_interp = rgi((pad_grid(zg), pad_grid(yg), pad_grid(xg)), pad_array(By_add))
+    BZ_interp = rgi((pad_grid(zg), pad_grid(yg), pad_grid(xg)), pad_array(Bz_add))
+    interps = [BX_interp, BY_interp, BZ_interp]
+
+    BX_grid = np.meshgrid(zg, yg, xe, indexing='ij')
+    BY_grid = np.meshgrid(zg, ye, xg, indexing='ij')
+    BZ_grid = np.meshgrid(ze, yg, xg, indexing='ij')
+    B_grids = [BX_grid, BY_grid, BZ_grid]
+
+    B_faces = []
+
+    for idx, B_grid in enumerate(B_grids):
+        faces_Ns = Ns + np.roll([0, 0, 1], -idx)
+        B_grid_z, B_grid_y, B_grid_x = B_grid
+        pts = np.array([B_grid_z.ravel(), B_grid_y.ravel(), B_grid_x.ravel()]).T
+        B_faces.append(interps[idx](pts).reshape(*faces_Ns))
+
+    
+    # Bx
+    B_mesh = meshblock + [1, 0, 0]
+    B_h5 = np.zeros(shape=(n_blocks, *B_mesh[::-1]))
+    for m in range(n_blocks):
+        off = blocks[:, m]
+        ind_s = (meshblock*off)[::-1]
+        ind_e = (meshblock*off + B_mesh)[::-1]
+        B_h5[m, :, :, :] = B_faces[0][ind_s[0]:ind_e[0], ind_s[1]:ind_e[1], ind_s[2]:ind_e[2]]
+    with h5py.File(h5name, 'a') as f:
+        f['bf1'][...] += B_h5
+
+    # By
+    B_mesh = meshblock + [0, 1, 0]
+    B_h5 = np.zeros(shape=(n_blocks, *B_mesh[::-1]))
+    for m in range(n_blocks):
+        off = blocks[:, m]
+        ind_s = (meshblock*off)[::-1]
+        ind_e = (meshblock*off + B_mesh)[::-1]
+        B_h5[m, :, :, :] = B_faces[1][ind_s[0]:ind_e[0], ind_s[1]:ind_e[1], ind_s[2]:ind_e[2]]
+    with h5py.File(h5name, 'a') as f:
+        f['bf2'][...] += B_h5
+
+    # Bz
+    B_mesh = meshblock + [0, 0, 1]
+    B_h5 = np.zeros(shape=(n_blocks, *B_mesh[::-1]))
+    for m in range(n_blocks):
+        off = blocks[:, m]
+        ind_s = (meshblock*off)[::-1]
+        ind_e = (meshblock*off + B_mesh)[::-1]
+        B_h5[m, :, :, :] = B_faces[2][ind_s[0]:ind_e[0], ind_s[1]:ind_e[1], ind_s[2]:ind_e[2]]
+    with h5py.File(h5name, 'a') as f:
+        f['bf3'][...] += B_h5

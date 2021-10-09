@@ -18,7 +18,7 @@ def decompose_k(KX, KY, KZ, B0_x, B0_y, B0_z):
     Kprp_y = KY - Kprl*b0_y
     Kprp_z = KZ - Kprl*b0_z
     Kprl   = abs(Kprl)
-    Kprp   = np.maximum(np.sqrt(abs(Kprp_x)**2 + abs(Kprp_y)**2 + abs(Kprp_z)**2), 0.01)
+    Kprp   = np.maximum(np.sqrt(abs(Kprp_x)**2 + abs(Kprp_y)**2 + abs(Kprp_z)**2), 1e-4)
 
     return Kprl, Kprp
 
@@ -154,9 +154,9 @@ def generate_alfven_spectrum(n_X, X_min, X_max, B_0, spectrum, expo=-5/3, expo_p
     # added just in case we change the direction of B_0
     # Kprl, Kprp = decompose_k(KX, KY, KZ, B0_x, B0_y, B0_z)
 
-    # Assuming that B_0 is just along x-axis
-    Kprl = abs(KX)
-    Kprp = np.maximum(np.sqrt(abs(KY)**2 + abs(KZ)**2), 0.01)
+    # Assuming that B_0 is along x-axis (or close to it) initially
+    Kprl = np.maximum(abs(KX), 1e-4)
+    Kprp = np.maximum(np.sqrt(abs(KY)**2 + abs(KZ)**2), 1e-4)
     Kmag = np.sqrt(Kprl**2 + Kprp**2)
 
     if run_test:
@@ -209,8 +209,8 @@ def generate_alfven_spectrum(n_X, X_min, X_max, B_0, spectrum, expo=-5/3, expo_p
     # removing the magnitude of the k vector and replacing
     # it with the randomly generated amplitude.
     # This removes the need to add 1 to kpow above.
-    # ft_dB_mag = np.sqrt(abs(ft_dB_x)**2 + abs(ft_dB_y)**2 + abs(ft_dB_z)**2)
-    ft_dB_mag = np.sqrt(abs(ft_dB_y)**2 + abs(ft_dB_z)**2)
+    ft_dB_mag = np.sqrt(abs(ft_dB_x)**2 + abs(ft_dB_y)**2 + abs(ft_dB_z)**2)
+    #ft_dB_mag = np.sqrt(abs(ft_dB_y)**2 + abs(ft_dB_z)**2)
     ft_dB_mag[ft_dB_mag == 0.] = 1e-15
     ft_dB_x *= z / ft_dB_mag
     ft_dB_y *= z / ft_dB_mag
@@ -232,7 +232,7 @@ def generate_alfven_spectrum(n_X, X_min, X_max, B_0, spectrum, expo=-5/3, expo_p
     dB_x = np.real(fft.ifftn(ft_dB_x))
     dB_y = np.real(fft.ifftn(ft_dB_y))
     dB_z = np.real(fft.ifftn(ft_dB_z))
-    ft_dB_y, ft_dB_z = None, None
+    ft_dB_x, ft_dB_y, ft_dB_z = None, None, None
 
     return dB_x, dB_y, dB_z
     #return dB_y, dB_z

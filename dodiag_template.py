@@ -25,8 +25,9 @@ else:
 output_dir = folder + 'output/'
 athinput_path = folder + 'ICs/athinput.from_array_ICs_' + sim_name
 dict_name = sim_name
+sb_theta_threshold = 90
 steps = 1
 do_spectrum = 1
 do_flyby = 1
 
-run.run_loop(output_dir, athinput_path, dict_name, steps, do_spectrum, do_flyby)
+run.run_loop(output_dir, athinput_path, dict_name, steps, do_spectrum, do_flyby, theta_threshold=sb_theta_threshold)
