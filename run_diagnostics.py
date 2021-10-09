@@ -56,8 +56,8 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
             print('     Data loaded')
             
             B_mag = np.sqrt(diag.dot_prod(B, B, 1))  # full field magnitude
-            B_0 = diag.box_avg(B)  # mean field
-            b_0 = diag.get_unit(B_0).reshape(*B.shape[:2], 1, 1, 1)
+            B_0 = diag.box_avg(B).reshape(*B.shape[:2], 1, 1, 1)  # mean field
+            b_0 = diag.get_unit(B_0)
             B_prp = B - diag.dot_prod(B, b_0, 1)*b_0
             u_prp = u - diag.dot_prod(u, b_0, 1)*b_0
             
