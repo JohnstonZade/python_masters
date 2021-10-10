@@ -190,7 +190,7 @@ def load_dict(output_dir, fname='', do_path_format=1):
         file = fname + '_' + file
 
     with open(format_path(output_dir, do_path_format)+file, 'rb') as pkl_file:
-        dict = pickle.load(pkl_file)
+        dict = pickle.load(pkl_file, protocol=pickle.HIGHEST_PROTOCOL)
     return dict
 
 
