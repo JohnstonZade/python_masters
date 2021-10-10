@@ -73,10 +73,12 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
             By_mean_full = np.append(By_mean_full, diag.box_avg(B_y))
 
             beta_full = np.append(beta_full, diag.beta(rho, B_mag, c_s_init, expansion_rate, t))
-            sb_mask, sb_frac = diag.switchback_finder(B, theta_threshold=theta_threshold)
-            sb_mask_full = np.append(sb_mask_full, sb_mask)
+            sb_frac = diag.switchback_finder(B, theta_threshold=theta_threshold)[1]
+            # sb_mask, sb_frac = diag.switchback_finder(B, theta_threshold=theta_threshold)
+            # sb_mask_full = np.append(sb_mask_full, sb_mask)
             sb_frac_full = np.append(sb_frac_full, sb_frac)
-            sb_mask, sb_frac = None, None
+            sb_frac = None
+            # sb_mask, sb_frac = None, None
             cross_h_full = np.append(cross_h_full, diag.cross_helicity(rho, u_prp, B_prp))
             z_p_full = np.append(z_p_full, z_p_rms)
             z_m_full = np.append(z_m_full, z_m_rms)
@@ -96,7 +98,7 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
         S['Bx_mean'] = Bx_mean_full
         S['By_mean'] = By_mean_full
         S['beta'] = beta_full
-        S['sb_mask'] = sb_mask_full
+        # S['sb_mask'] = sb_mask_full
         S['sb_frac'] = sb_frac_full
         S['Bprp_norm_fluc'] = Bprp_fluc_full
         S['uprp_norm_fluc'] = uprp_fluc_full
@@ -125,7 +127,7 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
             if n % spec_step == 0:  # don't want to run too often
                 print('Spectrum calculation started at n = ' + str(n))
                 if expansion_rate != 0.0:
-                    spec_a = round(S['perp_expand'][n], 1)
+                    spec_a = round(S['a'][n], 1)
                     spec_name = 'mhd_spec_a' + str(spec_a)
                 else:
                     spec_a = 1.0
@@ -144,7 +146,7 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
         for n in range(max_n):
             if n % spec_step == 0:
                 if expansion_rate != 0:
-                    flyby_a = round(S['perp_expand'][n], 1)
+                    flyby_a = round(S['a'][n], 1)
                     flyby_string = 'flyby_a' + str(flyby_a)
                 else:
                     flyby_a = 1.0
