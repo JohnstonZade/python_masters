@@ -82,9 +82,9 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
             cross_h_full = np.append(cross_h_full, diag.cross_helicity(rho, u_prp, B_prp))
             z_p_full = np.append(z_p_full, z_p_rms)
             z_m_full = np.append(z_m_full, z_m_rms)
-            Bprp_fluc_full = np.append(Bprp_fluc_full, diag.norm_fluc_amp(diag.dot_prod(B_prp, B_prp, 1), B_0))
-            uprp_fluc_full = np.append(uprp_fluc_full, diag.norm_fluc_amp(diag.dot_prod(u_prp, u_prp, 1), B_0 / np.sqrt(rho_avg)))
-            kinetic_fluc_full = np.append(kinetic_fluc_full, diag.norm_fluc_amp(rho*diag.dot_prod(u_prp, u_prp, 1), B_0))
+            Bprp_fluc_full = np.append(Bprp_fluc_full, diag.norm_fluc_amp(diag.dot_prod(B_prp, B_prp, 1), diag.dot_prod(B_0, B_0, 1)))
+            uprp_fluc_full = np.append(uprp_fluc_full, diag.norm_fluc_amp(diag.dot_prod(u_prp, u_prp, 1), diag.dot_prod(B_0, B_0, 1) / np.sqrt(rho_avg)))
+            kinetic_fluc_full = np.append(kinetic_fluc_full, diag.norm_fluc_amp(rho*diag.dot_prod(u_prp, u_prp, 1), diag.dot_prod(B_0, B_0, 1)))
             magcomp_sq_full = np.append(magcomp_sq_full, diag.mag_compress_Squire2020(B))
             # magcomp_sh_full = np.append(magcomp_sh_full, diag.mag_compress_Shoda2021(B))
 
