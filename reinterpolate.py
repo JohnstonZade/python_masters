@@ -26,7 +26,7 @@ def flyby(output_dir, flyby_a, flyby_n, do_rand_start=1, l_start=None,
 
     # extending to general mean fields
     rho_data = data['rho']
-    B = np.array(data['Bcc1'], data['Bcc2'], data['Bcc3'])
+    B = np.array((data['Bcc1'], data['Bcc2'], data['Bcc3']))
     B_0 = diag.get_mag(diag.box_avg(B))
     v_A = diag.alfven_speed(rho_data, B)
     scale_B_mean = 1 / B_0 if norm_B0 else 1  # 1 / <Bx> = a^2
