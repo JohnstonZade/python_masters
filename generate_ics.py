@@ -140,7 +140,7 @@ def create_athena_fromh5(save_folder, athinput_in_folder, athinput_in, h5name, a
             f['cons'] = hydro_prim
         hydro_prim = None
     
-    n_X, X_min, X_max, meshblock, dt_hst, dt, expand_old, exp_rate_old, iso_sound_speed = read_athinput(athinput_in, reinterpolate=1)
+    n_X, X_min, X_max, meshblock, dt_hst, dt_old, expand_old, exp_rate_old, iso_sound_speed = read_athinput(athinput_in, reinterpolate=1)
     athinput_out = edit_athinput(athinput_out, save_folder, n_X, X_min, X_max, meshblock,
                                  h5name, time_lim=time_lim, dt=dt, iso_sound_speed=np.sqrt(beta_multiplier)*iso_sound_speed,
                                  expand=expand, exp_rate=exp_rate)
