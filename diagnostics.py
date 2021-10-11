@@ -391,7 +391,8 @@ def get_mag(x, reshape=0):
               [1, 1, 1]]
          get_mag(x) = [√2, 5, √3]
     '''
-    return np.sqrt(dot_prod(x, x, reshape=reshape))
+    axis = 1 if len(x.shape == 5) else 0
+    return np.sqrt(dot_prod(x, x, axis=axis, reshape=reshape))
 
 
 def get_unit(x):
