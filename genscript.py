@@ -20,7 +20,7 @@ def cs_from_beta(init_norm_fluc, beta):
 
 def generate(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_cpus, exp_rate, 
              dt, init_norm_amp, beta, tlim=2., expand=1, expo=-5/3, expo_prl=-2, choose_res=0, N_prp=200,
-             do_parker=0, final_bybx_ratio=1.5,
+             do_parker=0, final_bybx_ratio=1.5, final_bybx_a=5,
              spectrum='isotropic', κ_prl=2, κ_prp=2, a_end=10, gen_ic=1, run_athena=0, run_spec=0):
     total_folder =  diag.format_path(folder)
 

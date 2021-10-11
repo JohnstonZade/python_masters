@@ -17,7 +17,7 @@ def decompose_k(KX, KY, KZ, B0_x, B0_y, B0_z):
     Kprp_x = KX - Kprl*b0_x
     Kprp_y = KY - Kprl*b0_y
     Kprp_z = KZ - Kprl*b0_z
-    Kprl   = abs(Kprl)
+    Kprl   = np.maximum(abs(Kprl), 1e-4)
     Kprp   = np.maximum(np.sqrt(abs(Kprp_x)**2 + abs(Kprp_y)**2 + abs(Kprp_z)**2), 1e-4)
 
     return Kprl, Kprp

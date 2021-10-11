@@ -15,7 +15,7 @@ def reinterp_to_grid(data, old_Xgrid, new_Ns, Ls):
     return data_interp(pts).reshape(*new_Ns)
 
 def flyby(output_dir, flyby_a, flyby_n, do_rand_start=1, l_start=None,
-          l_dir=np.array([np.pi/8, np.sqrt(0.5), 1.]), norm_Bx=1, method='matt'):
+          l_dir=np.array([np.pi/8, np.sqrt(0.5), 1.]), norm_B0=1, method='matt'):
     # Loading data with the correct method scales the data to the physical variables
     data = diag.load_data(output_dir, flyby_n, prob='from_array', method=method)
     Ns, Ls = get_grid_info(data)
@@ -24,16 +24,20 @@ def flyby(output_dir, flyby_a, flyby_n, do_rand_start=1, l_start=None,
     # Zg, Yg, Xg = np.meshgrid(zg, yg, xg, indexing='ij')  # only needed if defining a function on grid
     
 
+    # extending to general mean fields
     rho_data = data['rho']
-    scale_Bx = flyby_a**2 if norm_Bx else 1  # 1 / <Bx> = a^2
-    scale_u = np.sqrt(rho_data) * flyby_a**2 if norm_Bx else 1  # rho^1/2 / <Bx> = rho^1/2 * a^2
+    B = np.array(data['Bcc1'], data['Bcc2'], data['Bcc3'])
+    B_0 = diag.get_mag(diag.box_avg(B))
+    v_A = diag.alfven_speed(rho_data, B)
+    scale_B_mean = 1 / B_0 if norm_B0 else 1  # 1 / <Bx> = a^2
+    scale_v_A = 1 / v_A if norm_B0 else 1  # rho^1/2 / <Bx> = rho^1/2 * a^2
 
-    Bx = pad_array(data['Bcc1'] * scale_Bx)
-    By = pad_array(data['Bcc2'] * scale_Bx)
-    Bz = pad_array(data['Bcc3'] * scale_Bx)
-    ux = pad_array(data['vel1'] * scale_u)
-    uy = pad_array(data['vel2'] * scale_u)
-    uz = pad_array(data['vel3'] * scale_u)
+    Bx = pad_array(data['Bcc1'] * scale_B_mean)
+    By = pad_array(data['Bcc2'] * scale_B_mean)
+    Bz = pad_array(data['Bcc3'] * scale_B_mean)
+    ux = pad_array(data['vel1'] * scale_v_A)
+    uy = pad_array(data['vel2'] * scale_v_A)
+    uz = pad_array(data['vel3'] * scale_v_A)
     rho = pad_array(rho_data)
     Bmag = np.sqrt(Bx**2 + By**2 + Bz**2)
 
@@ -74,7 +78,7 @@ def flyby(output_dir, flyby_a, flyby_n, do_rand_start=1, l_start=None,
     FB['start_point'], FB['direction'] = l_start, l_dir
     FB['l_param'], FB['points'] = lvec, pts
     FB['a'], FB['snapshot_number'] = flyby_a, flyby_n
-    FB['normed_to_Bx'] = 'true' if norm_Bx else 'false'
+    FB['normed_to_Bx'] = 'true' if norm_B0 else 'false'
 
     return FB
 

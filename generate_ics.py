@@ -158,12 +158,13 @@ def create_athena_fromh5(save_folder, athinput_in_folder, athinput_in, h5name, a
                 ind_e = (meshblock*off + meshblock)[::-1]
                 B_unpacked[b, ind_s[0]:ind_e[0], ind_s[1]:ind_e[1], ind_s[2]:ind_e[2]] = f_athdf['B'][b, m, :, :, :]
     BXcc, BYcc, BZcc = B_unpacked
+    
     calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_blocks, blocks, dx, dy, dz)
 
 def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock, athinput=from_array_path,
                              time_lim=1, dt=0.2, expand=0, exp_rate=0., iso_sound_speed=1.0,
                              perp_energy=0.5, spectrum='isotropic', expo=-5/3, expo_prl=-2., kpeak=(2,2), kwidth=12.0,
-                             do_truncation=0, n_cutoff=None, do_mode_test=0, do_parker=0, final_bybx_ratio=1.5):
+                             do_truncation=0, n_cutoff=None, do_mode_test=0, do_parker=0, final_bybx_ratio=1.5, final_bybx_a=5):
     
     folder = diag.format_path(folder)
     ath_copy = edit_athinput(athinput, folder, n_X, X_min, X_max, meshblock,
@@ -176,10 +177,10 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock, athin
     B0_x = 1.0  # mean Bx
     B0_y = 0.0  # mean By
     if do_parker:
-        a_f = 1 + exp_rate*time_lim
-        initial_bybx_ratio = final_bybx_ratio / a_f
+        initial_bybx_ratio = final_bybx_ratio / final_bybx_a
         # we want B0_mag = 1.0 always
-        B0_x /= np.sqrt(1.0 + initial_bybx_ratio**2)
+        # can approximate B0_x as 1 if B0_y is small
+        B0_x /= np.sqrt(1.0 + initial_bybx_ratio**2) if initial_bybx_ratio >= 1e-2 else 1.0
         B0_y = initial_bybx_ratio*B0_x
     
     # Generate mean fields

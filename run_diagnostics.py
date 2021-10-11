@@ -55,24 +55,29 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
             t, a, B, u, rho = diag.load_time_series(output_dir, n_start, n_end, method=method)
             print('     Data loaded')
             
-            B_mag = np.sqrt(diag.dot_prod(B, B, 1))  # full field magnitude
-            B_0 = diag.box_avg(B).reshape(*B.shape[:2], 1, 1, 1)  # mean field
+            v_A = diag.alfven_speed(rho, B)
+            B_mag2 = diag.get_mag(B)**2  # full field magnitude
+            B_0 = diag.box_avg(B, reshape=1) # mean field
+            B0_mag = diag.get_mag(B_0)
             b_0 = diag.get_unit(B_0)
-            B_prp = B - diag.dot_prod(B, b_0, 1)*b_0
-            u_prp = u - diag.dot_prod(u, b_0, 1)*b_0
+            
+            # Not sure if normalizing by B_x or B_prl
+            B_prl = diag.dot_prod(B, b_0)*b_0
+            u_prl = diag.dot_prod(u, b_0)*b_0
+            B_prp = B - B_prl
+            u_prp = u - u_prl
             
             B_x = B[:, 0]
             B_y = B[:, 1]
             
-            rho_avg = diag.box_avg(rho)
-            z_p_rms, z_m_rms = diag.z_waves_evo(rho, u_prp, B_prp, a)
+            z_p_rms, z_m_rms = diag.z_waves_evo(rho, u_prp, B_prp, v_A)
 
             t_full = np.append(t_full, t)
             a_full = np.append(a_full, a)
             Bx_mean_full = np.append(Bx_mean_full, diag.box_avg(B_x))
             By_mean_full = np.append(By_mean_full, diag.box_avg(B_y))
 
-            beta_full = np.append(beta_full, diag.beta(rho, B_mag, c_s_init, expansion_rate, t))
+            beta_full = np.append(beta_full, diag.beta(rho, B_mag2, c_s_init, a))
             sb_frac = diag.switchback_finder(B, theta_threshold=theta_threshold)[1]
             # sb_mask, sb_frac = diag.switchback_finder(B, theta_threshold=theta_threshold)
             # sb_mask_full = np.append(sb_mask_full, sb_mask)
@@ -82,9 +87,9 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
             cross_h_full = np.append(cross_h_full, diag.cross_helicity(rho, u_prp, B_prp))
             z_p_full = np.append(z_p_full, z_p_rms)
             z_m_full = np.append(z_m_full, z_m_rms)
-            Bprp_fluc_full = np.append(Bprp_fluc_full, diag.norm_fluc_amp(diag.dot_prod(B_prp, B_prp, 1), diag.dot_prod(B_0, B_0, 1)))
-            uprp_fluc_full = np.append(uprp_fluc_full, diag.norm_fluc_amp(diag.dot_prod(u_prp, u_prp, 1), diag.dot_prod(B_0, B_0, 1) / np.sqrt(rho_avg)))
-            kinetic_fluc_full = np.append(kinetic_fluc_full, diag.norm_fluc_amp(rho*diag.dot_prod(u_prp, u_prp, 1), diag.dot_prod(B_0, B_0, 1)))
+            Bprp_fluc_full = np.append(Bprp_fluc_full, diag.norm_fluc_amp(diag.dot_prod(B_prp, B_prp), B0_mag))
+            uprp_fluc_full = np.append(uprp_fluc_full, diag.norm_fluc_amp(diag.dot_prod(u_prp, u_prp), v_A))
+            kinetic_fluc_full = np.append(kinetic_fluc_full, diag.norm_fluc_amp(rho*diag.dot_prod(u_prp, u_prp), B0_mag))
             magcomp_sq_full = np.append(magcomp_sq_full, diag.mag_compress_Squire2020(B))
             # magcomp_sh_full = np.append(magcomp_sh_full, diag.mag_compress_Shoda2021(B))
 
@@ -109,7 +114,10 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
         S['C_B2_Squire'] = magcomp_sq_full
         # S['C_B2_Shoda'] = magcomp_sh_full
         
-        a_normfluc, Bprp_fluc, kinetic_fluc = diag.norm_fluc_amp_hst(output_dir, expansion_rate, method)
+        B = diag.load_time_series(output_dir, 0, 1, method=method)[2]
+        B_0 = diag.box_avg(B)[0, :]
+        B = None
+        a_normfluc, Bprp_fluc, kinetic_fluc = diag.norm_fluc_amp_hst(output_dir, expansion_rate, B_0, method=method)
         S['a_norm_fluc_hst'] = a_normfluc
         S['Bprp_norm_fluc_hst'] = Bprp_fluc
         S['kinetic_norm_fluc_hst'] = kinetic_fluc

@@ -27,8 +27,6 @@ def format_path(output_dir, format=1):
     return output_dir
 
 
-
-
 def load_data(output_dir, n, prob=DEFAULT_PROB, do_path_format=1, method='matt'):
     '''Loads data from .athdf files output from Athena++.
 
@@ -144,7 +142,6 @@ def load_and_scale_h5(output_dir, prob=DEFAULT_PROB, do_path_format=1, method='m
             # f['x3v'][...] = grid_x3_v
             
             
-
 def load_hst(output_dir, adot, prob=DEFAULT_PROB, do_path_format=1, method='matt'):
     '''Loads data from .hst files output from Athena++.
     '''
@@ -176,6 +173,39 @@ def load_hst(output_dir, adot, prob=DEFAULT_PROB, do_path_format=1, method='matt
         hst_data['3-ME'] *= a_hst**2
 
     return hst_data
+
+
+def load_time_series(output_dir, n_start=0, n_end=-1, conserved=0, just_time=0, prob=DEFAULT_PROB, method='matt'):
+    # By default load all snapshots
+    # Otherwise load all snapshots n_start...(n_end - 1)
+    max_n = get_maxn(output_dir)
+    if n_end >= 0:
+        assert n_end > n_start, 'Please choose a valid range!'
+        n_end = min(n_end, max_n)  # making sure we don't overstep max n by mistake
+    else:
+        n_end = max_n
+    
+    t, a, B, u, rho = [], [], [], [], []
+
+    for n in range(n_start, n_end):
+        data_n = load_data(output_dir, n, prob, method=method)
+        t.append(data_n['Time'])
+        a.append(data_n['a_exp'])
+        if not just_time:
+            B.append((data_n['Bcc1'], data_n['Bcc2'], data_n['Bcc3']))
+            if conserved:
+                u.append((data_n['mom1'], data_n['mom2'], data_n['mom3']))
+                rho.append(data_n['dens'])
+            else:
+                u.append((data_n['vel1'], data_n['vel2'], data_n['vel3']))
+                rho.append(data_n['rho'])
+    
+    # The full-box variables B, u, rho are indexed in the following format:
+    # [timestep, component (if vector quantity, x=0 etc), z_step, y_step, x_step]
+    if just_time:
+        return np.array(t), np.array(a)
+    else: 
+        return np.array(t), np.array(a), np.array(B), np.array(u), np.array(rho)
 
 
 def load_athinput(athinput_path, do_path_format=1):
@@ -304,20 +334,30 @@ def get_split_cputime(dx, resolution, n_cpus_list, a_list, a_dot, total_time=1, 
     tot_phys = phys_time.sum()
     return format_cputime(tot_cpu, n_cpus, cputime=1, day_format=0), format_cputime(tot_phys, n_cpus, day_format=0)
             
-            
-        
-
 
 # --- MATH FUNCTIONS --- #
 
-def box_avg(x):
+def box_avg(x, reshape=0):
     # box indicies are always the last 3
     len_shape = len(x.shape)
+    if len_shape < 3:
+        # either already averaged or not a box quantity
+        return x
     axes = tuple(np.arange(len_shape-3, len_shape))
-    return np.mean(x, axis=axes)
+    avg = np.mean(x, axis=axes)
+    if reshape:
+        shape = x.shape
+        # add back in grid columns for broadcasting
+        avg = avg.reshape(*shape[:2], 1, 1, 1)
+    return avg
 
-def dot_prod(x, y, axis):
-    return np.sum(x*y, axis=axis)
+def dot_prod(x, y, axis=1, reshape=0):
+    x_dot_y = np.sum(x*y, axis=axis)
+    if reshape:
+        shape = x.shape
+        # add back in component column for broadcasting
+        x_dot_y = x_dot_y.reshape(shape[0], 1, *shape[2:])
+    return x_dot_y
 
 def rms(x, dot_vector=1, do_fluc=1):
     '''Returns the fluctuation RMS of a given quantity by default.
@@ -333,7 +373,7 @@ def rms(x, dot_vector=1, do_fluc=1):
     dx = x - x_mean.reshape(*x_mean.shape, 1, 1, 1)
     if len(x.shape) == 5 and dot_vector: # vector quantity
         # This is essentially dx**2 below summed along the component axis
-        dx2 = dot_prod(dx, dx, 1)
+        dx2 = dot_prod(dx, dx)
     else:  # scalar quantity or rms of individual vector components
         dx2 = dx**2
     return np.sqrt(box_avg(dx2))
@@ -342,7 +382,7 @@ def rms(x, dot_vector=1, do_fluc=1):
 # --- VECTOR FUNCTIONS --- #
 
 
-def get_mag(x):
+def get_mag(x, reshape=0):
     '''For an array of vectors with the same number of components,
     returns the magnitude of each vector in an array of the same size.
     
@@ -351,16 +391,12 @@ def get_mag(x):
               [1, 1, 1]]
          get_mag(x) = [√2, 5, √3]
     '''
-    return np.sqrt(dot_prod(x, x, 1))
+    return np.sqrt(dot_prod(x, x, reshape=reshape))
 
 
 def get_unit(x):
     '''Calculates unit vector.'''
-    x_mag = get_mag(x)
-    if len(x.shape) == 5:
-        x_mag = x_mag.reshape(x.shape[0], 1, *x.shape[2:])
-    else:
-        x_mag = x_mag.reshape(x.shape[0], 1)
+    x_mag = get_mag(x, reshape=1) if len(x.shape) == 5 else get_mag(x)
     return x / x_mag
 
 
@@ -394,7 +430,6 @@ def get_rootgrid(output_dir, prob=DEFAULT_PROB, zyx=0):
 
 def get_vol(output_dir, prob=DEFAULT_PROB):
     '''Returns the volume of the simulation domain.'''
-    # TODO: Will need to multiply by a^2 if using in expanding box
     X1, X2, X3 = get_lengths(output_dir=output_dir, prob=prob)
     return abs(X1*X2*X3)  # just a check to make volume positive
 
@@ -457,61 +492,65 @@ def ft_grid(input_type, data=None, output_dir=None, Ls=None,
 
 # --- MHD TURBULENCE DIAGNOSTICS --- #
 
+def alfven_speed(rho, B):
+    # generalizing the definition of Alfvén speed
+    # for aribitraty mean fields
+    B_0 = box_avg(B)  # mean field
+    B0_mag = get_mag(B_0)
+    return B0_mag / np.sqrt(box_avg(rho))
+    
+
 def cross_helicity(rho, u_perp, B_perp): 
-    udotB = dot_prod(u_perp, B_perp, 1)
-    u2, B2 = dot_prod(u_perp, u_perp, 1), dot_prod(B_perp, B_perp, 1)
+    udotB = dot_prod(u_perp, B_perp)
+    u2, B2 = dot_prod(u_perp, u_perp), dot_prod(B_perp, B_perp)
 
     return 2 * box_avg(np.sqrt(rho) * udotB) / box_avg(rho*u2 + B2)
 
 
-def z_waves_evo(rho, u_perp, B_perp, a):
+def z_waves_evo(rho, u_perp, B_perp, v_A):
     # magnetic field in velocity units
     b_perp = B_perp / np.sqrt(rho)
-    v_a = 1 / a  # B_0 = 1 initially
     z_p = u_perp + b_perp
     z_m = u_perp - b_perp
-    z_p_rms, z_m_rms = rms(z_p) / v_a, rms(z_m) / v_a
+    z_p_rms, z_m_rms = rms(z_p) / v_A, rms(z_m) / v_A
     return z_p_rms, z_m_rms
 
-def beta(rho, B_mag, c_s_init, expansion_rate, t):
+def beta(rho, B_mag2, cs_init, a):
     # rho and B_mag should be of the form rho[time, x, y, z]
     # from Squire2020, line before Eq. 4
     # assuming isothermal eos
-    sound_speed = expand_sound_speed(c_s_init, expansion_rate, t)
-    rhoB2_avg = box_avg(rho / B_mag**2)
+    sound_speed = cs_init * a**(-2/3)
+    rhoB2_avg = box_avg(rho / B_mag2)
     return 2 * sound_speed**2 * rhoB2_avg
 
 def mag_compress_Squire2020(B):
     # δ(B^2) / (δB_vec)^2
-    B_mag2 = dot_prod(B, B, 1)
+    B_mag2 = get_mag(B)**2
     rms_Bmag2 = rms(B_mag2)
     sqr_rmsB = rms(B)**2
     return rms_Bmag2 / sqr_rmsB
 
 def mag_compress_Shoda2021(B):
     # (δB)^2 / (δB_vec)^2
-    B_mag = np.sqrt(dot_prod(B, B, 1))
+    B_mag = get_mag(B)
     sqr_rmsBmag = rms(B_mag)**2
     sqr_rmsB = rms(B)**2
     return sqr_rmsBmag / sqr_rmsB
 
-def norm_fluc_amp(fluc, background):
+def norm_fluc_amp(fluc2, background):
+    # calculated from vectors
     # quantities of the form <B_⟂^2> / <B_x>**2
     # or <ρu_⟂^2> / <B_x>**2
-    mean_fluc = box_avg(fluc)
-    mean_bg_sqr = box_avg(background)**2
-    return mean_fluc / mean_bg_sqr
+    mean_fluc2 = box_avg(fluc2)
+    sqr_mean_bg = box_avg(background)**2
+    return mean_fluc2 / sqr_mean_bg
 
-def norm_fluc_amp_hst(output_dir, adot, method, prob=DEFAULT_PROB):
-    a, EKprp, EMprp, EBx_init = energy.get_energy_data(output_dir, adot, prob=prob, method=method)[1:]
-    Bx2 = EBx_init*a**(-4) # mean field energy (Bx_0 = 1) * <Bx>^2 evolution 
-    Bprp_fluc = EMprp / Bx2
-    uprp_fluc = EKprp / Bx2
+def norm_fluc_amp_hst(output_dir, adot, B_0, method='matt', prob=DEFAULT_PROB):
+    # calculated from energies
+    a, Bprp_fluc, uprp_fluc = energy.get_fluc_energy(output_dir, adot, B_0, prob=prob, method=method)
     return a, Bprp_fluc, uprp_fluc
 
 # --- EXPANDING BOX CODE --- #
-
-# def time_to_dist
 
 def switchback_finder(B, theta_threshold=90):
     # finding magnetic field reversals with an deviation greater
@@ -520,54 +559,13 @@ def switchback_finder(B, theta_threshold=90):
 
     theta_threshold *= np.pi / 180
     N_cells = B[0, 0].size  # number of cells in the box
-    B_0 = box_avg(B) # mean field in box = Parker spiral
-    b, b_0 = get_unit(B), get_unit(B_0).reshape(*B.shape[:2], 1, 1, 1)
+    B_0 = box_avg(B, reshape=1) # mean field in box = Parker spiral
+    b, b_0 = get_unit(B), get_unit(B_0)
     dev_from_mean = np.arccos(np.clip(dot_prod(b, b_0, 1), -1., 1.))
     SB_mask = dev_from_mean >= theta_threshold
     # fraction of SBs in box: number of cells with SBs / total cells in box
     SB_frac = np.array([B[n, 0][SB_mask[n]].size / N_cells for n in range(B.shape[0])])
     return SB_mask, SB_frac
 
-def a(expansion_rate, t):
-    """
-    Calculates the perpendicular expansion defined in Squire2020.
-    """
-    return 1 + expansion_rate*t
 
 
-def expand_sound_speed(init_c_s, expansion_rate, t):
-    # tempurature evolution is adiabatic
-    return init_c_s * (a(expansion_rate, t))**(-2/3)
-
-
-def load_time_series(output_dir, n_start=0, n_end=-1, conserved=0, just_time=0, prob=DEFAULT_PROB, method='matt'):
-    # By default load all snapshots
-    # Otherwise load all snapshots n_start...(n_end - 1)
-    max_n = get_maxn(output_dir)
-    if n_end >= 0:
-        assert n_end > n_start, 'Please choose a valid range!'
-        n_end = min(n_end, max_n)  # making sure we don't overstep max n by mistake
-    else:
-        n_end = max_n
-    
-    t, a, B, u, rho = [], [], [], [], []
-
-    for n in range(n_start, n_end):
-        data_n = load_data(output_dir, n, prob, method=method)
-        t.append(data_n['Time'])
-        a.append(data_n['a_exp'])
-        if not just_time:
-            B.append((data_n['Bcc1'], data_n['Bcc2'], data_n['Bcc3']))
-            if conserved:
-                u.append((data_n['mom1'], data_n['mom2'], data_n['mom3']))
-                rho.append(data_n['dens'])
-            else:
-                u.append((data_n['vel1'], data_n['vel2'], data_n['vel3']))
-                rho.append(data_n['rho'])
-    
-    # The full-box variables B, u, rho are indexed in the following format:
-    # [timestep, component (if vector quantity, x=0 etc), z_step, y_step, x_step]
-    if just_time:
-        return np.array(t), np.array(a)
-    else: 
-        return np.array(t), np.array(a), np.array(B), np.array(u), np.array(rho)
