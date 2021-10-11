@@ -115,7 +115,7 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
         # S['C_B2_Shoda'] = magcomp_sh_full
         
         B = diag.load_time_series(output_dir, 0, 1, method=method)[2]
-        B_0 = diag.box_avg(B)[0, :]
+        B_0 = diag.box_avg(B)[0, :2]
         B = None
         a_normfluc, Bprp_fluc, kinetic_fluc = diag.norm_fluc_amp_hst(output_dir, expansion_rate, B_0, method=method)
         S['a_norm_fluc_hst'] = a_normfluc
