@@ -38,7 +38,7 @@ def flyby(output_dir, flyby_a, flyby_n, do_rand_start=1, l_start=None,
     ux = pad_array(data['vel1'] * scale_v_A)
     uy = pad_array(data['vel2'] * scale_v_A)
     uz = pad_array(data['vel3'] * scale_v_A)
-    rho = pad_array(rho_data)
+    rho = pad_array(rho_data) *flyby_a**2
     Bmag = np.sqrt(Bx**2 + By**2 + Bz**2)
 
     # interpolaters
@@ -55,7 +55,7 @@ def flyby(output_dir, flyby_a, flyby_n, do_rand_start=1, l_start=None,
     # N_loop = 25  # number of times along an axis?
     # lvec = np.linspace(0, N_loop, N_linepts).reshape(N_linepts, 1)    
     N_y = Ns[1]
-    total_length = 10*N_y
+    total_length = N_y
     # total_length = flyby_a*N_y**2 if N_y <= 256 else flyby_a*N_y
     dl = yg[1] - yg[0]
     N_dl = int(total_length / dl)
