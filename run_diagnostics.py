@@ -38,6 +38,8 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
     S['expansion_rate'] = expansion_rate
     S['sound_speed'] = c_s_init
 
+    L_x, L_prp = diag.get_lengths(output_dir=output_dir)[:2]
+    
     if do_full_calc:
         t_full, a_full = np.array([]), np.array([])
         Bx_mean_full, By_mean_full, beta_full = np.array([]), np.array([]), np.array([])
@@ -114,10 +116,13 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
         S['C_B2_Squire'] = magcomp_sq_full
         # S['C_B2_Shoda'] = magcomp_sh_full
         
+        diag.save_dict(S, output_dir, dict_name)
+        
         B = diag.load_time_series(output_dir, 0, 1, method=method)[2]
         B_0 = diag.box_avg(B)[0, :2]
         B = None
-        a_normfluc, Bprp_fluc, kinetic_fluc = diag.norm_fluc_amp_hst(output_dir, expansion_rate, B_0, method=method)
+        a_normfluc, Bprp_fluc, kinetic_fluc = diag.norm_fluc_amp_hst(output_dir, expansion_rate, B_0,
+                                                                     Lx=L_x, Lprp=L_prp, method=method)
         S['a_norm_fluc_hst'] = a_normfluc
         S['Bprp_norm_fluc_hst'] = Bprp_fluc
         S['kinetic_norm_fluc_hst'] = kinetic_fluc

@@ -4,7 +4,8 @@ import numpy as np
 
 
 def get_fluc_energy(output_dir, adot, B_0, 
-                    vol_norm=0, rho_0=1.0, Lx=1.0, prob='', method='matt'):
+                    vol_norm=0, rho_0=1.0, Lx=1.0, Lperp=1.0,
+                    prob='', method='matt'):
     hstData = diag.load_hst(output_dir, adot, prob, method=method)
     t = hstData['time'] 
     a = hstData['a']
@@ -16,15 +17,16 @@ def get_fluc_energy(output_dir, adot, B_0,
     hstData['time_alfven_units'] = t / t_A
     
     # Volume to calculate energy density
-    vol = diag.get_vol(output_dir, prob) if vol_norm else 1
+    # vol = diag.get_vol(output_dir, prob)  if vol_norm else 1
+    vol = Lx * Lperp**2
     
     # Mean magnetic field evolution
     Bx_mean, By_mean = Bx0*a**-2, By0*a**-1
-    mean_ME_x, mean_ME_y = 0.5*Bx_mean**2, 0.5*By_mean**2
+    mean_ME_x, mean_ME_y = 0.5*vol*Bx_mean**2, 0.5*vol*By_mean**2
     
     # no mean flows as of yet, removing mean field contribution
-    KEprp_comp = np.array([hstData['1-KE'], hstData['2-KE'], hstData['3-KE']]) / vol
-    MEprp_comp = np.array([(hstData['1-ME'] - mean_ME_x), (hstData['2-ME'] - mean_ME_y), hstData['3-ME']]) / vol
+    KEprp_comp = np.array([hstData['1-KE'], hstData['2-KE'], hstData['3-KE']])
+    MEprp_comp = np.array([(hstData['1-ME'] - mean_ME_x), (hstData['2-ME'] - mean_ME_y), hstData['3-ME']])
 
     # Total fluc energy is the sum of the individual components
     KEprp = KEprp_comp.sum(axis=0)

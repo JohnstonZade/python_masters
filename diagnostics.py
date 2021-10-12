@@ -546,9 +546,9 @@ def norm_fluc_amp(fluc2, background):
     sqr_mean_bg = box_avg(background)**2
     return mean_fluc2 / sqr_mean_bg
 
-def norm_fluc_amp_hst(output_dir, adot, B_0, method='matt', prob=DEFAULT_PROB):
+def norm_fluc_amp_hst(output_dir, adot, B_0, Lx=1., Lperp=1., method='matt', prob=DEFAULT_PROB):
     # calculated from energies
-    a, Bprp_fluc, uprp_fluc = energy.get_fluc_energy(output_dir, adot, B_0, prob=prob, method=method)
+    a, Bprp_fluc, uprp_fluc = energy.get_fluc_energy(output_dir, adot, B_0, Lx=Lx, Lperp=Lperp, prob=prob, method=method)
     return a, Bprp_fluc, uprp_fluc
 
 # --- EXPANDING BOX CODE --- #
