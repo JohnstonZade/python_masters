@@ -174,14 +174,21 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock, athin
     # Dimension setting: 1D if only x has more than one gridpoint
     one_D = 1 if np.all(n_X[1:] == 1) else 0
 
+    
+    # if mean field is in positive x-direction
+    # then outwards propagating z+ waves travel in -x direction
+    # Thus the radial direction +R <-> -x to match with observations
+    # If +N <-> +z, then +T <-> -y
+    # Parker spiral deflected in -T direction from PSP
+    # Thus we need -By component to match observations
     B0_x = 1.0  # mean Bx
     B0_y = 0.0  # mean By
     if do_parker:
         initial_bybx_ratio = final_bybx_ratio / final_bybx_a
         # we want B0_mag = 1.0 always
         # can approximate B0_x as 1 if B0_y is small
-        B0_x /= np.sqrt(1.0 + initial_bybx_ratio**2) if initial_bybx_ratio >= 1e-2 else 1.0
-        B0_y = initial_bybx_ratio*B0_x
+        B0_x /= np.sqrt(1.0 + initial_bybx_ratio**2)
+        B0_y = -initial_bybx_ratio*B0_x  # see comment above
     
     # Generate mean fields
     # Density

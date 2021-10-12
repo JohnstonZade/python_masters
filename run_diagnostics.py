@@ -41,12 +41,13 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
     L_x, L_prp = diag.get_lengths(output_dir=output_dir)[:2]
     
     if do_full_calc:
-        t_full, a_full = np.array([]), np.array([])
-        Bx_mean_full, By_mean_full, beta_full = np.array([]), np.array([]), np.array([])
-        sb_mask_full, sb_frac_full = np.array([]), np.array([])
-        cross_h_full, z_p_full, z_m_full = np.array([]), np.array([]), np.array([])
-        Bprp_fluc_full, uprp_fluc_full, kinetic_fluc_full = np.array([]), np.array([]), np.array([])
-        magcomp_sq_full = np.array([])
+        S['time'], S['a'] = np.array([]), np.array([])
+        S['Bx_mean'], S['By_mean'], S['beta'] = np.array([]), np.array([]), np.array([])
+        S['sb_frac'], S['alfven_speed'] = np.array([]), np.array([])
+        S['sb_clock_angle'] = {}
+        S['cross_helicity'], S['z_plus'], S['z_minus'] = np.array([]), np.array([]), np.array([])
+        S['C_B2_Squire'] = np.array([])
+        # Bprp_fluc_full, uprp_fluc_full, kinetic_fluc_full = np.array([]), np.array([]), np.array([])
         # magcomp_sh_full = np.array([])
 
         print('max_n = ' + str(max_n))
@@ -57,75 +58,91 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
             t, a, B, u, rho = diag.load_time_series(output_dir, n_start, n_end, method=method)
             print('     Data loaded')
             
-            v_A = diag.alfven_speed(rho, B)
+            S['time'] = np.append(S['time'], t)
+            S['a'] = np.append(S['a'], a)
+            
+            print('         - Calculating beta')
             B_mag2 = diag.get_mag(B)**2  # full field magnitude
-            B_0 = diag.box_avg(B, reshape=1) # mean field
-            B0_mag = diag.get_mag(B_0)
-            b_0 = diag.get_unit(B_0)
+            S['beta'] = np.append(S['beta'], diag.beta(rho, B_mag2, c_s_init, a))
+            B_mag2 = None
             
-            # Not sure if normalizing by B_x or B_prl
-            B_prl = diag.dot_prod(B, b_0)*b_0
-            u_prl = diag.dot_prod(u, b_0)*b_0
-            B_prp = B - B_prl
-            u_prp = u - u_prl
+            print('         - Calculating mean field')
+            B_x, B_y = B[:, 0], B[:, 1]
+            S['Bx_mean'] = np.append(S['Bx_mean'], diag.box_avg(B_x))
+            S['By_mean'] = np.append(S['By_mean'], diag.box_avg(B_y))
+            B_x, B_y = None, None
             
-            B_x = B[:, 0]
-            B_y = B[:, 1]
+            v_A = diag.alfven_speed(rho, B)
+            S['alfven_speed'] = np.append(S['alfven_speed'], v_A)
+            b_0 = diag.get_unit(diag.box_avg(B, reshape=1)) # mean field
             
+            # Finding perpendicular fluctuations
+            B_prp = B - diag.dot_prod(B, b_0)*b_0
+            u_prp = u - diag.dot_prod(u, b_0)*b_0
+            b_0 = None
+            
+            print('         - Calculating z+/-')
             z_p_rms, z_m_rms = diag.z_waves_evo(rho, u_prp, B_prp, v_A)
-
-            t_full = np.append(t_full, t)
-            a_full = np.append(a_full, a)
-            Bx_mean_full = np.append(Bx_mean_full, diag.box_avg(B_x))
-            By_mean_full = np.append(By_mean_full, diag.box_avg(B_y))
-
-            beta_full = np.append(beta_full, diag.beta(rho, B_mag2, c_s_init, a))
-            sb_frac = diag.switchback_finder(B, theta_threshold=theta_threshold)[1]
-            # sb_mask, sb_frac = diag.switchback_finder(B, theta_threshold=theta_threshold)
-            # sb_mask_full = np.append(sb_mask_full, sb_mask)
-            sb_frac_full = np.append(sb_frac_full, sb_frac)
-            sb_frac = None
-            # sb_mask, sb_frac = None, None
-            cross_h_full = np.append(cross_h_full, diag.cross_helicity(rho, u_prp, B_prp))
-            z_p_full = np.append(z_p_full, z_p_rms)
-            z_m_full = np.append(z_m_full, z_m_rms)
-            Bprp_fluc_full = np.append(Bprp_fluc_full, diag.norm_fluc_amp(diag.dot_prod(B_prp, B_prp), B0_mag))
-            uprp_fluc_full = np.append(uprp_fluc_full, diag.norm_fluc_amp(diag.dot_prod(u_prp, u_prp), v_A))
-            kinetic_fluc_full = np.append(kinetic_fluc_full, diag.norm_fluc_amp(rho*diag.dot_prod(u_prp, u_prp), B0_mag))
-            magcomp_sq_full = np.append(magcomp_sq_full, diag.mag_compress_Squire2020(B))
-            # magcomp_sh_full = np.append(magcomp_sh_full, diag.mag_compress_Shoda2021(B))
-
+            S['z_plus'] = np.append(S['z_plus'], z_p_rms)
+            S['z_minus'] = np.append(S['z_minus'], z_m_rms)
+            z_p_rms, z_m_rms = None, None
+            
+            print('         - Calculating cross helicity')
+            S['cross_helicity'] = np.append(S['cross_helicity'], diag.cross_helicity(rho, u_prp, B_prp))
+            
+            # print('         - Calculating cross helicity')
+            # Bprp_fluc_full = np.append(Bprp_fluc_full, diag.norm_fluc_amp(diag.dot_prod(B_prp, B_prp), B0_mag))
+            # uprp_fluc_full = np.append(uprp_fluc_full, diag.norm_fluc_amp(diag.dot_prod(u_prp, u_prp), v_A))
+            # kinetic_fluc_full = np.append(kinetic_fluc_full, diag.norm_fluc_amp(rho*diag.dot_prod(u_prp, u_prp), B0_mag))
+            rho, B_prp, u_prp, v_A = None, None, None, None
+            
+            print('         - Calculating SB fraction')
+            sb_mask, sb_frac = diag.switchback_finder(B, theta_threshold=theta_threshold)
+            sb_ca_temp = diag.clock_angle(B, sb_mask)
+            if i == 0:
+                # set up bins and grid
+                # these will be the same for all runs
+                S['sb_clock_angle'] = sb_ca_temp
+            else:
+                # increment count otherwise
+                S['sb_clock_angle']['clock_angle_count'] += sb_ca_temp['clock_angle_count']
+            S['sb_frac'] = np.append(S['sb_frac'], sb_frac)
+            sb_frac, sb_mask, sb_ca_temp = None, None, None
+            
+            print('         - Calculating magnetic compressibility')
+            S['C_B2_Squire'] = np.append(S['C_B2_Squire'], diag.mag_compress_Squire2020(B))
+            
             # clear unneeded variables to save memory, run flyby code after this
-            t, a = None, None
-            B, u, B_prp, u_prp, B_x, B_mag, rho_avg = None, None, None, None, None, None, None
+            t, a, B, u = None, None, None, None 
             print('     Data cleared')
+            diag.save_dict(S, output_dir, dict_name)
+            print('     Dictionary saved')
 
-        S['time'] = t_full
-        S['a'] = a_full
-        S['Bx_mean'] = Bx_mean_full
-        S['By_mean'] = By_mean_full
-        S['beta'] = beta_full
-        # S['sb_mask'] = sb_mask_full
-        S['sb_frac'] = sb_frac_full
-        S['Bprp_norm_fluc'] = Bprp_fluc_full
-        S['uprp_norm_fluc'] = uprp_fluc_full
-        S['kinetic_norm_fluc'] = kinetic_fluc_full
-        S['cross_helicity'] = cross_h_full
-        S['z_plus'] = z_p_full
-        S['z_minus'] = z_m_full
-        S['C_B2_Squire'] = magcomp_sq_full
-        # S['C_B2_Shoda'] = magcomp_sh_full
+        # S['time'] = t_full
+        # S['a'] = a_full
+        # S['Bx_mean'] = S['Bx_mean']
+        # S['By_mean'] = S['By_mean']
+        # S['beta'] = S['beta']
+        # S['sb_frac'] = sb_frac_full
+        # S['Bprp_norm_fluc'] = Bprp_fluc_full
+        # S['uprp_norm_fluc'] = uprp_fluc_full
+        # S['kinetic_norm_fluc'] = kinetic_fluc_full
+        # S['cross_helicity'] = cross_h_full
+        # S['z_plus'] = z_p_full
+        # S['z_minus'] = z_m_full
+        # S['C_B2_Squire'] = magcomp_sq_full
         
-        diag.save_dict(S, output_dir, dict_name)
+        # diag.save_dict(S, output_dir, dict_name)
         
+        print('Calculating amplitude evolution')
         B = diag.load_time_series(output_dir, 0, 1, method=method)[2]
         B_0 = diag.box_avg(B)[0, :2]
         B = None
         a_normfluc, Bprp_fluc, kinetic_fluc = diag.norm_fluc_amp_hst(output_dir, expansion_rate, B_0,
-                                                                     Lx=L_x, Lprp=L_prp, method=method)
-        S['a_norm_fluc_hst'] = a_normfluc
-        S['Bprp_norm_fluc_hst'] = Bprp_fluc
-        S['kinetic_norm_fluc_hst'] = kinetic_fluc
+                                                                     Lx=L_x, Lperp=L_prp, method=method)
+        S['a_norm_fluc'] = a_normfluc
+        S['Bprp_norm_fluc'] = Bprp_fluc
+        S['kinetic_norm_fluc'] = kinetic_fluc
 
         diag.save_dict(S, output_dir, dict_name)
 
@@ -135,7 +152,7 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
     else:
         spec_step = int(a_step / (expansion_rate*dt))  # eg if delta_a = 1, adot=0.5, dt=0.2 then spec_step = 10
     if do_spectrum:
-        spec_hik_mag, spec_hik_kin, spec_hik_a = np.array([]), np.array([]), np.array([])
+        # spec_hik_mag, spec_hik_kin, spec_hik_a = np.array([]), np.array([]), np.array([])
         for n in range(max_n):
             if n % spec_step == 0:  # don't want to run too often
                 print('Spectrum calculation started at n = ' + str(n))
@@ -147,18 +164,19 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
                     spec_name = 'mhd_spec_t' + str(round(S['time'][n], 1))
                 S[spec_name] = spec.calc_spectrum(output_dir, output_dir, prob='from_array', dict_name=spec_name,
                                                   do_single_file=1, n=n, a=spec_a, method=method)
-                spec_hik_a = np.append(spec_hik_a, spec_a)
-                spec_hik_mag = np.append(spec_hik_mag, spec_hik_energy_frac(S[spec_name]))
-                spec_hik_kin = np.append(spec_hik_kin, spec_hik_energy_frac(S[spec_name], do_magnetic=0))
-        T = {}
-        T['hi_mag_energy_frac'], T['hi_kin_energy_frac'], T['hi_energy_a'] = spec_hik_mag, spec_hik_kin, spec_hik_a
-        S['energy_in_hi_k'] = T
+                # spec_hik_a = np.append(spec_hik_a, spec_a)
+                # spec_hik_mag = np.append(spec_hik_mag, spec_hik_energy_frac(S[spec_name]))
+                # spec_hik_kin = np.append(spec_hik_kin, spec_hik_energy_frac(S[spec_name], do_magnetic=0))
+        # T = {}
+        # T['hi_mag_energy_frac'], T['hi_kin_energy_frac'], T['hi_energy_a'] = spec_hik_mag, spec_hik_kin, spec_hik_a
+        # S['energy_in_hi_k'] = T
         diag.save_dict(S, output_dir, dict_name)
 
     if do_flyby:
         for n in range(max_n):
             if n % spec_step == 0:
-                if expansion_rate != 0:
+                print('Flyby started at n = ' + str(n))
+                if expansion_rate != 0.0:
                     flyby_a = round(S['a'][n], 1)
                     flyby_string = 'flyby_a' + str(flyby_a)
                 else:

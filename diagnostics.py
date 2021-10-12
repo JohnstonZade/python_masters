@@ -568,5 +568,33 @@ def switchback_finder(B, theta_threshold=90):
     SB_frac = np.array([B[n, 0][SB_mask[n]].size / N_cells for n in range(B.shape[0])])
     return SB_mask, SB_frac
 
+def clock_angle(B, SB_mask):
+    B_0 = box_avg(B, reshape=1) # mean field in box = Parker spiral
+    parker_angle = np.arctan(B_0[:, 1] / B_0[:, 0])
+    b_0 = get_unit(B_0)
+    B_prp = B - dot_prod(B, b_0)*b_0
+    
+    shape_tup = (B_0.shape[0],1,1,1)
+    # unit vector in T direction in TN-plane rotated to
+    # be perpendicular to mean field
+    t_prime_x =  np.sin(parker_angle)*np.ones(shape=shape_tup)
+    t_prime_y = -np.cos(parker_angle)*np.ones(shape=shape_tup)
 
+    B_N = B_prp[:, 2]  # +N <-> +z in box
+    B_T = B_prp[:, 0] * t_prime_x + B_prp[:, 1] * t_prime_y
+    B_prp_mag = get_mag(B_prp)
+    angle = np.arccos(B_N / B_prp_mag)
+    # clock angle is measured clockwise from N axis (z axis in box)
+    # 0 = +N (+z), 90 = +T (-y), 180 = -N (-z), 270/-90 = -T (+y)
+    clock_angle = np.where(B_T >= 0., angle, -angle)
+    ca_bins = np.linspace(-np.pi, np.pi, 51)
+    ca = np.histogram(clock_angle[SB_mask], ca_bins)[0]
+    ca_grid = 0.5*(ca_bins[1:] + ca_bins[:-1])
+    return {
+        'clock_angle_count': ca,
+        'bins': ca_bins,
+        'grid': ca_grid
+    }
+    
+    
 
