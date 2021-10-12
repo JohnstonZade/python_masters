@@ -162,13 +162,11 @@ def create_athena_fromh5(save_folder, athinput_in_folder, athinput_in, h5name, a
     calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_blocks, blocks, dx, dy, dz)
 
 def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock, athinput=from_array_path,
-                             time_lim=1, dt=0.2, expand=0, exp_rate=0., iso_sound_speed=1.0,
+                             time_lim=1, dt=0.2, expand=0, exp_rate=0., beta=1.0,
                              perp_energy=0.5, spectrum='isotropic', expo=-5/3, expo_prl=-2., kpeak=(2,2), kwidth=12.0,
                              do_truncation=0, n_cutoff=None, do_mode_test=0, do_parker=0, final_bybx_ratio=1.5, final_bybx_a=5):
     
     folder = diag.format_path(folder)
-    ath_copy = edit_athinput(athinput, folder, n_X, X_min, X_max, meshblock,
-                             h5name, time_lim, dt, iso_sound_speed, expand, exp_rate)
     h5name = folder + h5name  # eg 'ICs_template.h5'                             
     N_HYDRO = 4  # number of hydro variables (e.g. density and momentum); assuming isothermal here
     # Dimension setting: 1D if only x has more than one gridpoint
@@ -236,6 +234,14 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock, athin
     BYcc += norm_perp_energy*dB_y
     BZcc += norm_perp_energy*dB_z
     dB_x, dB_y, dB_z, du_x, du_y, du_z = None, None, None, None, None, None
+    
+    B2 = BXcc**2 + BYcc**2 + BZcc**2
+    mean_rho_on_B2 = diag.box_avg(rho / B2)
+    iso_sound_speed = np.sqrt(0.5*beta / mean_rho_on_B2)
+    
+    ath_copy = edit_athinput(athinput, folder, n_X, X_min, X_max, meshblock,
+                             h5name, time_lim, dt, iso_sound_speed, expand, exp_rate)
+    
 
     # --- MESHBLOCK STRUCTURE --- #
 
@@ -248,7 +254,7 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock, athin
     # - MAGNETIC
     calc_and_save_B(BXcc, BYcc, BZcc, h5name, n_X, X_min, X_max, meshblock, n_blocks, blocks, dx, dy, dz)
     print('Magnetic Saved Successfully')
-    BXcc, BYcc, BZcc = None, None, None
+    BXcc, BYcc, BZcc, B2 = None, None, None, None
     dx, dy, dz = None, None, None
 
     # - HYDRO

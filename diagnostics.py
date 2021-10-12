@@ -382,7 +382,7 @@ def rms(x, dot_vector=1, do_fluc=1):
 # --- VECTOR FUNCTIONS --- #
 
 
-def get_mag(x, reshape=0):
+def get_mag(x, squared=0, axis=1, reshape=0):
     '''For an array of vectors with the same number of components,
     returns the magnitude of each vector in an array of the same size.
     
@@ -391,8 +391,8 @@ def get_mag(x, reshape=0):
               [1, 1, 1]]
          get_mag(x) = [√2, 5, √3]
     '''
-    axis = 1 if len(x.shape) == 5 else 0
-    return np.sqrt(dot_prod(x, x, axis=axis, reshape=reshape))
+    mag2 = dot_prod(x, x, axis=axis, reshape=reshape)
+    return mag2 if squared else np.sqrt(mag2)
 
 
 def get_unit(x):
@@ -497,7 +497,12 @@ def alfven_speed(rho, B):
     # generalizing the definition of Alfvén speed
     # for aribitraty mean fields
     B_0 = box_avg(B)  # mean field
-    B0_mag = get_mag(B_0)
+    
+    # choose the component axis
+    # axis = 0 for single time entry
+    # axis = 1 for multiple time entries
+    axis = len(B_0.shape) - 1
+    B0_mag = get_mag(B_0, axis=axis)
     return B0_mag / np.sqrt(box_avg(rho))
     
 

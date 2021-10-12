@@ -64,7 +64,7 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
             S['a'] = np.append(S['a'], a)
             
             print('         - Calculating beta')
-            B_mag2 = diag.get_mag(B)**2  # full field magnitude
+            B_mag2 = diag.get_mag(B, squared=1)  # full field magnitude
             S['beta'] = np.append(S['beta'], diag.beta(rho, B_mag2, c_s_init, a))
             B_mag2 = None
             

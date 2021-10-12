@@ -130,7 +130,7 @@ def calc_spectrum(output_dir, save_dir, return_dict=1, prob=default_prob,
                     # B_x ∼ a^(-2) ⟹ (B_x)^2 ∼ a^(-4), assuming ⟨B_x0⟩=1
                     # (above only for purely radial fields, this is more general)
                     B = np.array((data['Bcc1'], data['Bcc2'], data['Bcc3']))
-                    B_0 = diag.get_mag(diag.box_avg(B))
+                    B_0 = diag.get_mag(diag.box_avg(B), axis=0)  # single time entry
                     for key in S:
                         if 'EM' in key:
                             S[key] /= B_0**2

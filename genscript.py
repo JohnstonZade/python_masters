@@ -46,7 +46,7 @@ def generate(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_cpus, exp_rat
     init_norm_fluc = init_norm_amp ** 2
     perp_energy = 0.5*init_norm_fluc    # initial energy of Alfvénic fluctuation components (assuming Bx0=1)
 
-    iso_sound_speed = cs_from_beta(init_norm_fluc, beta)  # initial sound speed
+    # iso_sound_speed = cs_from_beta(init_norm_fluc, beta)  # initial sound speed
     
     kpeak = (κ_prl, κ_prp)  # center of Gaussian spectrum peak
  
@@ -66,7 +66,7 @@ def generate(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_cpus, exp_rat
     if gen_ic:
         genics.create_athena_alfvenspec(total_folder, h5name, n_X, X_min, X_max, meshblock,
                                         time_lim=time_lim, dt=dt, expand=expand, exp_rate=exp_rate,
-                                        iso_sound_speed=iso_sound_speed, perp_energy=perp_energy,
+                                        beta=beta, perp_energy=perp_energy,
                                         spectrum=spectrum, expo=expo, expo_prl=expo_prl, kpeak=kpeak,
                                         do_parker=do_parker, final_bybx_ratio=final_bybx_ratio,
                                         do_truncation=do_truncation, n_cutoff=n_cutoff)                      
