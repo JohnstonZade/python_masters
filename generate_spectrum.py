@@ -17,8 +17,8 @@ def decompose_k(KX, KY, KZ, B0_x, B0_y, B0_z):
     Kprp_x = KX - Kprl*b0_x
     Kprp_y = KY - Kprl*b0_y
     Kprp_z = KZ - Kprl*b0_z
-    Kprl   = np.maximum(abs(Kprl), 1e-4)
-    Kprp   = np.maximum(np.sqrt(abs(Kprp_x)**2 + abs(Kprp_y)**2 + abs(Kprp_z)**2), 1e-4)
+    Kprl   = abs(Kprl)
+    Kprp   = np.sqrt(abs(Kprp_x)**2 + abs(Kprp_y)**2 + abs(Kprp_z)**2)
 
     return Kprl, Kprp
 
@@ -155,9 +155,9 @@ def generate_alfven_spectrum(n_X, X_min, X_max, B_0, spectrum, expo=-5/3, expo_p
     # Kprl, Kprp = decompose_k(KX, KY, KZ, B0_x, B0_y, B0_z)
 
     # Assuming that B_0 is along x-axis (or close to it) initially
-    Kprl = np.maximum(abs(KX), 1e-4)
-    Kprp = np.maximum(np.sqrt(abs(KY)**2 + abs(KZ)**2), 1e-4)
-    Kmag = np.sqrt(Kprl**2 + Kprp**2)
+    Kprl = abs(KX)
+    Kprp = np.sqrt(abs(KY)**2 + abs(KZ)**2)
+    Kmag = np.maximum(np.sqrt(Kprl**2 + Kprp**2), 1e-15)
 
     if run_test:
         z = run_tests(Ls, KX, KY, KZ)
@@ -188,7 +188,7 @@ def generate_alfven_spectrum(n_X, X_min, X_max, B_0, spectrum, expo=-5/3, expo_p
         r, theta = None, None
 
         # excluding purely parallel waves
-        prl_mask = (KY == 0.) | (KZ == 0.)
+        prl_mask = (Kprp == 0.) | (KY == 0.) | (KZ == 0.)
         z[prl_mask] = 0j
         # exclude purely perpendicular waves as they don't propagate
         # remember ω_A = k_prl * v_A
@@ -238,7 +238,7 @@ def generate_alfven_spectrum(n_X, X_min, X_max, B_0, spectrum, expo=-5/3, expo_p
     #return dB_y, dB_z
 
 
-def run_tests(Ls, KX, KY, KZ, n=0, B_0x=1.0):
+def run_tests(Ls, KX, KY, KZ, n=3, B_0x=1.0):
     # no weighting of amplitudes by spectrum
     # just want to test if it generates modes correctly
     # parallel wavenumbers

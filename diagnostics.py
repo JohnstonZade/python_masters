@@ -346,17 +346,18 @@ def box_avg(x, reshape=0):
     axes = tuple(np.arange(len_shape-3, len_shape))
     avg = np.mean(x, axis=axes)
     if reshape:
-        shape = x.shape
+        shape = avg.shape
         # add back in grid columns for broadcasting
-        avg = avg.reshape(*shape[:2], 1, 1, 1)
+        avg = avg.reshape(*shape, 1, 1, 1)
     return avg
 
 def dot_prod(x, y, axis=1, reshape=0):
     x_dot_y = np.sum(x*y, axis=axis)
     if reshape:
-        shape = x.shape
+        shape = x_dot_y.shape
+        shape_tup = (1, *shape) if axis == 0 else (shape[0], 1, *shape[1:])
         # add back in component column for broadcasting
-        x_dot_y = x_dot_y.reshape(shape[0], 1, *shape[2:])
+        x_dot_y = x_dot_y.reshape(shape_tup)
     return x_dot_y
 
 def rms(x, dot_vector=1, do_fluc=1):
@@ -397,7 +398,10 @@ def get_mag(x, squared=0, axis=1, reshape=0):
 
 def get_unit(x):
     '''Calculates unit vector.'''
-    x_mag = get_mag(x, reshape=1) if len(x.shape) == 5 else get_mag(x)
+    len_shape = len(x.shape)
+    axis = len_shape - 4
+    
+    x_mag = get_mag(x, reshape=1, axis=axis)
     return x / x_mag
 
 
@@ -452,7 +456,7 @@ def ft_array(N):
     return array
 
 
-def ft_grid(input_type, data=None, output_dir=None, Ls=None,
+def ft_grid(input_type, data=None, output_dir='', Ls=None,
             Ns=None, prob=DEFAULT_PROB, make_iso_box=1):
     '''
     Creates a grid in k-space corresponding to the real grid given in data.
@@ -467,11 +471,11 @@ def ft_grid(input_type, data=None, output_dir=None, Ls=None,
         X3 = data['RootGridX3'][1] - data['RootGridX3'][0]
 
         Ls = (X3, X2, X1)
-        Ns = data['RootGridSize'][::-1]
+        Ns = data['RootGridSize']
 
     elif input_type == 'output':
         assert (output_dir is not None), 'Must have a valid directory path!'
-        Ls = get_lengths(output_dir, prob, zyx=1)  # box side lengths
+        Ls = get_lengths(output_dir=output_dir, prob=prob, zyx=1)  # box side lengths
         Ns = get_rootgrid(output_dir, prob, zyx=1) # number of grid points
 
     elif input_type == 'array':
@@ -480,7 +484,7 @@ def ft_grid(input_type, data=None, output_dir=None, Ls=None,
     else:
         raise ValueError('Please enter a valid input type')
 
-    # Corresponds to Athena++ standard k=0 ⟺ Z, 1 ⟺ Y, 2 ⟺ X
+    # k=0 ⟺ Z, 1 ⟺ Y, 2 ⟺ X
     K = {
         k: 2j * np.pi * ft_array(Ns[k])
         if make_iso_box
@@ -567,6 +571,7 @@ def switchback_finder(B, theta_threshold=90):
     N_cells = B[0, 0].size  # number of cells in the box
     B_0 = box_avg(B, reshape=1) # mean field in box = Parker spiral
     b, b_0 = get_unit(B), get_unit(B_0)
+    b_0[b_0 < 1e-10] = 0.
     dev_from_mean = np.arccos(np.clip(dot_prod(b, b_0, 1), -1., 1.))
     SB_mask = dev_from_mean >= theta_threshold
     # fraction of SBs in box: number of cells with SBs / total cells in box
@@ -575,19 +580,22 @@ def switchback_finder(B, theta_threshold=90):
 
 def clock_angle(B, SB_mask):
     B_0 = box_avg(B, reshape=1) # mean field in box = Parker spiral
-    parker_angle = np.arctan(B_0[:, 1] / B_0[:, 0])
+    comp_index = len(B_0.shape) - 4
+    B0x, B0y = np.take(B_0, 0, comp_index), np.take(B_0, 1, comp_index)
+    parker_angle = np.arctan(B0y / B0x)
     b_0 = get_unit(B_0)
-    B_prp = B - dot_prod(B, b_0)*b_0
+    b_0[b_0 < 1e-10] = 0.
+    B_prp = B - dot_prod(B, b_0, reshape=1)*b_0
     
-    shape_tup = (B_0.shape[0],1,1,1)
+    shape_tup = (B_0.shape[0],1,1,1) if comp_index == 1 else (1,1,1)
     # unit vector in T direction in TN-plane rotated to
     # be perpendicular to mean field
     t_prime_x =  np.sin(parker_angle)*np.ones(shape=shape_tup)
     t_prime_y = -np.cos(parker_angle)*np.ones(shape=shape_tup)
 
-    B_N = B_prp[:, 2]  # +N <-> +z in box
-    B_T = B_prp[:, 0] * t_prime_x + B_prp[:, 1] * t_prime_y
-    B_prp_mag = get_mag(B_prp)
+    B_N = np.take(B_prp, 2, comp_index)  # +N <-> +z in box
+    B_T = np.take(B_prp, 0, comp_index) * t_prime_x + np.take(B_prp, 1, comp_index) * t_prime_y
+    B_prp_mag = get_mag(B_prp, axis=comp_index)
     angle = np.arccos(B_N / B_prp_mag)
     # clock angle is measured clockwise from N axis (z axis in box)
     # 0 = +N (+z), 90 = +T (-y), 180 = -N (-z), 270/-90 = -T (+y)
@@ -601,5 +609,46 @@ def clock_angle(B, SB_mask):
         'grid': ca_grid
     }
     
+def mean_cos2(b_0, B_prp, output_dir):
+    # part of diagnostic used in Mallet2021
+    # assumes time series
     
+    # load in the grid at the first snapshot
+    # this won't change in the comobile frame
+    KZ, KY, KX = ft_grid('output',output_dir=output_dir, make_iso_box=0)
+    K = np.array([KX, KY, KZ]).reshape(1,3,*KX.shape)
 
+    # Decomposing k parallel and perpendicular to mean field
+    Kprl = dot_prod(K, b_0)
+    Kprp = K - dot_prod(K, b_0, reshape=1)*b_0
+    Kprl = abs(Kprl)
+    Kprp = get_mag(abs(Kprp))
+    Kmag = np.maximum(np.sqrt(Kprl**2 + Kprp**2), 1e-15)
+    
+    # cosine squared of angle between k and B_0
+    cos2_theta = (Kprl / Kmag)**2
+    
+    # take the FFT of B_prp over the box
+    len_shape = len(B_prp.shape)
+    box_axes = np.arange(len_shape-3, len_shape)
+    prp_fft = np.fft.fftn(B_prp, axes=box_axes)
+    
+    # Energy of fluctuations is mod^2 of FFT of fluctuations
+    # Have to normalize by the number of points in the box
+    N_points = np.array(prp_fft.shape[-3:]).prod()
+    energy_vec = 0.5*abs(prp_fft)**2 / N_points
+    
+    # Total energy of fluctuations is the sum 
+    # of the energy in each component
+    energy = energy_vec.sum(axis=1)
+    
+    # Weight the cosine2 at each point in the box by the energy at that point
+    # and then average and normalize by the mean energy
+    return box_avg(cos2_theta * energy) / box_avg(energy)
+
+def Bfluc_Mallet2021(adot, cos2_theta, beta, g):
+    # Equation 88 from paper, assuming this is equivalent
+    # to magnetic compressibility
+    # assuming g is the normalized fluctuation amplitude
+
+    return 0

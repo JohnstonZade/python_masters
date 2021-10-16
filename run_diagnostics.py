@@ -77,6 +77,7 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
             v_A = diag.alfven_speed(rho, B)
             S['alfven_speed'] = np.append(S['alfven_speed'], v_A)
             b_0 = diag.get_unit(diag.box_avg(B, reshape=1)) # mean field
+            b_0[b_0 < 1e-10] = 0.
             
             # Finding perpendicular fluctuations
             B_prp = B - diag.dot_prod(B, b_0)*b_0
@@ -95,14 +96,20 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
             
             print('         - Calculating SB fraction')
             sb_mask, sb_frac = diag.switchback_finder(B, theta_threshold=theta_threshold)
-            sb_ca_temp = diag.clock_angle(B, sb_mask)
-            if i == 0:
-                # set up bins and grid
-                # these will be the same for all runs
-                S['sb_clock_angle'] = sb_ca_temp
-            else:
+            for n in range(n_start,n_end):
+                t_index = n - n_start
+                sb_ca_temp = diag.clock_angle(B[t_index:t_index+1], sb_mask[t_index:t_index+1])
+                if n == 0:
+                    # set up bins and grid
+                    # these will be the same for all runs
+                    S['sb_clock_angle']['grid'] = sb_ca_temp['grid']
+                    S['sb_clock_angle']['bins'] = sb_ca_temp['bins']
+                    S['sb_clock_angle']['clock_angle_count'] = np.zeros_like(sb_ca_temp['grid'])
                 # increment count otherwise
                 S['sb_clock_angle']['clock_angle_count'] += sb_ca_temp['clock_angle_count']
+                # increment individual count
+                s_name = str(n)
+                S['sb_clock_angle'][s_name] = sb_ca_temp['clock_angle_count']
             S['sb_frac'] = np.append(S['sb_frac'], sb_frac)
             sb_frac, sb_mask, sb_ca_temp = None, None, None
             

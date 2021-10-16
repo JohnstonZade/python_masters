@@ -15,7 +15,8 @@ def reinterp_to_grid(data, old_Xgrid, new_Ns, Ls):
     return data_interp(pts).reshape(*new_Ns)
 
 def flyby(output_dir, flyby_a, flyby_n, do_rand_start=1, l_start=None,
-          l_dir=np.array([np.pi/8, np.sqrt(0.5), 1.]), norm_B0=1, method='matt'):
+          l_dir=np.array([np.pi/8, np.sqrt(0.5), 1.]), norm_B0=1, method='matt',
+          output_plot=1):
     # Loading data with the correct method scales the data to the physical variables
     data = diag.load_data(output_dir, flyby_n, prob='from_array', method=method)
     Ns, Ls = get_grid_info(data)
@@ -55,8 +56,9 @@ def flyby(output_dir, flyby_a, flyby_n, do_rand_start=1, l_start=None,
     # N_loop = 25  # number of times along an axis?
     # lvec = np.linspace(0, N_loop, N_linepts).reshape(N_linepts, 1)    
     N_y = Ns[1]
-    total_length = N_y
-    # total_length = flyby_a*N_y**2 if N_y <= 256 else flyby_a*N_y
+    # if plotting, do a short flyby to cut down on space
+    # otherwise flythrough most of the box and analyse
+    total_length = N_y if output_plot else N_y**2
     dl = yg[1] - yg[0]
     N_dl = int(total_length / dl)
     lvec = np.linspace(-total_length/2, total_length/2, N_dl).reshape(N_dl, 1)

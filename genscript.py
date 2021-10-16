@@ -69,7 +69,7 @@ def generate(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_cpus, exp_rat
                                         beta=beta, perp_energy=perp_energy,
                                         spectrum=spectrum, expo=expo, expo_prl=expo_prl, kpeak=kpeak,
                                         do_parker=do_parker, final_bybx_ratio=final_bybx_ratio,
-                                        do_truncation=do_truncation, n_cutoff=n_cutoff)                      
+                                        final_bybx_a=final_bybx_a, do_truncation=do_truncation, n_cutoff=n_cutoff)                      
 
     if run_athena:
         os.chdir(total_folder)
