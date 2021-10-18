@@ -7,6 +7,7 @@ import os
 import pickle
 import h5py
 import numpy as np
+import scipy.ndimage as ndimage
 from pathlib import Path
 from itertools import permutations as perm
 from athena_read import athdf, athinput, hst
@@ -562,47 +563,119 @@ def norm_fluc_amp_hst(output_dir, adot, B_0, Lx=1., Lperp=1., method='matt', pro
 
 # --- EXPANDING BOX CODE --- #
 
-def switchback_finder(B, theta_threshold=90):
+def switchback_threshold(B, theta_threshold=30, flyby=0):
     # finding magnetic field reversals with an deviation greater
     # than theta_threshold from the mean magnetic field/Parker spiral
     # theta_threshold is input in degrees
-
     theta_threshold *= np.pi / 180
-    N_cells = B[0, 0].size  # number of cells in the box
-    B_0 = box_avg(B, reshape=1) # mean field in box = Parker spiral
-    b, b_0 = get_unit(B), get_unit(B_0)
-    b_0[b_0 < 1e-10] = 0.
-    dev_from_mean = np.arccos(np.clip(dot_prod(b, b_0, 1), -1., 1.))
-    SB_mask = dev_from_mean >= theta_threshold
+
+    if flyby:
+        Bx, By, Bmag = B
+        # calculate either deviation from radial or Parker
+        B0x, B0y = (Bx.mean(), By.mean())
+        B0 = np.sqrt(B0x**2 + B0y**2)
+        B_dot_Bmean = (Bx*B0x+By*B0y) / (Bmag*B0)
+    else:
+        Bx = B[:, 0]
+        B_0 = box_avg(B, reshape=1) # mean field in box = Parker spiral
+        b, b_0 = get_unit(B), get_unit(B_0)
+        B_dot_Bmean = dot_prod(b, b_0, 1)
+
+    dev_from_mean = np.arccos(np.clip(B_dot_Bmean, -1., 1.))
+    SB_mask_all = dev_from_mean >= theta_threshold
+    SB_radial_flip = SB_mask_all & (Bx <= 0.)
     # fraction of SBs in box: number of cells with SBs / total cells in box
-    SB_frac = np.array([B[n, 0][SB_mask[n]].size / N_cells for n in range(B.shape[0])])
-    return SB_mask, SB_frac
+    if flyby:
+        SB_frac = SB_mask_all[SB_mask_all].size / SB_mask_all.size
+    else:
+        SB_frac = np.array([SB_mask_all[n][SB_mask_all[n]].size / SB_mask_all.size for n in range(B.shape[0])])
+    return SB_mask_all, SB_radial_flip, SB_frac
 
-def clock_angle(B, SB_mask):
-    B_0 = box_avg(B, reshape=1) # mean field in box = Parker spiral
-    comp_index = len(B_0.shape) - 4
-    B0x, B0y = np.take(B_0, 0, comp_index), np.take(B_0, 1, comp_index)
-    parker_angle = np.arctan(B0y / B0x)
-    b_0 = get_unit(B_0)
-    b_0[b_0 < 1e-10] = 0.
-    B_prp = B - dot_prod(B, b_0, reshape=1)*b_0
+def switchback_finder(B, SB_mask, array3D=1):
+    # label each individual switchback
+    # and find the position of these switchbacks
+    # treating the mask as a 3D "image"
+    labels, nlabels = ndimage.label(SB_mask)
+    pos = ndimage.find_objects(labels)
     
-    shape_tup = (B_0.shape[0],1,1,1) if comp_index == 1 else (1,1,1)
-    # unit vector in T direction in TN-plane rotated to
-    # be perpendicular to mean field
-    t_prime_x =  np.sin(parker_angle)*np.ones(shape=shape_tup)
-    t_prime_y = -np.cos(parker_angle)*np.ones(shape=shape_tup)
-
-    B_N = np.take(B_prp, 2, comp_index)  # +N <-> +z in box
-    B_T = np.take(B_prp, 0, comp_index) * t_prime_x + np.take(B_prp, 1, comp_index) * t_prime_y
-    B_prp_mag = get_mag(B_prp, axis=comp_index)
-    angle = np.arccos(B_N / B_prp_mag)
-    # clock angle is measured clockwise from N axis (z axis in box)
-    # 0 = +N (+z), 90 = +T (-y), 180 = -N (-z), 270/-90 = -T (+y)
-    clock_angle = np.where(B_T >= 0., angle, -angle)
+    # collect all switchbacks into a dictionary
+    SBs = {
+        'n_SBs': nlabels,
+        'pos': pos
+    }
+    Bx = B[:,0] if array3D else B[0]
+    By = B[:,1] if array3D else B[1]
+    Bz = B[:,2] if array3D else B[2]
+    
+    for i in range(nlabels):
+        # iterate over each individual switchback one at a time
+        # setting its region to True and everywhere else False
+        SB_mask_copy = np.zeros_like(SB_mask)
+        SB_mask_copy[pos[i]] = SB_mask[pos[i]]
+        SB = np.array((Bx[SB_mask_copy], By[SB_mask_copy], Bz[SB_mask_copy]))
+        SBs[i] = SB
+    
+    return SBs
+    
+def clock_angle(B, SB_mask, mean_switchback=1, flyby=0):
+    if flyby:
+        Bx, By, Bz = B
+        B0x, B0y = Bx.mean(), By.mean()  # Parker spiral
+        parker_angle = np.arctan(B0y/B0x)
+        B0 = np.sqrt(B0x**2 + B0y**2)
+        b0x, b0y = B0x/B0, B0y/B0
+        Bprl = Bx*b0x + By*b0y
+        Bprpx = Bx - Bprl*b0x
+        Bprpy = By - Bprl*b0y
+        B_prp = (Bprpx, Bprpy, Bz)
+    else:
+        B_0 = box_avg(B) # mean field in box = Parker spiral
+        comp_index = len(B_0.shape) - 1
+        B0x, B0y = np.take(B_0, 0, comp_index), np.take(B_0, 1, comp_index)
+        parker_angle = np.arctan(B0y / B0x)
+        b_0 = get_unit(box_avg(B, reshape=1))
+        
+        # get magnetic field vectors perpendicular
+        # to the mean field (this is in the rotated TN-plane)
+        B_prp = B - dot_prod(B, b_0, reshape=1)*b_0
     ca_bins = np.linspace(-np.pi, np.pi, 51)
-    ca = np.histogram(clock_angle[SB_mask], ca_bins)[0]
     ca_grid = 0.5*(ca_bins[1:] + ca_bins[:-1])
+    
+    if mean_switchback:
+        # find the perpendicular components of switchbacks
+        # I'm assuming that projection and averaging commute
+        SBs = switchback_finder(B_prp, SB_mask, array3D=(not flyby))
+        
+        clock_angle = []
+        for n in range(SBs['n_SBs']):
+            # find the mean vector over the entire switchback
+            SB_n = SBs[n].mean(axis=1)
+            # decompose vector into N and T components
+            # T unit vector is -y_hat rotated by Parker angle
+            B_N = SB_n[2] # +N <-> +z in box
+            B_T = SB_n[0]*np.sin(parker_angle) - SB_n[1]*np.cos(parker_angle)
+            B_prp_mag = get_mag(SB_n, axis=0)
+            # clock angle is measured clockwise from N axis (z axis in box)
+            # 0 = +N (+z), 90 = +T (-y), 180 = -N (-z), 270/-90 = -T (+y)
+            clock_angle.append(np.arccos(B_N / B_prp_mag) if B_T >= 0. else -np.arccos(B_N / B_prp_mag))
+        ca = np.histogram(clock_angle, ca_bins)[0]
+    else:
+        shape_tup = (B_0.shape[0],1,1,1) if comp_index == 1 else (1,1,1)
+        # unit vector in T direction in TN-plane rotated to
+        # be perpendicular to mean field
+        t_prime_x =  np.sin(parker_angle)*np.ones(shape=shape_tup)
+        t_prime_y = -np.cos(parker_angle)*np.ones(shape=shape_tup)
+
+        B_N = np.take(B_prp, 2, comp_index)  # +N <-> +z in box
+        B_T = np.take(B_prp, 0, comp_index) * t_prime_x + np.take(B_prp, 1, comp_index) * t_prime_y
+        B_prp_mag = get_mag(B_prp, axis=comp_index)
+        angle = np.arccos(B_N / B_prp_mag)
+        # clock angle is measured clockwise from N axis (z axis in box)
+        # 0 = +N (+z), 90 = +T (-y), 180 = -N (-z), 270/-90 = -T (+y)
+        clock_angle = np.where(B_T >= 0., angle, -angle)
+        
+        ca = np.histogram(clock_angle[SB_mask], ca_bins)[0]
+
     return {
         'clock_angle_count': ca,
         'bins': ca_bins,
@@ -646,6 +719,79 @@ def mean_cos2(b_0, B_prp, output_dir):
     # and then average and normalize by the mean energy
     return box_avg(cos2_theta * energy) / box_avg(energy)
 
+def plot_dropouts(flyby, window=250):
+    
+    def calc_relative(value, slice_before, slice_during):
+        # average over value before switchback
+        value_mean = value[slice_before].mean()
+        value_during = value[slice_during]
+        return (value_during - value_mean) / value_mean
+    
+    # similar time series analysis as
+    # from Farrell2020
+    Bx, By, Bz, Bmag = flyby['Bx'], flyby['By'], flyby['Bz'], flyby['Bmag']
+    ux, uy, uz = flyby['ux'], flyby['uy'], flyby['uz']
+    rho = flyby['rho']
+    dropouts = {
+        'Bx': np.zeros(window),
+        'By': np.zeros(window),
+        'Bz': np.zeros(window),
+        'ux': np.zeros(window),
+        'uy': np.zeros(window),
+        'uz': np.zeros(window),
+        'Bmag': np.zeros(window),
+        'rho': np.zeros(window),
+        'By_rel': np.zeros(window),
+        'Bz_rel': np.zeros(window),
+        'ux_rel': np.zeros(window),
+        'uy_rel': np.zeros(window),
+        'uz_rel': np.zeros(window),
+        'Bmag_rel': np.zeros(window),
+        'rho_rel': np.zeros(window)
+    }
+    # looking at SBs with radial flips
+    SB_mask = switchback_threshold((Bx, By, Bmag), flyby=1)[1]
+    SBs = switchback_finder((Bx, By, Bz), SB_mask, array3D=0)
+    
+    if SBs['n_SBs'] == 0:
+        return dropouts
+
+    flyby_size = Bx.size
+    count = 0
+    for i in range(SBs['n_SBs']):
+        SB_position = SBs['pos'][i][0]
+        SB_start, SB_stop = SB_position.start, SB_position.stop
+        if (SB_start < window//2) or (SB_stop > (flyby_size - window//2)):
+            continue
+        # SB_start, SB_stop = SB_position.start + window//2, SB_position.stop + window//2
+        # centre on middle of switchback
+        SB_centre = (SB_start + SB_stop) // 2
+        SB_slice = slice(SB_centre - window//2, SB_centre + window//2)
+        mean_slice = slice(SB_start - window//2, SB_start - 10)
+        dropouts['Bx'] += Bx[SB_slice]
+        dropouts['By'] += By[SB_slice]
+        dropouts['Bz'] += Bz[SB_slice]
+        dropouts['ux'] += ux[SB_slice]
+        dropouts['uy'] += uy[SB_slice]
+        dropouts['uz'] += uz[SB_slice]
+        dropouts['Bmag'] += Bmag[SB_slice]
+        dropouts['rho'] += rho[SB_slice]
+        dropouts['By_rel'] += calc_relative(By, mean_slice, SB_slice)
+        dropouts['Bz_rel'] += calc_relative(Bz, mean_slice, SB_slice)
+        dropouts['ux_rel'] += calc_relative(ux, mean_slice, SB_slice)
+        dropouts['uy_rel'] += calc_relative(uy, mean_slice, SB_slice)
+        dropouts['uz_rel'] += calc_relative(uz, mean_slice, SB_slice)
+        dropouts['Bmag_rel'] += calc_relative(Bmag, mean_slice, SB_slice)
+        dropouts['rho_rel'] += calc_relative(rho, mean_slice, SB_slice)
+        count += 1
+    
+    for key in dropouts.keys():
+        # average
+        dropouts[key] /= count
+    
+    return dropouts
+    
+    
 def Bfluc_Mallet2021(adot, cos2_theta, beta, g):
     # Equation 88 from paper, assuming this is equivalent
     # to magnetic compressibility

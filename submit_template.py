@@ -15,6 +15,7 @@ submit = __import__('generate_submit')
 genics = __import__('generate_ics')
 gen = __import__('genscript')
 spectra = ['isotropic', 'anisotropic', 'gaussian']
+import numpy as np
 
 reinterpolate = False
 athdf_to_h5 = False
@@ -26,6 +27,7 @@ cell_aspect = 2  # dx / dx_prp
 Nx_init = 64     # initial x resolution
 choose_res = False  # override resolution aspect ratio
 N_prp = 64       # perpendicular resolution if overriden
+prob_3D = True  # set false if wanting a 2D problem
 
 a_end = 10       # final expansion
 exp_rate = 0.5
@@ -72,5 +74,5 @@ elif athdf_to_h5:
 else:
     gen.generate(sim_name, folder, box_aspect, cell_aspect, Nx_init, n_cpus, exp_rate,
                  dt, init_norm_amp, beta, tlim=tlim, choose_res=choose_res, N_prp=N_prp,
-                 spectrum=spectrum, κ_prl=κ_prl, κ_prp=κ_prp, a_end=a_end,
+                 spectrum=spectrum, κ_prl=κ_prl, κ_prp=κ_prp, a_end=a_end, prob_3D=prob_3D,
                  do_parker=do_parker, final_bybx_ratio=final_bybx_ratio, final_bybx_a=final_bybx_a)

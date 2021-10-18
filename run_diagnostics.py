@@ -48,9 +48,9 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
             S['time'], S['a'] = np.array([]), np.array([])
             S['Bx_mean'], S['By_mean'], S['beta'] = np.array([]), np.array([]), np.array([])
             S['sb_frac'], S['alfven_speed'] = np.array([]), np.array([])
-            S['sb_clock_angle'] = {}
+            S['sb_clock_angle_whole_box'], S['sb_clock_angle_flyby'], S['dropouts'] = {}, {}, {}
             S['cross_helicity'], S['z_plus'], S['z_minus'] = np.array([]), np.array([]), np.array([])
-            S['C_B2_Squire'] = np.array([])
+            S['C_B2_Squire'], S['mean_cos2_theta'] = np.array([]), np.array([])
 
         print('max_n = ' + str(max_n))
         for i in range(n_steps):
@@ -77,11 +77,11 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
             v_A = diag.alfven_speed(rho, B)
             S['alfven_speed'] = np.append(S['alfven_speed'], v_A)
             b_0 = diag.get_unit(diag.box_avg(B, reshape=1)) # mean field
-            b_0[b_0 < 1e-10] = 0.
             
             # Finding perpendicular fluctuations
             B_prp = B - diag.dot_prod(B, b_0)*b_0
             u_prp = u - diag.dot_prod(u, b_0)*b_0
+            S['mean_cos2_theta'] = np.append(S['mean_cos2_theta'], diag.mean_cos2(b_0, B_prp, output_dir))
             b_0 = None
             
             print('         - Calculating z+/-')
@@ -94,24 +94,48 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
             S['cross_helicity'] = np.append(S['cross_helicity'], diag.cross_helicity(rho, u_prp, B_prp))
             rho, B_prp, u_prp, v_A = None, None, None, None
             
+            # --- SWITCHBACK DIAGNOSTICS --- #
             print('         - Calculating SB fraction')
-            sb_mask, sb_frac = diag.switchback_finder(B, theta_threshold=theta_threshold)
+            sb_mask_all, sb_mask_flip, sb_frac = diag.switchback_threshold(B, theta_threshold=theta_threshold)
             for n in range(n_start,n_end):
                 t_index = n - n_start
-                sb_ca_temp = diag.clock_angle(B[t_index:t_index+1], sb_mask[t_index:t_index+1])
+                sb_ca_temp = diag.clock_angle(B[t_index:t_index+1], sb_mask_all[t_index:t_index+1])
                 if n == 0:
                     # set up bins and grid
                     # these will be the same for all runs
-                    S['sb_clock_angle']['grid'] = sb_ca_temp['grid']
-                    S['sb_clock_angle']['bins'] = sb_ca_temp['bins']
-                    S['sb_clock_angle']['clock_angle_count'] = np.zeros_like(sb_ca_temp['grid'])
+                    S['sb_clock_angle_whole_box']['grid'] = sb_ca_temp['grid']
+                    S['sb_clock_angle_whole_box']['bins'] = sb_ca_temp['bins']
+                    S['sb_clock_angle_whole_box']['clock_angle_count'] = np.zeros_like(sb_ca_temp['grid'])
                 # increment count otherwise
-                S['sb_clock_angle']['clock_angle_count'] += sb_ca_temp['clock_angle_count']
-                # increment individual count
+                S['sb_clock_angle_whole_box']['clock_angle_count'] += sb_ca_temp['clock_angle_count']
+                # add individual count
                 s_name = str(n)
-                S['sb_clock_angle'][s_name] = sb_ca_temp['clock_angle_count']
+                S['sb_clock_angle_whole_box'][s_name] = sb_ca_temp['clock_angle_count']
             S['sb_frac'] = np.append(S['sb_frac'], sb_frac)
-            sb_frac, sb_mask, sb_ca_temp = None, None, None
+            sb_frac, sb_mask_all, sb_mask_flip, sb_ca_temp = None, None, None, None
+            
+            if steps == 1:
+                print('         - Calculating SB flyby')
+                flyby = reinterpolate.flyby(output_dir, a[0], n_start, method=method)
+                Bx, By, Bz, Bmag = flyby['Bx'], flyby['By'], flyby['Bz'], flyby['Bmag']
+                # switchback finder
+                SB_mask = diag.switchback_threshold((Bx, By, Bmag), flyby=1)[0]
+                # flyby clock angle
+                clock_angle_dict = diag.clock_angle((Bx, By, Bz), SB_mask, flyby=1)
+                if n_start == 0:
+                    # set up bins and grid
+                    # these will be the same for all runs
+                    S['sb_clock_angle_flyby']['grid'] = clock_angle_dict['grid']
+                    S['sb_clock_angle_flyby']['bins'] = clock_angle_dict['bins']
+                    S['sb_clock_angle_flyby']['clock_angle_count'] = np.zeros_like(clock_angle_dict['grid'])
+                # increment count otherwise
+                S['sb_clock_angle_flyby']['clock_angle_count'] += clock_angle_dict['clock_angle_count']
+                # add individual count
+                s_name = str(n)
+                S['sb_clock_angle_flyby'][s_name] = clock_angle_dict['clock_angle_count']
+                clock_angle_dict = None
+                # farrell analysis
+                S['dropouts'][s_name] = diag.plot_dropouts(flyby)
             
             print('         - Calculating magnetic compressibility')
             S['C_B2_Squire'] = np.append(S['C_B2_Squire'], diag.mag_compress_Squire2020(B))

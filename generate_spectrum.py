@@ -188,7 +188,10 @@ def generate_alfven_spectrum(n_X, X_min, X_max, B_0, spectrum, expo=-5/3, expo_p
         r, theta = None, None
 
         # excluding purely parallel waves
-        prl_mask = (Kprp == 0.) | (KY == 0.) | (KZ == 0.)
+        if KZ.shape[0] > 1:
+            prl_mask = (Kprp == 0.) | (KY == 0.) | (KZ == 0.)
+        else:
+            prl_mask = (Kprp == 0.) | (KY == 0.)
         z[prl_mask] = 0j
         # exclude purely perpendicular waves as they don't propagate
         # remember ω_A = k_prl * v_A
@@ -238,7 +241,7 @@ def generate_alfven_spectrum(n_X, X_min, X_max, B_0, spectrum, expo=-5/3, expo_p
     #return dB_y, dB_z
 
 
-def run_tests(Ls, KX, KY, KZ, n=3, B_0x=1.0):
+def run_tests(Ls, KX, KY, KZ, n=0, B_0x=1.0):
     # no weighting of amplitudes by spectrum
     # just want to test if it generates modes correctly
     # parallel wavenumbers
