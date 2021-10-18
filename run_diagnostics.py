@@ -170,7 +170,7 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
                 print(flyby_string + ' done')
                 
                 print(' - Calculating flyby SBs')
-                flyby = reinterpolate.flyby(output_dir, a[0], n_start, method=method, output_plot=0)
+                flyby = reinterpolate.flyby(output_dir, flyby_a, n, method=method, output_plot=0)
                 Bx, By, Bz, Bmag = flyby['Bx'], flyby['By'], flyby['Bz'], flyby['Bmag']
                 # switchback finder
                 SB_mask = diag.switchback_threshold((Bx, By, Bmag), flyby=1)[0]
