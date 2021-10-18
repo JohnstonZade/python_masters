@@ -106,10 +106,10 @@ def load_and_scale_h5(output_dir, prob=DEFAULT_PROB, do_path_format=1, method='m
         with h5py.File(h5name, 'a') as f:
             prim = f['prim'][...]
             B = f['B'][...]
-            # grid_x2_f = f['x2f'][...]
-            # grid_x2_v = f['x2v'][...]
-            # grid_x3_f = f['x3f'][...]
-            # grid_x3_v = f['x3v'][...]
+            grid_x2_f = f['x2f'][...]
+            grid_x2_v = f['x2v'][...]
+            grid_x3_f = f['x3f'][...]
+            grid_x3_v = f['x3v'][...]
             if undo:
                 prim[0] *= λ if matts_method else 1
                 prim[1] /= Λ[0]
@@ -118,10 +118,10 @@ def load_and_scale_h5(output_dir, prob=DEFAULT_PROB, do_path_format=1, method='m
                 B[0] /= Λ[0] / λ if matts_method else Λ[0]
                 B[1] /= Λ[1] / λ if matts_method else Λ[1]
                 B[2] /= Λ[2] / λ if matts_method else Λ[2]
-                # grid_x2_f /= a
-                # grid_x2_v /= a
-                # grid_x3_f /= a
-                # grid_x3_v /= a
+                grid_x2_f /= a
+                grid_x2_v /= a
+                grid_x3_f /= a
+                grid_x3_v /= a
             else:
                 prim[0] /= λ if matts_method else 1
                 prim[1] *= Λ[0]
@@ -130,17 +130,17 @@ def load_and_scale_h5(output_dir, prob=DEFAULT_PROB, do_path_format=1, method='m
                 B[0] *= Λ[0] / λ if matts_method else Λ[0]
                 B[1] *= Λ[1] / λ if matts_method else Λ[1]
                 B[2] *= Λ[2] / λ if matts_method else Λ[2]
-                # grid_x2_f *= a
-                # grid_x2_v *= a
-                # grid_x3_f *= a
-                # grid_x3_v *= a
+                grid_x2_f *= a
+                grid_x2_v *= a
+                grid_x3_f *= a
+                grid_x3_v *= a
             
             f['prim'][...] = prim
             f['B'][...] = B
-            # f['x2f'][...] = grid_x2_f
-            # f['x2v'][...] = grid_x2_v
-            # f['x3f'][...] = grid_x3_f
-            # f['x3v'][...] = grid_x3_v
+            f['x2f'][...] = grid_x2_f
+            f['x2v'][...] = grid_x2_v
+            f['x3f'][...] = grid_x3_f
+            f['x3v'][...] = grid_x3_v
             
             
 def load_hst(output_dir, adot, prob=DEFAULT_PROB, do_path_format=1, method='matt'):
@@ -682,14 +682,17 @@ def clock_angle(B, SB_mask, mean_switchback=1, flyby=0):
         'grid': ca_grid
     }
     
-def mean_cos2(b_0, B_prp, output_dir):
+def mean_cos2(b_0, B_prp, a, output_dir):
     # part of diagnostic used in Mallet2021
     # assumes time series
     
     # load in the grid at the first snapshot
     # this won't change in the comobile frame
     KZ, KY, KX = ft_grid('output',output_dir=output_dir, make_iso_box=0)
-    K = np.array([KX, KY, KZ]).reshape(1,3,*KX.shape)
+    # add in a evolution to perpendicular lengths
+    K_temp = np.array([KX, KY, KZ]).reshape(1,3,*KX.shape)
+    K = K_temp / a.reshape(a.shape[0],1,1,1,1)
+    K[:, 0] *= a.reshape(a.shape[0],1,1,1)
 
     # Decomposing k parallel and perpendicular to mean field
     Kprl = dot_prod(K, b_0)

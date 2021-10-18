@@ -81,7 +81,7 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
             # Finding perpendicular fluctuations
             B_prp = B - diag.dot_prod(B, b_0)*b_0
             u_prp = u - diag.dot_prod(u, b_0)*b_0
-            S['mean_cos2_theta'] = np.append(S['mean_cos2_theta'], diag.mean_cos2(b_0, B_prp, output_dir))
+            S['mean_cos2_theta'] = np.append(S['mean_cos2_theta'], diag.mean_cos2(b_0, B_prp, a, output_dir))
             b_0 = None
             
             print('         - Calculating z+/-')
@@ -113,29 +113,6 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
                 S['sb_clock_angle_whole_box'][s_name] = sb_ca_temp['clock_angle_count']
             S['sb_frac'] = np.append(S['sb_frac'], sb_frac)
             sb_frac, sb_mask_all, sb_mask_flip, sb_ca_temp = None, None, None, None
-            
-            if steps == 1:
-                print('         - Calculating SB flyby')
-                flyby = reinterpolate.flyby(output_dir, a[0], n_start, method=method)
-                Bx, By, Bz, Bmag = flyby['Bx'], flyby['By'], flyby['Bz'], flyby['Bmag']
-                # switchback finder
-                SB_mask = diag.switchback_threshold((Bx, By, Bmag), flyby=1)[0]
-                # flyby clock angle
-                clock_angle_dict = diag.clock_angle((Bx, By, Bz), SB_mask, flyby=1)
-                if n_start == 0:
-                    # set up bins and grid
-                    # these will be the same for all runs
-                    S['sb_clock_angle_flyby']['grid'] = clock_angle_dict['grid']
-                    S['sb_clock_angle_flyby']['bins'] = clock_angle_dict['bins']
-                    S['sb_clock_angle_flyby']['clock_angle_count'] = np.zeros_like(clock_angle_dict['grid'])
-                # increment count otherwise
-                S['sb_clock_angle_flyby']['clock_angle_count'] += clock_angle_dict['clock_angle_count']
-                # add individual count
-                s_name = str(n)
-                S['sb_clock_angle_flyby'][s_name] = clock_angle_dict['clock_angle_count']
-                clock_angle_dict = None
-                # farrell analysis
-                S['dropouts'][s_name] = diag.plot_dropouts(flyby)
             
             print('         - Calculating magnetic compressibility')
             S['C_B2_Squire'] = np.append(S['C_B2_Squire'], diag.mag_compress_Squire2020(B))
@@ -191,6 +168,29 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
                 S[flyby_string] = reinterpolate.flyby(output_dir, flyby_a, n, method=method)
                 diag.save_dict(S, output_dir, dict_name)
                 print(flyby_string + ' done')
+                
+                print(' - Calculating flyby SBs')
+                flyby = reinterpolate.flyby(output_dir, a[0], n_start, method=method, output_plot=0)
+                Bx, By, Bz, Bmag = flyby['Bx'], flyby['By'], flyby['Bz'], flyby['Bmag']
+                # switchback finder
+                SB_mask = diag.switchback_threshold((Bx, By, Bmag), flyby=1)[0]
+                # flyby clock angle
+                clock_angle_dict = diag.clock_angle((Bx, By, Bz), SB_mask, flyby=1)
+                if n_start == 0:
+                    # set up bins and grid
+                    # these will be the same for all runs
+                    S['sb_clock_angle_flyby']['grid'] = clock_angle_dict['grid']
+                    S['sb_clock_angle_flyby']['bins'] = clock_angle_dict['bins']
+                    S['sb_clock_angle_flyby']['clock_angle_count'] = np.zeros_like(clock_angle_dict['grid'])
+                # increment count otherwise
+                S['sb_clock_angle_flyby']['clock_angle_count'] += clock_angle_dict['clock_angle_count']
+                # add individual count
+                s_name = str(n)
+                S['sb_clock_angle_flyby'][s_name] = clock_angle_dict['clock_angle_count']
+                clock_angle_dict = None
+                # farrell analysis
+                S['dropouts'][s_name] = diag.plot_dropouts(flyby)
+                diag.save_dict(S, output_dir, dict_name)
 
     
 
