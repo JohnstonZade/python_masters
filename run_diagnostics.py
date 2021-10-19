@@ -176,7 +176,7 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
                 SB_mask = diag.switchback_threshold((Bx, By, Bmag), flyby=1)[0]
                 # flyby clock angle
                 clock_angle_dict = diag.clock_angle((Bx, By, Bz), SB_mask, flyby=1)
-                if n_start == 0:
+                if n == 0:
                     # set up bins and grid
                     # these will be the same for all runs
                     S['sb_clock_angle_flyby']['grid'] = clock_angle_dict['grid']
