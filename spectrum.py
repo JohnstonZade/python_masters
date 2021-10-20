@@ -17,9 +17,8 @@ def array_avg(arr):
 
 
 def calc_spectrum(output_dir, save_dir, return_dict=1, prob=default_prob,
-                  dict_name='mhd_spec', do_single_file=0, n=0, a=1,
-                  normalize_energy=1, do_mhd=1, bmag_and_rho=0,
-                  method='matt'):
+                  dict_name='mhd_spec', do_single_file=0, n=0,
+                  normalize_energy=1, bmag_and_rho=0, method='matt'):
 
     # Getting turnover time and converting to file number
     if do_single_file:
@@ -55,7 +54,8 @@ def calc_spectrum(output_dir, save_dir, return_dict=1, prob=default_prob,
         ns = 0  # counter
         fields = ['vel1', 'vel2', 'vel3', 'Bcc1', 'Bcc2', 'Bcc3',
                   'EK', 'EK_prlbox', 'EK_prpbox', 'EK_prpfluc', 'EK_prpfluc_prlbox', 'EK_prpfluc_prpbox', 'EK_prpfluc_2D',
-                  'EM', 'EM_prlbox', 'EM_prpbox', 'EM_prpfluc', 'EM_prpfluc_prlbox', 'EM_prpfluc_prpbox', 'EM_prpfluc_2D']
+                  'EM', 'EM_prlbox', 'EM_prpbox', 'EM_prpfluc', 'EM_prpfluc_prlbox', 'EM_prpfluc_prpbox', 'EM_prpfluc_2D',
+                  'E+_prpfluc_prlbox', 'E+_prpfluc_prpbox', 'E+_prpfluc_2D', 'E-_prpfluc_prlbox', 'E-_prpfluc_prpbox', 'E-_prpfluc_2D']
         if bmag_and_rho:
             fields.append('B')
             fields.append('rho')
@@ -79,20 +79,53 @@ def calc_spectrum(output_dir, save_dir, return_dict=1, prob=default_prob,
                 iso = spec1D(ft, Kmag, Kmag_bins, Kmag_mult)
                 prlbox = spec1D(ft, Kprl, Kprl_bins, Kprl_mult)
                 prpbox = spec1D(ft, Kprp, Kprp_bins, Kprp_mult)
+                # Perpendicular fluctuation spectra
+                S['EK_prpfluc'] += iso
+                S['EK_prpfluc_prlbox'] += prlbox
+                S['EK_prpfluc_prpbox'] += prpbox
+                # 2D (k_prl and k_prl) spectrum
+                S['EK_prpfluc_2D']  += spec2D(ft, Kprp, Kprl, Kprp_bins, Kprl_bins, Kprp_mult)
+
+            Bmag = 0
+            for Bcc in fields[3:6]:
+                B = data[Bcc]
+                ft = fft.fftn(B - np.mean(B)) / Npoints
+                iso = spec1D(ft, Kmag, Kmag_bins, Kmag_mult)
+                prlbox = spec1D(ft, Kprl, Kprl_bins, Kprl_mult)
+                prpbox = spec1D(ft, Kprp, Kprp_bins, Kprp_mult)
                 # Isotropic spectra
-                S[vel] += iso
-                S['EK'] += iso  # Total spectrum is sum of each component
-                # Box-parallel (along x-axis) spectrum
-                S['EK_prlbox'] += prlbox
-                # Box-perpendicular spectrum
-                S['EK_prpbox'] += prpbox
-                if vel != 'vel1':
-                    # Perpendicular fluctuation spectra
-                    S['EK_prpfluc'] += iso
-                    S['EK_prpfluc_prlbox'] += prlbox
-                    S['EK_prpfluc_prpbox'] += prpbox
+                # S[Bcc] += iso
+                # S['EM'] += iso  # Total spectrum is sum of each component
+                # # Box-parallel (along x-axis) spectrum
+                # S['EM_prlbox'] += prlbox
+                # # Box-perpendicular spectrum
+                # S['EM_prpbox'] += prpbox
+                # Perpendicular fluctuation spectra
+                S['EM_prpfluc'] += iso
+                S['EM_prpfluc_prlbox'] += prlbox
+                S['EM_prpfluc_prpbox'] += prpbox
+                # 2D (k_prl and k_prl) spectrum
+                S['EM_prpfluc_2D']  += spec2D(ft, Kprp, Kprl, Kprp_bins, Kprl_bins, Kprp_mult)
+                Bmag += B**2
+                
+                        
+            # Elsasser spectra
+            rho = data['rho']
+            for i in range(1,4):
+                u = data['vel'+str(i)]
+                B = data['Bcc'+str(i)]
+                b = (B - np.mean(B)) / np.sqrt(rho)  # perpendicular mag fluc in velocity units
+                for idx, name in enumerate(['E+_', 'E-_']):
+                    z = u + ((-1)**idx)*b # z+ for idx = 0, z- otherwise
+                    ft_z = fft.fftn(z) / Npoints
+                    iso = spec1D(ft_z, Kmag, Kmag_bins, Kmag_mult)
+                    prlbox = spec1D(ft_z, Kprl, Kprl_bins, Kprl_mult)
+                    prpbox = spec1D(ft_z, Kprp, Kprp_bins, Kprp_mult)
+                    S[name+'prpfluc_prlbox'] += prlbox
+                    S[name+'prpfluc_prpbox'] += prpbox
                     # 2D (k_prl and k_prl) spectrum
-                    S['EK_prpfluc_2D']  += spec2D(ft, Kprp, Kprl, Kprp_bins, Kprl_bins, Kprp_mult)
+                    S[name+'prpfluc_2D']  += spec2D(ft, Kprp, Kprl, Kprp_bins, Kprl_bins, Kprp_mult)
+
             if normalize_energy:
                 # v_A ~ a^(-1) ⟹ (v_A)^2 ∼ a^(-2), assuming v_A0 = 1 
                 # (above only for purely radial fields, this is more general)
@@ -100,47 +133,20 @@ def calc_spectrum(output_dir, save_dir, return_dict=1, prob=default_prob,
                 B = np.array((data['Bcc1'], data['Bcc2'], data['Bcc3']))
                 v_A = diag.alfven_speed(rho, B)
                 for key in S:
-                    if 'EK' in key:
+                    if ('EK' in key) or ('E+' in key) or ('E-' in key):
                         S[key] /= v_A**2
 
-            if do_mhd:
-                Bmag = 0
-                for Bcc in fields[3:6]:
-                    B = data[Bcc]
-                    ft = fft.fftn(B) / Npoints
-                    iso = spec1D(ft, Kmag, Kmag_bins, Kmag_mult)
-                    prlbox = spec1D(ft, Kprl, Kprl_bins, Kprl_mult)
-                    prpbox = spec1D(ft, Kprp, Kprp_bins, Kprp_mult)
-                    # Isotropic spectra
-                    S[Bcc] += iso
-                    S['EM'] += iso  # Total spectrum is sum of each component
-                    # Box-parallel (along x-axis) spectrum
-                    S['EM_prlbox'] += prlbox
-                    # Box-perpendicular spectrum
-                    S['EM_prpbox'] += prpbox
-                    if Bcc != 'Bcc1':
-                        # Perpendicular fluctuation spectra
-                        S['EM_prpfluc'] += iso
-                        S['EM_prpfluc_prlbox'] += prlbox
-                        S['EM_prpfluc_prpbox'] += prpbox
-                        # 2D (k_prl and k_prl) spectrum
-                        S['EM_prpfluc_2D']  += spec2D(ft, Kprp, Kprl, Kprp_bins, Kprl_bins, Kprp_mult)
-                    Bmag += B**2
-                if normalize_energy:
-                    # B_x ∼ a^(-2) ⟹ (B_x)^2 ∼ a^(-4), assuming ⟨B_x0⟩=1
-                    # (above only for purely radial fields, this is more general)
-                    B = np.array((data['Bcc1'], data['Bcc2'], data['Bcc3']))
-                    B_0 = diag.get_mag(diag.box_avg(B), axis=0)  # single time entry
-                    for key in S:
-                        if 'EM' in key:
-                            S[key] /= B_0**2
-
-                if bmag_and_rho:
-                    Bmag = np.sqrt(Bmag)
-                    ft_Bmag = fft.fftn(Bmag)
-                    S['B'] += spec1D(ft_Bmag, ft_Bmag, Kmag, Kmag_bins, Kmag_mult)
-
+                # B_x ∼ a^(-2) ⟹ (B_x)^2 ∼ a^(-4), assuming ⟨B_x0⟩=1
+                # (above only for purely radial fields, this is more general)
+                B_0 = diag.get_mag(diag.box_avg(B), axis=0)  # single time entry
+                for key in S:
+                    if 'EM' in key:
+                        S[key] /= B_0**2
+            
             if bmag_and_rho:
+                Bmag = np.sqrt(Bmag)
+                ft_Bmag = fft.fftn(Bmag)
+                S['B'] += spec1D(ft_Bmag, ft_Bmag, Kmag, Kmag_bins, Kmag_mult) 
                 ft_rho = fft.fftn(data['rho'] - np.mean(data['rho']))
                 S['rho'] += spec1D(ft_rho, ft_rho, Kmag, Kmag_bins, Kmag_mult)
 

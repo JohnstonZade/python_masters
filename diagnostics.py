@@ -613,10 +613,32 @@ def switchback_finder(B, SB_mask, array3D=1):
         SB_mask_copy = np.zeros_like(SB_mask)
         SB_mask_copy[pos[i]] = SB_mask[pos[i]]
         SB = np.array((Bx[SB_mask_copy], By[SB_mask_copy], Bz[SB_mask_copy]))
-        SBs[i] = SB
+        SBs[i] = SB        
     
     return SBs
     
+def switchback_aspect(SB_mask, Ls, Ns):
+    # label each individual switchback
+    # and find the position of these switchbacks
+    # treating the mask as a 3D "image"
+    labels, nlabels = ndimage.label(SB_mask)
+    pos = ndimage.find_objects(labels)
+    
+    if nlabels == 0:
+        return 0.
+
+    dx = Ls / Ns  # dz, dy, dx
+    aspect = 0.
+    # aspect ratio: crude
+    # average over the Lx length vs the average Lprp length
+    for i in range(nlabels):
+        Lx = (pos[i][3].stop - pos[i][3].start)*dx[2]
+        Ly = (pos[i][2].stop - pos[i][2].start)*dx[1]
+        Lz = (pos[i][1].stop - pos[i][1].start)*dx[0]
+        aspect += Lx / (0.5*(Ly+Lz))
+    aspect /= nlabels
+    return aspect
+
 def clock_angle(B, SB_mask, mean_switchback=1, flyby=0):
     if flyby:
         Bx, By, Bz = B
@@ -718,11 +740,17 @@ def mean_cos2(b_0, B_prp, a, output_dir):
     # of the energy in each component
     energy = energy_vec.sum(axis=1)
     
+    cos2_box = box_avg(abs(K[:, 0])**2 / np.maximum((abs(K[:, 0])**2 + abs(K[:, 1])**2 + abs(K[:, 2])**2),1e-15))  # mean box-allowed wave vector rotation due to expansion
+    cos2_field = box_avg(cos2_theta)  # mean box-allowed wave vector rotation relative to mean field
+    not2D_mode_mask = abs(Kprl) != 0.0
+    cos2_energyweight = box_avg(cos2_theta * energy) / box_avg(energy)
+    cos2_energyweight_no2D = np.mean(cos2_theta[not2D_mode_mask] * energy[not2D_mode_mask]) / np.mean(energy[not2D_mode_mask])
+    
     # Weight the cosine2 at each point in the box by the energy at that point
     # and then average and normalize by the mean energy
-    return box_avg(cos2_theta * energy) / box_avg(energy)
+    return cos2_box, cos2_field, cos2_energyweight, cos2_energyweight_no2D
 
-def plot_dropouts(flyby, window=250):
+def plot_dropouts(flyby, window=150, sb_start=1):
     
     def calc_relative(value, slice_before, slice_during):
         # average over value before switchback
@@ -761,16 +789,20 @@ def plot_dropouts(flyby, window=250):
 
     flyby_size = Bx.size
     count = 0
+    # it's tricky to only look at one side of the switchback
+    # since they only cover a few tens of grid cells
+    # meaning no matter how I window them I can't look at just one side 
+    # without losing detail
     for i in range(SBs['n_SBs']):
         SB_position = SBs['pos'][i][0]
         SB_start, SB_stop = SB_position.start, SB_position.stop
         if (SB_start < window//2) or (SB_stop > (flyby_size - window//2)):
             continue
         # SB_start, SB_stop = SB_position.start + window//2, SB_position.stop + window//2
-        # centre on middle of switchback
-        SB_centre = (SB_start + SB_stop) // 2
+        # centre on entering of switchback
+        SB_centre = SB_start if sb_start else SB_stop
         SB_slice = slice(SB_centre - window//2, SB_centre + window//2)
-        mean_slice = slice(SB_start - window//2, SB_start - 10)
+        mean_slice = slice(SB_start - window//2, SB_start - 10) if sb_start else slice(SB_start + 10, SB_start + window//2)
         dropouts['Bx'] += Bx[SB_slice]
         dropouts['By'] += By[SB_slice]
         dropouts['Bz'] += Bz[SB_slice]
