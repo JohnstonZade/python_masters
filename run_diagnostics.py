@@ -47,7 +47,7 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
         if n_done == 0:
             S['time'], S['a'] = np.array([]), np.array([])
             S['Bx_mean'], S['By_mean'], S['beta'] = np.array([]), np.array([]), np.array([])
-            S['sb_frac'], S['sb_aspect'], S['alfven_speed'] = np.array([]), np.array([]), np.array([])
+            S['full_sb_frac'], S['radial_sb_frac'], S['sb_aspect'], S['alfven_speed'] = np.array([]), np.array([]), np.array([]), np.array([])
             S['sb_clock_angle_whole_box'] = {30: {}, 60: {}, 90: {}}
             S['mean_cos2_theta'] = {'box': np.array([]), 'field': np.array([]), 'energy_weight': np.array([]), 'no2D_energy_weight': np.array([])}
             S['cross_helicity'], S['z_plus'], S['z_minus'] = np.array([]), np.array([]), np.array([])
@@ -103,7 +103,7 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
             print('         - Calculating SB fraction')
             for theta_threshold in [30, 60, 90]:
                 print('             - θ_thresh = ' + str(theta_threshold) + '∘')
-                sb_mask_all, sb_mask_flip, sb_frac = diag.switchback_threshold(B, theta_threshold=theta_threshold)
+                sb_mask_all, sb_mask_flip, full_sb_frac, radial_sb_frac = diag.switchback_threshold(B, theta_threshold=theta_threshold)
                 theta_dict = S['sb_clock_angle_whole_box'][theta_threshold]
                 for n in range(n_start,n_end):
                     t_index = n - n_start
@@ -120,12 +120,13 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
                     s_name = str(n)
                     theta_dict[s_name] = sb_ca_temp['clock_angle_count']
                     S['sb_clock_angle_whole_box'][theta_threshold] = theta_dict
-            S['sb_frac'] = np.append(S['sb_frac'], sb_frac)
+            S['full_sb_frac'] = np.append(S['full_sb_frac'], full_sb_frac)
+            S['radial_sb_frac'] = np.append(S['radial_sb_frac'], radial_sb_frac)
             Ns = np.array(B.shape[2:])  # Nz, Ny, Nx
             Ls = np.array([a[0]*L_prp, a[0]*L_prp, L_x])  # Lz, Ly, Lx
             # aspect ratio relative to box for SBs with flipped radial field
-            S['sb_aspect'] = np.append(S['sb_frac'], diag.switchback_aspect(sb_mask_flip, Ls, Ns))
-            sb_frac, sb_mask_all, sb_mask_flip, sb_ca_temp = None, None, None, None
+            S['sb_aspect'] = np.append(S['sb_aspect'], diag.switchback_aspect(sb_mask_flip, Ls, Ns))
+            radial_sb_frac, full_sb_frac, sb_mask_all, sb_mask_flip, sb_ca_temp = None, None, None, None, None
             
             print('         - Calculating magnetic compressibility')
             S['C_B2_Squire'] = np.append(S['C_B2_Squire'], diag.mag_compress_Squire2020(B))

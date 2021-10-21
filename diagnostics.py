@@ -586,10 +586,13 @@ def switchback_threshold(B, theta_threshold=30, flyby=0):
     SB_radial_flip = SB_mask_all & (Bx <= 0.)
     # fraction of radial flips in box: number of cells with SBs / total cells in box
     if flyby:
-        SB_frac = SB_radial_flip[SB_radial_flip].size / SB_radial_flip.size
+        full_SB_frac = SB_mask_all[SB_mask_all].size / SB_mask_all.size
+        radial_SB_frac = SB_radial_flip[SB_radial_flip].size / SB_radial_flip.size
     else:
-        SB_frac = np.array([SB_radial_flip[n][SB_radial_flip[n]].size / SB_radial_flip.size for n in range(B.shape[0])])
-    return SB_mask_all, SB_radial_flip, SB_frac
+        full_SB_frac = np.array([SB_mask_all[n][SB_mask_all[n]].size / SB_mask_all.size for n in range(B.shape[0])])
+        radial_SB_frac = np.array([SB_radial_flip[n][SB_radial_flip[n]].size / SB_radial_flip.size for n in range(B.shape[0])])
+        
+    return SB_mask_all, SB_radial_flip, full_SB_frac, radial_SB_frac
 
 def switchback_finder(B, SB_mask, array3D=1):
     # label each individual switchback
