@@ -18,7 +18,7 @@ def read_athinput(athinput_path):
  
 
 def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spectrum=0, do_flyby=1, 
-             method='matt'):
+             override_do_full_calc=0, method='matt'):
     
     max_n = diag.get_maxn(output_dir)
     n_done = 0
@@ -32,6 +32,11 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
             do_full_calc = False
             print('Not doing full calculation')
 
+    if override_do_full_calc:
+        do_full_calc = not override_do_full_calc
+        print('Overriding full calculation')
+    
+
     # overestimate the number of steps needed; edge case is handled when loading data
     n_steps = int(np.ceil((max_n - n_done) / steps))
     print('n done = ' + str(n_done))
@@ -42,13 +47,14 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
     S['sound_speed'] = c_s_init
 
     L_x, L_prp = diag.get_lengths(output_dir=output_dir)[:2]
+    Ls = np.array([L_prp, L_prp, L_x])  # Lz, Ly, Lx
     
     if do_full_calc:
         if n_done == 0:
             S['time'], S['a'] = np.array([]), np.array([])
             S['Bx_mean'], S['By_mean'], S['beta'] = np.array([]), np.array([]), np.array([])
-            S['full_sb_frac'], S['radial_sb_frac'], S['sb_aspect'], S['alfven_speed'] = np.array([]), np.array([]), np.array([]), np.array([])
-            S['sb_clock_angle_whole_box'] = {30: {}, 60: {}, 90: {}}
+            S['alfven_speed'] = np.array([])
+            S['sb_data'] = {30: {}, 60: {}, 90: {}}
             S['mean_cos2_theta'] = {'box': np.array([]), 'field': np.array([]), 'energy_weight': np.array([]), 'no2D_energy_weight': np.array([])}
             S['cross_helicity'], S['z_plus'], S['z_minus'] = np.array([]), np.array([]), np.array([])
             S['C_B2_Squire'] = np.array([])
@@ -82,6 +88,7 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
             # Finding perpendicular fluctuations
             B_prp = B - diag.dot_prod(B, b_0)*b_0
             u_prp = u - diag.dot_prod(u, b_0)*b_0
+            print('         - Calculating <cos^2 θ> ')
             cos2_box, cos2_field, cos2_energy_weight, cos2_energyweight_no2D = diag.mean_cos2(b_0, B_prp, a, output_dir)
             S['mean_cos2_theta']['box'] = np.append(S['mean_cos2_theta']['box'], cos2_box)
             S['mean_cos2_theta']['field'] = np.append(S['mean_cos2_theta']['field'], cos2_field)
@@ -100,32 +107,39 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
             rho, B_prp, u_prp, v_A = None, None, None, None
             
             # --- SWITCHBACK DIAGNOSTICS --- #
-            print('         - Calculating SB fraction')
+            
+            Ns = np.array(B.shape[2:])  # Nz, Ny, Nx
+
+            print('         - Calculating SB data')
             for theta_threshold in [30, 60, 90]:
                 print('             - θ_thresh = ' + str(theta_threshold) + '∘')
                 sb_mask_all, sb_mask_flip, full_sb_frac, radial_sb_frac = diag.switchback_threshold(B, theta_threshold=theta_threshold)
-                theta_dict = S['sb_clock_angle_whole_box'][theta_threshold]
+                theta_dict = S['sb_data'][theta_threshold]
                 for n in range(n_start,n_end):
                     t_index = n - n_start
                     sb_ca_temp = diag.clock_angle(B[t_index:t_index+1], sb_mask_all[t_index:t_index+1])
                     if n == 0:
-                        # set up bins and grid
-                        # these will be the same for all runs
-                        theta_dict['grid'] = sb_ca_temp['grid']
-                        theta_dict['bins'] = sb_ca_temp['bins']
-                        theta_dict['clock_angle_count'] = np.zeros_like(sb_ca_temp['grid'])
-                    # increment count otherwise
-                    theta_dict['clock_angle_count'] += sb_ca_temp['clock_angle_count']
+                        # -- CLOCK ANGLE -- #
+                        theta_dict['clock_angle'] = {}
+                        theta_dict['clock_angle']['grid'] = sb_ca_temp['grid']
+                        theta_dict['clock_angle']['bins'] = sb_ca_temp['bins']
+                        theta_dict['clock_angle']['clock_angle_count'] = np.zeros_like(sb_ca_temp['grid'])
+                        
+                        # -- SB FRACTION -- #
+                        theta_dict['full_sb_frac'] = np.array([])
+                        theta_dict['radial_sb_frac'] = np.array([])
+                        theta_dict['aspect'] = np.array([])
+                    # increment total count
+                    theta_dict['clock_angle']['clock_angle_count'] += sb_ca_temp['clock_angle_count']
                     # add individual count
                     s_name = str(n)
-                    theta_dict[s_name] = sb_ca_temp['clock_angle_count']
-                    S['sb_clock_angle_whole_box'][theta_threshold] = theta_dict
-            S['full_sb_frac'] = np.append(S['full_sb_frac'], full_sb_frac)
-            S['radial_sb_frac'] = np.append(S['radial_sb_frac'], radial_sb_frac)
-            Ns = np.array(B.shape[2:])  # Nz, Ny, Nx
-            Ls = np.array([a[0]*L_prp, a[0]*L_prp, L_x])  # Lz, Ly, Lx
-            # aspect ratio relative to box for SBs with flipped radial field
-            S['sb_aspect'] = np.append(S['sb_aspect'], diag.switchback_aspect(sb_mask_flip, Ls, Ns))
+                    theta_dict['clock_angle'][s_name] = sb_ca_temp['clock_angle_count']
+                    # add individual switchback fraction data
+                    theta_dict['full_sb_frac'] = np.append(theta_dict['full_sb_frac'], full_sb_frac)
+                    theta_dict['radial_sb_frac'] = np.append(theta_dict['radial_sb_frac'], radial_sb_frac)
+                    theta_dict['aspect'] = np.append(theta_dict['aspect'], diag.switchback_aspect(sb_mask_flip, Ls, Ns))
+                    S['sb_data'][theta_threshold] = theta_dict
+
             radial_sb_frac, full_sb_frac, sb_mask_all, sb_mask_flip, sb_ca_temp = None, None, None, None, None
             
             print('         - Calculating magnetic compressibility')
@@ -139,7 +153,7 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
         
         print('Calculating amplitude evolution')
         B = diag.load_time_series(output_dir, 0, 1, method=method)[2]
-        B_0 = diag.box_avg(B)[0, :2]
+        B_0 = diag.box_avg(B)[0, :2]  # initial mean field (always in xy-plane)
         B = None
         a_normfluc, Bprp_fluc, kinetic_fluc = diag.norm_fluc_amp_hst(output_dir, expansion_rate, B_0,
                                                                      Lx=L_x, Lperp=L_prp, method=method)
@@ -156,21 +170,21 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
     else:
         spec_step = int(a_step / (expansion_rate*dt))  # eg if delta_a = 1, adot=0.5, dt=0.2 then spec_step = 10
     if do_spectrum:
+        S['spectra'] = {}
         for n in range(max_n):
             if n % spec_step == 0:  # don't want to run too often
                 print('Spectrum calculation started at n = ' + str(n))
                 if expansion_rate != 0.0:
-                    spec_a = round(S['a'][n], 1)
-                    spec_name = 'mhd_spec_a' + str(spec_a)
+                    spec_name = 'mhd_spec_a' + str(round(S['a'][n], 1))
                 else:
-                    spec_a = 1.0
                     spec_name = 'mhd_spec_t' + str(round(S['time'][n], 1))
-                S[spec_name] = spec.calc_spectrum(output_dir, output_dir, prob='from_array', dict_name=spec_name,
+                S['spectra'][spec_name] = spec.calc_spectrum(output_dir, output_dir, prob='from_array', dict_name=spec_name,
                                                   do_single_file=1, n=n, method=method)
             diag.save_dict(S, output_dir, dict_name)
 
     if do_flyby:
-        S['sb_clock_angle_flyby'], S['dropouts'] = {30: {}, 60: {}, 90: {}}, {}
+        S['flyby'] = {}
+        S['flyby']['sb_clock_angle'], S['flyby']['dropouts'] = {30: {}, 60: {}, 90: {}}, {}
         for n in range(max_n):
             if n % spec_step == 0:
                 print('Flyby started at n = ' + str(n))
@@ -180,19 +194,17 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
                 else:
                     flyby_a = 1.0
                     flyby_string = 'flyby_t' + str(round(S['time'][n], 1))
-                S[flyby_string] = reinterpolate.flyby(output_dir, flyby_a, n, method=method)
+                S['flyby'][flyby_string] = reinterpolate.flyby(output_dir, flyby_a, n, method=method)
                 diag.save_dict(S, output_dir, dict_name)
                 print(flyby_string + ' done')
                 
                 print(' - Calculating flyby SBs')
                 
-                flyby = S[flyby_string]
+                flyby = S['flyby'][flyby_string]
                 Bx, By, Bz, Bmag = flyby['Bx'], flyby['By'], flyby['Bz'], flyby['Bmag']
                 
-                S['sb_clock_angle_flyby'][theta_threshold]
-                
                 for theta_threshold in [30, 60, 90]:
-                    theta_dict = S['sb_clock_angle_flyby'][theta_threshold]
+                    theta_dict = S['flyby']['sb_clock_angle'][theta_threshold]
                     # switchback finder
                     SB_mask = diag.switchback_threshold((Bx, By, Bmag), flyby=1, theta_threshold=theta_threshold)[0]
                     # flyby clock angle
@@ -206,21 +218,9 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
                     # increment count otherwise
                     theta_dict['clock_angle_count'] += clock_angle_dict['clock_angle_count']
                     # add individual count
-                    s_name = str(n)
-                    theta_dict[s_name] = clock_angle_dict['clock_angle_count']
-                    S['sb_clock_angle_flyby'][theta_threshold] = theta_dict
+                    theta_dict[flyby_string] = clock_angle_dict['clock_angle_count']
+                    S['flyby']['sb_clock_angle'][theta_threshold] = theta_dict
                     clock_angle_dict = None
                 # farrell analysis
-                S['dropouts'][s_name] = diag.plot_dropouts(flyby)
+                S['flyby']['dropouts'][flyby_string] = diag.plot_dropouts(flyby)
                 diag.save_dict(S, output_dir, dict_name)
-
-    
-
-
-def spec_hik_energy_frac(S, do_magnetic=1):
-    k = S['grids']['Kmag']
-    kmax = max(k)
-    E = S['EM'] if do_magnetic else S['EK']
-    hik_E = E[k > (kmax/6)].sum()
-    tot_E = E.sum()
-    return hik_E / tot_E
