@@ -88,12 +88,12 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
             # Finding perpendicular fluctuations
             B_prp = B - diag.dot_prod(B, b_0)*b_0
             u_prp = u - diag.dot_prod(u, b_0)*b_0
-            print('         - Calculating <cos^2 θ> ')
-            cos2_box, cos2_field, cos2_energy_weight, cos2_energyweight_no2D = diag.mean_cos2(b_0, B_prp, a, output_dir)
-            S['mean_cos2_theta']['box'] = np.append(S['mean_cos2_theta']['box'], cos2_box)
-            S['mean_cos2_theta']['field'] = np.append(S['mean_cos2_theta']['field'], cos2_field)
-            S['mean_cos2_theta']['energy_weight'] = np.append(S['mean_cos2_theta']['energy_weight'], cos2_energy_weight)
-            S['mean_cos2_theta']['no2D_energy_weight'] = np.append(S['mean_cos2_theta']['no2D_energy_weight'], cos2_energyweight_no2D)
+            # print('         - Calculating <cos^2 θ> ')
+            # cos2_box, cos2_field, cos2_energy_weight, cos2_energyweight_no2D = diag.mean_cos2(b_0, B_prp, a, output_dir)
+            # S['mean_cos2_theta']['box'] = np.append(S['mean_cos2_theta']['box'], cos2_box)
+            # S['mean_cos2_theta']['field'] = np.append(S['mean_cos2_theta']['field'], cos2_field)
+            # S['mean_cos2_theta']['energy_weight'] = np.append(S['mean_cos2_theta']['energy_weight'], cos2_energy_weight)
+            # S['mean_cos2_theta']['no2D_energy_weight'] = np.append(S['mean_cos2_theta']['no2D_energy_weight'], cos2_energyweight_no2D)
             b_0 = None
             
             print('         - Calculating z+/-')
