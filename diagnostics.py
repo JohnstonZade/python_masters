@@ -581,16 +581,17 @@ def switchback_threshold(B, theta_threshold=30, flyby=0):
         b, b_0 = get_unit(B), get_unit(B_0)
         B_dot_Bmean = dot_prod(b, b_0, 1)
 
+    N_cells = Bx[0].size
     dev_from_mean = np.arccos(np.clip(B_dot_Bmean, -1., 1.))
     SB_mask_all = dev_from_mean >= theta_threshold
     SB_radial_flip = SB_mask_all & (Bx <= 0.)
     # fraction of radial flips in box: number of cells with SBs / total cells in box
     if flyby:
-        full_SB_frac = SB_mask_all[SB_mask_all].size / SB_mask_all.size
-        radial_SB_frac = SB_radial_flip[SB_radial_flip].size / SB_radial_flip.size
+        full_SB_frac = SB_mask_all[SB_mask_all].size / N_cells
+        radial_SB_frac = SB_radial_flip[SB_radial_flip].size / N_cells
     else:
-        full_SB_frac = np.array([SB_mask_all[n][SB_mask_all[n]].size / SB_mask_all.size for n in range(B.shape[0])])
-        radial_SB_frac = np.array([SB_radial_flip[n][SB_radial_flip[n]].size / SB_radial_flip.size for n in range(B.shape[0])])
+        full_SB_frac = np.array([SB_mask_all[n][SB_mask_all[n]].size / N_cells for n in range(B.shape[0])])
+        radial_SB_frac = np.array([SB_radial_flip[n][SB_radial_flip[n]].size / N_cells for n in range(B.shape[0])])
         
     return SB_mask_all, SB_radial_flip, full_SB_frac, radial_SB_frac
 
