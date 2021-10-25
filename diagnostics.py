@@ -472,7 +472,7 @@ def ft_grid(input_type, data=None, output_dir='', Ls=None,
         X3 = data['RootGridX3'][1] - data['RootGridX3'][0]
 
         Ls = (X3, X2, X1)
-        Ns = data['RootGridSize']
+        Ns = data['RootGridSize'][::-1]
 
     elif input_type == 'output':
         assert (output_dir is not None), 'Must have a valid directory path!'
