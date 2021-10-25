@@ -49,6 +49,16 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
     L_x, L_prp = diag.get_lengths(output_dir=output_dir)[:2]
     Ls = np.array([L_prp, L_prp, L_x])  # Lz, Ly, Lx
     
+    # step for non-continuous calculations such as cos^2 theta
+    a_max = 1 + expansion_rate*(max_n-1)*dt
+    a_step = 1 if (a_max > 2) else 0.1
+    if expansion_rate == 0:
+        spec_step = int(1 / dt) if max_n > 10 else 1
+    else:
+        spec_step = int(a_step / (expansion_rate*dt))  # eg if delta_a = 1, adot=0.5, dt=0.2 then spec_step = 10
+        
+    S['spec_step'] = spec_step
+    
     if do_full_calc:
         if n_done == 0:
             S['time'], S['a'] = np.array([]), np.array([])
@@ -73,7 +83,7 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
             print('         - Calculating beta')
             B_mag2 = diag.get_mag(B, squared=1)  # full field magnitude
             S['beta'] = np.append(S['beta'], diag.beta(rho, B_mag2, c_s_init, a))
-            B_mag2 = None
+            t, B_mag2 = None, None
             
             print('         - Calculating mean field')
             B_x, B_y = B[:, 0], B[:, 1]
@@ -88,13 +98,15 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
             # Finding perpendicular fluctuations
             B_prp = B - diag.dot_prod(B, b_0)*b_0
             u_prp = u - diag.dot_prod(u, b_0)*b_0
-            # print('         - Calculating <cos^2 θ> ')
-            # cos2_box, cos2_field, cos2_energy_weight, cos2_energyweight_no2D = diag.mean_cos2(b_0, B_prp, a, output_dir)
-            # S['mean_cos2_theta']['box'] = np.append(S['mean_cos2_theta']['box'], cos2_box)
-            # S['mean_cos2_theta']['field'] = np.append(S['mean_cos2_theta']['field'], cos2_field)
-            # S['mean_cos2_theta']['energy_weight'] = np.append(S['mean_cos2_theta']['energy_weight'], cos2_energy_weight)
-            # S['mean_cos2_theta']['no2D_energy_weight'] = np.append(S['mean_cos2_theta']['no2D_energy_weight'], cos2_energyweight_no2D)
-            b_0 = None
+            # only do every now and then as FFT is quite compuationally intensive
+            if n_start % spec_step == 0:
+                print('         - Calculating <cos^2 θ> ')
+                cos2_box, cos2_field, cos2_energy_weight, cos2_energyweight_no2D = diag.mean_cos2(b_0, B_prp, a, output_dir)
+                S['mean_cos2_theta']['box'] = np.append(S['mean_cos2_theta']['box'], cos2_box)
+                S['mean_cos2_theta']['field'] = np.append(S['mean_cos2_theta']['field'], cos2_field)
+                S['mean_cos2_theta']['energy_weight'] = np.append(S['mean_cos2_theta']['energy_weight'], cos2_energy_weight)
+                S['mean_cos2_theta']['no2D_energy_weight'] = np.append(S['mean_cos2_theta']['no2D_energy_weight'], cos2_energyweight_no2D)
+            b_0, u, a = None, None, None
             
             print('         - Calculating z+/-')
             z_p_rms, z_m_rms = diag.z_waves_evo(rho, u_prp, B_prp, v_A)
@@ -146,7 +158,7 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
             S['C_B2_Squire'] = np.append(S['C_B2_Squire'], diag.mag_compress_Squire2020(B))
             
             # clear unneeded variables to save memory, run flyby code after this
-            t, a, B, u = None, None, None, None 
+            B = None 
             print('     Data cleared')
             diag.save_dict(S, output_dir, dict_name)
             print('     Dictionary saved')
@@ -163,12 +175,7 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
 
         diag.save_dict(S, output_dir, dict_name)
 
-    a_max = 1 + expansion_rate*(max_n-1)*dt
-    a_step = 1 if (a_max > 2) else 0.1
-    if expansion_rate == 0:
-        spec_step = int(1 / dt) if max_n > 10 else 1
-    else:
-        spec_step = int(a_step / (expansion_rate*dt))  # eg if delta_a = 1, adot=0.5, dt=0.2 then spec_step = 10
+    
     if do_spectrum:
         S['spectra'] = {}
         for n in range(max_n):
