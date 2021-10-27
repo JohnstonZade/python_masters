@@ -207,7 +207,7 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
                 
                 print(' - Calculating flyby SBs')
                 
-                flyby = S['flyby'][flyby_string]
+                flyby = reinterpolate.flyby(output_dir, flyby_a, n, method=method, output_plot=0)
                 Bx, By, Bz, Bmag = flyby['Bx'], flyby['By'], flyby['Bz'], flyby['Bmag']
                 
                 for theta_threshold in [30, 60, 90]:

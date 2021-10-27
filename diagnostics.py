@@ -8,6 +8,7 @@ import pickle
 import h5py
 import numpy as np
 import scipy.ndimage as ndimage
+from scipy.signal import find_peaks
 from pathlib import Path
 from itertools import permutations as perm
 from athena_read import athdf, athinput, hst
@@ -754,80 +755,66 @@ def mean_cos2(b_0, B_prp, a, output_dir):
     # and then average and normalize by the mean energy
     return cos2_box, cos2_field, cos2_energyweight, cos2_energyweight_no2D
 
-def plot_dropouts(flyby, window=150, sb_start=1):
-    
-    def calc_relative(value, slice_before, slice_during):
-        # average over value before switchback
-        value_mean = value[slice_before].mean()
-        value_during = value[slice_during]
-        return (value_during - value_mean) / value_mean
-    
-    # similar time series analysis as
-    # from Farrell2020
-    Bx, By, Bz, Bmag = flyby['Bx'], flyby['By'], flyby['Bz'], flyby['Bmag']
-    ux, uy, uz = flyby['ux'], flyby['uy'], flyby['uz']
-    rho = flyby['rho']
-    dropouts = {
-        'Bx': np.zeros(window),
-        'By': np.zeros(window),
-        'Bz': np.zeros(window),
-        'ux': np.zeros(window),
-        'uy': np.zeros(window),
-        'uz': np.zeros(window),
-        'Bmag': np.zeros(window),
-        'rho': np.zeros(window),
-        'By_rel': np.zeros(window),
-        'Bz_rel': np.zeros(window),
-        'ux_rel': np.zeros(window),
-        'uy_rel': np.zeros(window),
-        'uz_rel': np.zeros(window),
-        'Bmag_rel': np.zeros(window),
-        'rho_rel': np.zeros(window)
-    }
-    # looking at SBs with radial flips
-    SB_mask = switchback_threshold((Bx, By, Bmag), flyby=1)[1]
-    SBs = switchback_finder((Bx, By, Bz), SB_mask, array3D=0)
-    
-    if SBs['n_SBs'] == 0:
-        return dropouts
+def plot_dropouts(flyby):
+    # performing analysis as in Farrell
+    dl = 4  # units of resolution
+    dBr = -flyby['Bx'][dl:] + flyby['Bx'][:-dl]
+    dur = -flyby['ux'][dl:] + flyby['ux'][:-dl]
+    l = flyby['l_param'][:,0][dl//2:-dl//2]
+    Br = -flyby['Bx'][dl//2:-dl//2]
+    Bt = -flyby['By'][dl//2:-dl//2]
+    Bn =  flyby['Bz'][dl//2:-dl//2]
+    ur = -flyby['ux'][dl//2:-dl//2]
+    ut = -flyby['uy'][dl//2:-dl//2]
+    un =  flyby['uz'][dl//2:-dl//2]
+    unonr = np.sqrt(ut**2 + un**2)
+    rho = flyby['rho'][dl//2:-dl//2]
+    Bmag = flyby['Bmag'][dl//2:-dl//2]
 
-    flyby_size = Bx.size
-    count = 0
-    # it's tricky to only look at one side of the switchback
-    # since they only cover a few tens of grid cells
-    # meaning no matter how I window them I can't look at just one side 
-    # without losing detail
-    for i in range(SBs['n_SBs']):
-        SB_position = SBs['pos'][i][0]
-        SB_start, SB_stop = SB_position.start, SB_position.stop
-        if (SB_start < window//2) or (SB_stop > (flyby_size - window//2)):
-            continue
-        # SB_start, SB_stop = SB_position.start + window//2, SB_position.stop + window//2
-        # centre on entering of switchback
-        SB_centre = SB_start if sb_start else SB_stop
-        SB_slice = slice(SB_centre - window//2, SB_centre + window//2)
-        mean_slice = slice(SB_start - window//2, SB_start - 10) if sb_start else slice(SB_start + 10, SB_start + window//2)
-        dropouts['Bx'] += Bx[SB_slice]
-        dropouts['By'] += By[SB_slice]
-        dropouts['Bz'] += Bz[SB_slice]
-        dropouts['ux'] += ux[SB_slice]
-        dropouts['uy'] += uy[SB_slice]
-        dropouts['uz'] += uz[SB_slice]
-        dropouts['Bmag'] += Bmag[SB_slice]
-        dropouts['rho'] += rho[SB_slice]
-        dropouts['By_rel'] += calc_relative(By, mean_slice, SB_slice)
-        dropouts['Bz_rel'] += calc_relative(Bz, mean_slice, SB_slice)
-        dropouts['ux_rel'] += calc_relative(ux, mean_slice, SB_slice)
-        dropouts['uy_rel'] += calc_relative(uy, mean_slice, SB_slice)
-        dropouts['uz_rel'] += calc_relative(uz, mean_slice, SB_slice)
-        dropouts['Bmag_rel'] += calc_relative(Bmag, mean_slice, SB_slice)
-        dropouts['rho_rel'] += calc_relative(rho, mean_slice, SB_slice)
-        count += 1
-    
-    for key in dropouts.keys():
-        # average
-        dropouts[key] /= count
-    
+    # switchback index
+    SBI = dBr*dur
+    # only look at places with SBIs above sb_cut
+    # this is what is used in Farrell
+    sb_cut = 0.75
+    # how far to look on either side of the switchback boundary
+    sbsz = 30
+
+    # find the indicies where these occur
+    sbi, sbh = find_peaks(SBI, height=sb_cut)
+    nsbs = sbi.size
+
+    # step up <=> sign > 0
+    # step down <=> sign < 0
+    upordown = np.sign(dBr[sbi])
+
+    sbBr, sbBt, sbBn = np.zeros(shape=(3, nsbs, 2*sbsz))
+    sbur, sbut, sbun, sbunonr = np.zeros(shape=(4, nsbs, 2*sbsz))
+    sbrho, sbBmag = np.zeros(shape=(2, nsbs, 2*sbsz))
+    for i in range(nsbs):
+        sbBr[i] = Br[sbi[i]-sbsz:sbi[i]+sbsz]
+        sbBt[i] = Bt[sbi[i]-sbsz:sbi[i]+sbsz]
+        sbBn[i] = Bn[sbi[i]-sbsz:sbi[i]+sbsz]
+        sbur[i] = ur[sbi[i]-sbsz:sbi[i]+sbsz]
+        sbut[i] = ut[sbi[i]-sbsz:sbi[i]+sbsz]
+        sbun[i] = un[sbi[i]-sbsz:sbi[i]+sbsz]
+        sbunonr[i] = unonr[sbi[i]-sbsz:sbi[i]+sbsz]
+        sbrho[i] = rho[sbi[i]-sbsz:sbi[i]+sbsz]
+        sbBmag[i] = Bmag[sbi[i]-sbsz:sbi[i]+sbsz]
+
+    dropouts = {'step_up':{}, 'step_down': {}}
+    for step in dropouts:
+        mask = upordown > 0 if step == 'step_up' else upordown < 0
+        dropouts[step]['Br'] = sbBr[mask].mean(axis=0)
+        dropouts[step]['Bt'] = sbBt[mask].mean(axis=0)
+        dropouts[step]['Bn'] = sbBn[mask].mean(axis=0)
+        dropouts[step]['ur'] = sbur[mask].mean(axis=0)
+        dropouts[step]['ut'] = sbut[mask].mean(axis=0)
+        dropouts[step]['un'] = sbun[mask].mean(axis=0)
+        dropouts[step]['unonr'] = sbunonr[mask].mean(axis=0)
+        dropouts[step]['rho'] = sbrho[mask].mean(axis=0)
+        dropouts[step]['Bmag'] = sbBmag[mask].mean(axis=0)
+
+    dropouts['l_sb'] = l[round(l.size)//2 - sbsz:round(l.size)//2 + sbsz]
     return dropouts
     
     
