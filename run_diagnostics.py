@@ -256,7 +256,7 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
             sb_frac_radial, sb_frac_dev, sb_mask_dev, sb_mask_devflip, sb_ca_temp = None, None, None, None, None
             
             # clear unneeded variables to save memory, run flyby code after this
-            B, t, a = None 
+            B, t, a = None, None, None
             print('     Data cleared')
             diag.save_dict(S, output_dir, dict_name)
             print('     Dictionary saved')

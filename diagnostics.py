@@ -627,7 +627,7 @@ def switchback_finder(B, SB_mask, array3D=1):
     By = B[:,1] if array3D else B[1]
     Bz = B[:,2] if array3D else B[2]
     
-    labels, nlabels, label_array = label_switchbacks(SB_mask, array_3D=array3D)
+    labels, nlabels, label_array = label_switchbacks(SB_mask, array3D=array3D)
     
     # collect all switchbacks into a dictionary
     SBs = {
