@@ -8,6 +8,7 @@ import pickle
 import h5py
 import numpy as np
 import scipy.ndimage as ndimage
+from sklearn.decomposition import PCA
 from scipy.signal import find_peaks
 from pathlib import Path
 from itertools import permutations as perm
@@ -584,41 +585,65 @@ def switchback_threshold(B, theta_threshold=30, flyby=0):
 
     N_cells = Bx[0].size
     dev_from_mean = np.arccos(np.clip(B_dot_Bmean, -1., 1.))
-    SB_mask_all = dev_from_mean >= theta_threshold
-    SB_radial_flip = SB_mask_all & (Bx <= 0.)
+    SB_radial_flip = Bx <= 0.
+    SB_dev = dev_from_mean >= theta_threshold
+    SB_dev_radial_flip = SB_dev & SB_radial_flip
     # fraction of radial flips in box: number of cells with SBs / total cells in box
     if flyby:
-        full_SB_frac = SB_mask_all[SB_mask_all].size / N_cells
-        radial_SB_frac = SB_radial_flip[SB_radial_flip].size / N_cells
+        dev_SB_frac = SB_dev[SB_dev].size / N_cells  # number of SBs deviating from mean field
+        radial_SB_frac = SB_radial_flip[SB_radial_flip].size / N_cells  # number of SBs with flipped field
+        dev_radial_SB_frac = SB_dev_radial_flip[SB_dev_radial_flip].size / N_cells  # number of SBs dev from mean with radial flip
     else:
-        full_SB_frac = np.array([SB_mask_all[n][SB_mask_all[n]].size / N_cells for n in range(B.shape[0])])
+        dev_SB_frac = np.array([SB_dev[n][SB_dev[n]].size / N_cells for n in range(B.shape[0])])
         radial_SB_frac = np.array([SB_radial_flip[n][SB_radial_flip[n]].size / N_cells for n in range(B.shape[0])])
+        dev_radial_SB_frac = np.array([SB_dev_radial_flip[n][SB_dev_radial_flip[n]].size / N_cells for n in range(B.shape[0])])
+    
+    return SB_dev, SB_dev_radial_flip, dev_SB_frac, radial_SB_frac, dev_radial_SB_frac
+
+def label_switchbacks(SB_mask, array3D=1):
+    labels, nlabels = ndimage.label(SB_mask)
+    
+    if array3D:
+        # ensuring switchbacks are joined if straddling
+        # periodic boundaries
+        x_boundary = (labels[:, :, :, 0] > 0) & (labels[:, :, :, -1] > 0)
+        y_boundary = (labels[:, :, 0, :] > 0) & (labels[:, :, -1, :] > 0)
+        z_boundary = (labels[:, 0, :, :] > 0) & (labels[:, -1, :, :] > 0)
+        labels[:,:,:,-1][x_boundary] = labels[:,:,:,0][x_boundary]
+        labels[:,:,-1,:][y_boundary] = labels[:,:,0,:][y_boundary]
+        labels[:,-1,:,:][z_boundary] = labels[:,0,:,:][z_boundary]
         
-    return SB_mask_all, SB_radial_flip, full_SB_frac, radial_SB_frac
+        # update number of switchbacks
+        label_array = np.unique(labels[labels > 0])
+        nlabels = label_array.size
+    return labels, nlabels, label_array
 
 def switchback_finder(B, SB_mask, array3D=1):
     # label each individual switchback
     # and find the position of these switchbacks
     # treating the mask as a 3D "image"
-    labels, nlabels = ndimage.label(SB_mask)
-    pos = ndimage.find_objects(labels)
     
-    # collect all switchbacks into a dictionary
-    SBs = {
-        'n_SBs': nlabels,
-        'pos': pos
-    }
     Bx = B[:,0] if array3D else B[0]
     By = B[:,1] if array3D else B[1]
     Bz = B[:,2] if array3D else B[2]
     
-    for i in range(nlabels):
-        # iterate over each individual switchback one at a time
-        # setting its region to True and everywhere else False
-        SB_mask_copy = np.zeros_like(SB_mask)
-        SB_mask_copy[pos[i]] = SB_mask[pos[i]]
-        SB = np.array((Bx[SB_mask_copy], By[SB_mask_copy], Bz[SB_mask_copy]))
-        SBs[i] = SB        
+    labels, nlabels, label_array = label_switchbacks(SB_mask, array_3D=array3D)
+    
+    # collect all switchbacks into a dictionary
+    SBs = {
+        'n_SBs': nlabels
+    }
+
+    i = 0
+    for label_i in label_array:
+        # find all the points where switchbacks are
+        # only considering a collection of points greater than 10
+        points = np.where(labels == label_i)
+        if points[0].shape[0] <= 10:
+            SBs['n_SBs'] -= 1
+            continue
+        SBs[i] = np.array((Bx[points], By[points], Bz[points]))
+        i += 1
     
     return SBs
     
@@ -626,23 +651,45 @@ def switchback_aspect(SB_mask, Ls, Ns):
     # label each individual switchback
     # and find the position of these switchbacks
     # treating the mask as a 3D "image"
-    labels, nlabels = ndimage.label(SB_mask)
-    pos = ndimage.find_objects(labels)
+    labels, nlabels, label_array = label_switchbacks(SB_mask)
     
     if nlabels == 0:
         return 0.
-
+    
+    pcas = {}
     dx = Ls / Ns  # dz, dy, dx
-    aspect = 0.
-    # aspect ratio: crude
-    # average over the Lx length vs the average Lprp length
-    for i in range(nlabels):
-        Lx = (pos[i][3].stop - pos[i][3].start)*dx[2]
-        Ly = (pos[i][2].stop - pos[i][2].start)*dx[1]
-        Lz = (pos[i][1].stop - pos[i][1].start)*dx[0]
-        aspect += Lx / (0.5*(Ly+Lz))
-    aspect /= nlabels
-    return aspect
+    sb_index = 0
+    for label_i in label_array:
+        # get the points where the switchback resides
+        points = np.array(np.where(labels[0]==label_i), dtype='float').T
+        if points.shape[0] <= 10:
+            continue
+        points *= dx  # get real coordinates, in order to calculate lengths
+        # if the points cut across periodic boundaries, 
+        # shift until they form a cohesive whole
+        for i in range(3):
+            if ((abs(points[:, i]) < Ls[i]/10).any()):
+                points[:, i] = np.mod(points[:, i] + Ls[i]/4, Ls[i])
+            if ((abs(Ls[i] - points[:, i]) < Ls[i]/10).any()):
+                points[:, i] = np.mod(points[:, i] - Ls[i]/4, Ls[i])
+        
+        # perform a PCA on the switchback lengths
+        # this gives three vectors along which the
+        # length varies the most to the least
+        pca = PCA(n_components=3, whiten=True)
+        pca.fit(points)
+        # convention: switchback is aligned along direction
+        # with highest variance in length
+        # length along vector ~ 4*sqrt(variance)
+        V = pca.components_  # unit vectors sorted by variance
+        V_length = 4*np.sqrt(pca.explained_variance_)
+        pcas[sb_index] = {
+            'unit_vectors': V[:, ::-1],  # sorting x, y, z components
+            'lengths': V_length
+        }
+        sb_index += 1
+   
+    return pcas
 
 def clock_angle(B, SB_mask, mean_switchback=1, flyby=0):
     if flyby:

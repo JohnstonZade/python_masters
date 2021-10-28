@@ -59,7 +59,7 @@ def flyby(output_dir, flyby_a, flyby_n, do_rand_start=1, l_start=None,
     # if plotting, do a short flyby to cut down on space
     # otherwise flythrough most of the box and analyse
     total_length = N_y if output_plot else 100*N_y
-    dl = flyby_a*(yg[1] - yg[0])
+    dl = yg[1] - yg[0]
     N_dl = int(total_length / dl)
     lvec = np.linspace(-total_length/2, total_length/2, N_dl).reshape(N_dl, 1)
 
