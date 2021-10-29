@@ -601,21 +601,35 @@ def switchback_threshold(B, theta_threshold=30, flyby=0):
     return SB_dev, SB_dev_radial_flip, dev_SB_frac, radial_SB_frac, dev_radial_SB_frac
 
 def label_switchbacks(SB_mask, array3D=1):
-    labels, nlabels = ndimage.label(SB_mask)
+    if array3D:
+        s = ndimage.generate_binary_structure(4,4)
+        labels, nlabels = ndimage.label(SB_mask, structure=s)
+    else:
+        labels, nlabels = ndimage.label(SB_mask)
+    
     
     if array3D:
         # ensuring switchbacks are joined if straddling
-        # periodic boundaries
+        # periodic boundaries by setting labels the same
         x_boundary = (labels[:, :, :, 0] > 0) & (labels[:, :, :, -1] > 0)
         y_boundary = (labels[:, :, 0, :] > 0) & (labels[:, :, -1, :] > 0)
         z_boundary = (labels[:, 0, :, :] > 0) & (labels[:, -1, :, :] > 0)
-        labels[:,:,:,-1][x_boundary] = labels[:,:,:,0][x_boundary]
-        labels[:,:,-1,:][y_boundary] = labels[:,:,0,:][y_boundary]
-        labels[:,-1,:,:][z_boundary] = labels[:,0,:,:][z_boundary]
-        
+        boundaries = [z_boundary, y_boundary, x_boundary]
+
+        for i in range(3):
+            labels_left, labels_right = labels.take(0, axis=i+1), labels.take(-1, axis=i+1)
+            # get the labels that join up across the boundary
+            right_list = np.unique(labels_right[(labels_right > 0) & (labels_left > 0)])
+            for l in right_list:
+                # set the labels on the right to the corresponding labels on
+                # the left
+                bound_slice = np.where((labels_right == l) & boundaries[i])
+                labels[labels == l] = labels_left[bound_slice][0]
+
         # update number of switchbacks
         label_array = np.unique(labels[labels > 0])
         nlabels = label_array.size
+    
     return labels, nlabels, label_array
 
 def switchback_finder(B, SB_mask, array3D=1):
@@ -656,22 +670,46 @@ def switchback_aspect(SB_mask, Ls, Ns):
     if nlabels == 0:
         return 0.
     
+    points_shape = np.array([])
+    for label_i in label_array:
+        points = np.array(np.where(labels[0]==label_i), dtype='float').T
+        points_shape = np.append(points_shape, points.shape[0])
+    points_shape = points_shape[points_shape.argsort()[::-1]]
+    label_array = label_array[points_shape.argsort()[::-1]]  # sort by largest number of points
+    
     pcas = {}
     dx = Ls / Ns  # dz, dy, dx
     sb_index = 0
-    for label_i in label_array:
+    for idx, label_i in enumerate(label_array):
         # get the points where the switchback resides
-        points = np.array(np.where(labels[0]==label_i), dtype='float').T
-        if points.shape[0] <= 10:
+        if points_shape[idx] <= 20:
             continue
+        points = np.array(np.where(labels[0]==label_i), dtype='float').T
         points *= dx  # get real coordinates, in order to calculate lengths
-        # if the points cut across periodic boundaries, 
-        # shift until they form a cohesive whole
+        # shift switchbacks so they don't straddle the boundary
         for i in range(3):
-            if ((abs(points[:, i]) < Ls[i]/10).any()):
-                points[:, i] = np.mod(points[:, i] + Ls[i]/4, Ls[i])
-            if ((abs(Ls[i] - points[:, i]) < Ls[i]/10).any()):
-                points[:, i] = np.mod(points[:, i] - Ls[i]/4, Ls[i])
+            L = Ls[i]
+            ps = np.unique(points[:, i])
+            dx_i = dx[i]
+            # get the left and right most points of the boundary
+            left_point, right_point = ps.min(), ps.max()
+            # shift switchback to have leftmost point at origin
+            shift = left_point
+    
+            # if the switchback straddles the boundary
+            # find the rightmost point and shift to the boundary
+            # mod L
+            if left_point == 0 and right_point == (L-dx_i):
+                for r in range(2, ps.size+1):
+                    # looking for a gap larger than the grid spacing
+                    # to count as sides
+                    if right_point - ps[-r] == dx_i:
+                        right_point = ps[-r]
+                    else:
+                        break
+                shift = right_point
+
+            points[:, i] = np.mod(points[:, i] - shift, L)
         
         # perform a PCA on the switchback lengths
         # this gives three vectors along which the
