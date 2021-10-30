@@ -20,7 +20,7 @@ def flyby(output_dir, flyby_a, flyby_n, do_rand_start=1, l_start=None,
     # Loading data with the correct method scales the data to the physical variables
     data = diag.load_data(output_dir, flyby_n, prob='from_array', method=method)
     Ns, Ls = get_grid_info(data)
-    
+    Ls[:2] *= flyby_a  # stretch perpendicular lengths
     zg, yg, xg = reinterp_generate_grid(Ns, Ls)
     # Zg, Yg, Xg = np.meshgrid(zg, yg, xg, indexing='ij')  # only needed if defining a function on grid
     
@@ -51,17 +51,18 @@ def flyby(output_dir, flyby_a, flyby_n, do_rand_start=1, l_start=None,
     uz_i = rgi((zg, yg, xg), uz)
     Bmag_i = rgi((zg, yg, xg), Bmag)
     rho_i = rgi((zg, yg, xg), rho)
-
-    # N_linepts = 4*np.max(Ns)
-    # N_loop = 25  # number of times along an axis?
-    # lvec = np.linspace(0, N_loop, N_linepts).reshape(N_linepts, 1)    
-    N_y = Ns[1]
+  
     # if plotting, do a short flyby to cut down on space
-    # otherwise flythrough most of the box and analyse
-    total_length = N_y if output_plot else 100*N_y
-    dl = yg[1] - yg[0]
-    N_dl = int(total_length / dl)
-    lvec = np.linspace(-total_length/2, total_length/2, N_dl).reshape(N_dl, 1)
+    # otherwise fly through either 1/10 of the box 
+    # or 5 million points (for large resolutions) for analysis
+    N_points = Ns.prod()
+    N_dl = 50000 if output_plot else min(5e6, N_points//10)
+    dl = yg[1] - yg[0] # walk in steps of dy = a*Ly / Ny
+    total_length = N_dl * dl
+    print(N_dl)
+    print(dl)
+    print(total_length)
+    lvec = np.linspace(0, total_length, N_dl, endpoint=False).reshape(N_dl, 1)
 
     if do_rand_start:
         # start at random point in box
@@ -78,7 +79,7 @@ def flyby(output_dir, flyby_a, flyby_n, do_rand_start=1, l_start=None,
     FB['ux'], FB['uy'], FB['uz'] = ux_i(pts), uy_i(pts), uz_i(pts)
     FB['Bmag'], FB['rho'] = Bmag_i(pts), rho_i(pts)
     FB['start_point'], FB['direction'] = l_start, l_dir
-    FB['l_param'], FB['points'] = lvec, pts
+    FB['l_param'], FB['points'] = lvec[:, 0], pts
     FB['a'], FB['snapshot_number'] = flyby_a, flyby_n
     FB['normed_to_Bx'] = 'true' if norm_B0 else 'false'
 

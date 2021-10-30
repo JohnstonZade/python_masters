@@ -842,10 +842,10 @@ def mean_cos2(b_0, B_prp, a, output_dir):
 
 def plot_dropouts(flyby):
     # performing analysis as in Farrell
-    dl = 4  # units of resolution
+    dl = 8  # units of resolution a*L_y/N_y
     dBr = -flyby['Bx'][dl:] + flyby['Bx'][:-dl]
     dur = -flyby['ux'][dl:] + flyby['ux'][:-dl]
-    l = flyby['l_param'][:,0][dl//2:-dl//2]
+    l = flyby['l_param'][dl//2:-dl//2]
     Br = -flyby['Bx'][dl//2:-dl//2]
     Bt = -flyby['By'][dl//2:-dl//2]
     Bn =  flyby['Bz'][dl//2:-dl//2]
@@ -866,7 +866,11 @@ def plot_dropouts(flyby):
 
     # find the indicies where these occur
     sbi, sbh = find_peaks(SBI, height=sb_cut)
+    # can't analyse SBs too close to the edges
+    sbi = sbi[(sbi >= sbsz) & (sbi < Br.size - sbsz)]
     nsbs = sbi.size
+    
+    print(nsbs)
 
     # step up <=> sign > 0
     # step down <=> sign < 0

@@ -181,11 +181,8 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
     
     # step for non-continuous calculations
     a_max = 1 + expansion_rate*(max_n-1)*dt
-    a_step = 1 if (a_max > 2) else 0.1
-    if expansion_rate == 0:
-        spec_step = int(1 / dt) if max_n > 10 else 1
-    else:
-        spec_step = int(a_step / (expansion_rate*dt))  # eg if delta_a = 1, adot=0.5, dt=0.2 then spec_step = 10
+    a_step = 0.5  # analyse in steps of da = 0.5
+    spec_step = int(a_step / (expansion_rate*dt))
         
     S['spec_step'] = spec_step
     
@@ -198,68 +195,69 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
         for i in range(n_steps):
             n_start = n_done + i*steps
             n_end = n_done + (i+1)*steps
-            print(' Analysing n = ' + str(n_start) + ' to ' + str(n_end-1))
-            t, a, B, u, rho = diag.load_time_series(output_dir, n_start, n_end, method=method)
-            u, rho = None, None
-            print('     Data loaded')
-            
-            S['time'] = np.append(S['time'], t)
-            S['a'] = np.append(S['a'], a)
-            
-            # --- SWITCHBACK DIAGNOSTICS --- #
-            
-            Ns = np.array(B.shape[2:])  # Nz, Ny, Nx
-            Ls[:2] *= a
+            if n_start % spec_step == 0:
+                print(' Analysing n = ' + str(n_start) + ' to ' + str(n_end-1))
+                t, a, B, u, rho = diag.load_time_series(output_dir, n_start, n_end, method=method)
+                u, rho = None, None
+                print('     Data loaded')
+                
+                S['time'] = np.append(S['time'], t)
+                S['a'] = np.append(S['a'], a)
+                
+                # --- SWITCHBACK DIAGNOSTICS --- #
+                
+                Ns = np.array(B.shape[2:])  # Nz, Ny, Nx
+                Ls[:2] *= a
 
-            print('         - Calculating SB data')
-            # loop over threshold angles
-            for theta_threshold in [30, 60, 90]:
-                print('             - θ_thresh = ' + str(theta_threshold) + '∘')
-                sb_mask_dev, sb_mask_devflip, sb_frac_dev, sb_frac_radial, sb_frac_devflip = diag.switchback_threshold(B, theta_threshold=theta_threshold)
-                theta_dict = S['sb_data'][theta_threshold]
-                for n in range(n_start,n_end):
-                    t_index = n - n_start
-                    sb_ca_temp = diag.clock_angle(B[t_index:t_index+1], sb_mask_dev[t_index:t_index+1])
-                    if n == 0:
-                        # --- SETUP --- #
-                        # -- CLOCK ANGLE -- #
-                        theta_dict['clock_angle'] = {}
-                        theta_dict['clock_angle']['grid'] = sb_ca_temp['grid']
-                        theta_dict['clock_angle']['bins'] = sb_ca_temp['bins']
-                        theta_dict['clock_angle']['clock_angle_count'] = np.zeros_like(sb_ca_temp['grid'])
+                print('         - Calculating SB data')
+                # loop over threshold angles
+                for theta_threshold in [30, 60, 90]:
+                    print('             - θ_thresh = ' + str(theta_threshold) + '∘')
+                    sb_mask_dev, sb_mask_devflip, sb_frac_dev, sb_frac_radial, sb_frac_devflip = diag.switchback_threshold(B, theta_threshold=theta_threshold)
+                    theta_dict = S['sb_data'][theta_threshold]
+                    for n in range(n_start,n_end):
+                        t_index = n - n_start
+                        sb_ca_temp = diag.clock_angle(B[t_index:t_index+1], sb_mask_dev[t_index:t_index+1])
+                        if n == 0:
+                            # --- SETUP --- #
+                            # -- CLOCK ANGLE -- #
+                            theta_dict['clock_angle'] = {}
+                            theta_dict['clock_angle']['grid'] = sb_ca_temp['grid']
+                            theta_dict['clock_angle']['bins'] = sb_ca_temp['bins']
+                            theta_dict['clock_angle']['clock_angle_count'] = np.zeros_like(sb_ca_temp['grid'])
+                            
+                            # -- SB FRACTION -- #
+                            theta_dict['full_sb_frac'] = np.array([])
+                            theta_dict['radial_sb_frac'] = np.array([])
+                            theta_dict['aspect_full'] = {}
+                            theta_dict['aspect_radial_flip'] = {}
+
+                        # increment total count
+                        theta_dict['clock_angle']['clock_angle_count'] += sb_ca_temp['clock_angle_count']
                         
-                        # -- SB FRACTION -- #
-                        theta_dict['full_sb_frac'] = np.array([])
-                        theta_dict['radial_sb_frac'] = np.array([])
-                        theta_dict['aspect_full'] = np.array([])
-                        theta_dict['aspect_radial_flip'] = np.array([])
-
-                    # increment total count
-                    theta_dict['clock_angle']['clock_angle_count'] += sb_ca_temp['clock_angle_count']
-                    
-                    # add individual count
-                    s_name = str(n)
-                    theta_dict['clock_angle'][s_name] = sb_ca_temp['clock_angle_count']
-                    
-                    # add individual switchback fraction data
-                    theta_dict['full_sb_frac'] = np.append(theta_dict['full_sb_frac'], sb_frac_dev)
-                    theta_dict['radial_sb_frac'] = np.append(theta_dict['radial_sb_frac'], sb_frac_devflip)
-                    
-                    # do PCA analysis
-                    theta_dict['aspect_full'] = np.append(theta_dict['aspect_full'], diag.switchback_aspect(sb_mask_dev, Ls, Ns))
-                    theta_dict['aspect_radial_flip'] = np.append(theta_dict['aspect_radial_flip'], diag.switchback_aspect(sb_mask_devflip, Ls, Ns))
-                    
-                    S['sb_data'][theta_threshold] = theta_dict
-                    
-            # total radial switchback fraction (f_{bx < 0})
-            S['sb_data']['sb_frac_radial'] = np.append(S['sb_data']['sb_frac_radial'], sb_frac_radial)
-            sb_frac_radial, sb_frac_dev, sb_mask_dev, sb_mask_devflip, sb_ca_temp = None, None, None, None, None
-            
-            # clear unneeded variables to save memory, run flyby code after this
-            B, t, a = None, None, None
-            print('     Data cleared')
-            diag.save_dict(S, output_dir, dict_name)
-            print('     Dictionary saved')
+                        # add individual count
+                        s_name = str(n)
+                        theta_dict['clock_angle'][s_name] = sb_ca_temp['clock_angle_count']
+                        
+                        # add individual switchback fraction data
+                        theta_dict['full_sb_frac'] = np.append(theta_dict['full_sb_frac'], sb_frac_dev)
+                        theta_dict['radial_sb_frac'] = np.append(theta_dict['radial_sb_frac'], sb_frac_devflip)
+                        
+                        # do PCA analysis
+                        theta_dict['aspect_full'][s_name] = diag.switchback_aspect(sb_mask_dev, Ls, Ns)
+                        theta_dict['aspect_radial_flip'][s_name] = diag.switchback_aspect(sb_mask_devflip, Ls, Ns)
+                        
+                        S['sb_data'][theta_threshold] = theta_dict
+                        
+                # total radial switchback fraction (f_{bx < 0})
+                S['sb_data']['sb_frac_radial'] = np.append(S['sb_data']['sb_frac_radial'], sb_frac_radial)
+                sb_frac_radial, sb_frac_dev, sb_mask_dev, sb_mask_devflip, sb_ca_temp = None, None, None, None, None
+                
+                # clear unneeded variables to save memory, run flyby code after this
+                B, t, a = None, None, None
+                print('     Data cleared')
+                diag.save_dict(S, output_dir, dict_name)
+                print('     Dictionary saved')
     
     S['flyby'] = {}
     S['flyby']['sb_clock_angle'], S['flyby']['dropouts'] = {30: {}, 60: {}, 90: {}}, {}
