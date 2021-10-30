@@ -626,9 +626,9 @@ def label_switchbacks(SB_mask, array3D=1):
                 bound_slice = np.where((labels_right == l) & boundaries[i])
                 labels[labels == l] = labels_left[bound_slice][0]
 
-        # update number of switchbacks
-        label_array = np.unique(labels[labels > 0])
-        nlabels = label_array.size
+    # update number of switchbacks
+    label_array = np.unique(labels[labels > 0])
+    nlabels = label_array.size
     
     return labels, nlabels, label_array
 
@@ -683,8 +683,10 @@ def switchback_aspect(SB_mask, Ls, Ns):
     for idx, label_i in enumerate(label_array):
         # get the points where the switchback resides
         if points_shape[idx] <= 20:
-            continue
+            continue  # want more than 20 points
         points = np.array(np.where(labels[0]==label_i), dtype='float').T
+        if points.shape[0] < 3:
+            continue # want 3D structures
         points *= dx  # get real coordinates, in order to calculate lengths
         # shift switchbacks so they don't straddle the boundary
         for i in range(3):
@@ -870,8 +872,9 @@ def plot_dropouts(flyby):
     sbi = sbi[(sbi >= sbsz) & (sbi < Br.size - sbsz)]
     nsbs = sbi.size
     
-    print(nsbs)
-
+    if nsbs == 0:
+        return None
+    
     # step up <=> sign > 0
     # step down <=> sign < 0
     upordown = np.sign(dBr[sbi])

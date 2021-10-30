@@ -59,9 +59,6 @@ def flyby(output_dir, flyby_a, flyby_n, do_rand_start=1, l_start=None,
     N_dl = 50000 if output_plot else min(5e6, N_points//10)
     dl = yg[1] - yg[0] # walk in steps of dy = a*Ly / Ny
     total_length = N_dl * dl
-    print(N_dl)
-    print(dl)
-    print(total_length)
     lvec = np.linspace(0, total_length, N_dl, endpoint=False).reshape(N_dl, 1)
 
     if do_rand_start:

@@ -161,10 +161,20 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
     
     dict_name += '_sbdata'
     
+    # expansion rate, sound speed from athinput
+    expansion_rate, c_s_init, tlim, dt = read_athinput(athinput_path)
+    S['expansion_rate'] = expansion_rate
+    
+    # step for non-continuous calculations
+    a_step = 0.5  # analyse in steps of da = 0.5
+    spec_step = int(a_step / (expansion_rate*dt))
+    
+    
+    
     if diag.check_dict(output_dir, dict_name):
         S = diag.load_dict(output_dir, dict_name)
         n_done = S['a'].size
-        if n_done == max_n:
+        if n_done == (1 + max_n // spec_step):
             do_full_calc = False
             print('Not doing full calculation')
             
@@ -172,17 +182,10 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
     n_steps = int(np.ceil((max_n - n_done) / steps))
     print('n done = ' + str(n_done))
     
-    # expansion rate, sound speed from athinput
-    expansion_rate, c_s_init, tlim, dt = read_athinput(athinput_path)
-    S['expansion_rate'] = expansion_rate
+    
 
     L_x, L_prp = diag.get_lengths(output_dir=output_dir)[:2]
-    Ls = np.array([L_prp, L_prp, L_x])  # Lz, Ly, Lx
     
-    # step for non-continuous calculations
-    a_max = 1 + expansion_rate*(max_n-1)*dt
-    a_step = 0.5  # analyse in steps of da = 0.5
-    spec_step = int(a_step / (expansion_rate*dt))
         
     S['spec_step'] = spec_step
     
@@ -207,7 +210,10 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
                 # --- SWITCHBACK DIAGNOSTICS --- #
                 
                 Ns = np.array(B.shape[2:])  # Nz, Ny, Nx
-                Ls[:2] *= a
+                Ls = np.array([L_prp, L_prp, L_x])  # Lz, Ly, Lx
+                print(L_prp)
+                Ls[:2] *= a[0]
+                print(Ls)
 
                 print('         - Calculating SB data')
                 # loop over threshold angles
@@ -261,15 +267,16 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
     
     S['flyby'] = {}
     S['flyby']['sb_clock_angle'], S['flyby']['dropouts'] = {30: {}, 60: {}, 90: {}}, {}
-    for n in range(max_n):
+    flyby_n = np.arange(0, max_n, step=spec_step)
+    for i, n in enumerate(flyby_n):
         if n % spec_step == 0:
             print('Flyby started at n = ' + str(n))
             if expansion_rate != 0.0:
-                flyby_a = round(S['a'][n], 1)
+                flyby_a = round(S['a'][i], 1)
                 flyby_string = 'flyby_a' + str(flyby_a)
             else:
                 flyby_a = 1.0
-                flyby_string = 'flyby_t' + str(round(S['time'][n], 1))
+                flyby_string = 'flyby_t' + str(round(S['time'][i], 1))
             S['flyby'][flyby_string] = reinterpolate.flyby(output_dir, flyby_a, n, method=method)
             diag.save_dict(S, output_dir, dict_name)
             print(flyby_string + ' done')
