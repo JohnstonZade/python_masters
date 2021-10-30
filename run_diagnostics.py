@@ -211,9 +211,7 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
                 
                 Ns = np.array(B.shape[2:])  # Nz, Ny, Nx
                 Ls = np.array([L_prp, L_prp, L_x])  # Lz, Ly, Lx
-                print(L_prp)
                 Ls[:2] *= a[0]
-                print(Ls)
 
                 print('         - Calculating SB data')
                 # loop over threshold angles
