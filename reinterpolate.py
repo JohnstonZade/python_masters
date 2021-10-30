@@ -56,7 +56,7 @@ def flyby(output_dir, flyby_a, flyby_n, do_rand_start=1, l_start=None,
     # otherwise fly through either 1/10 of the box 
     # or 5 million points (for large resolutions) for analysis
     N_points = Ns.prod()
-    N_dl = 50000 if output_plot else min(5e6, N_points//10)
+    N_dl = 50000 if output_plot else min(int(5e6), N_points//10)
     dl = yg[1] - yg[0] # walk in steps of dy = a*Ly / Ny
     total_length = N_dl * dl
     lvec = np.linspace(0, total_length, N_dl, endpoint=False).reshape(N_dl, 1)
