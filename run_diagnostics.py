@@ -17,7 +17,7 @@ def read_athinput(athinput_path):
     return expansion_rate, iso_sound_speed, tlim, dt
  
 
-def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spectrum=0, do_flyby=1, 
+def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=1, do_spectrum=0, 
              override_do_full_calc=0, method='matt'):
     
     max_n = diag.get_maxn(output_dir)
@@ -153,7 +153,7 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, do_spec
             diag.save_dict(S, output_dir, dict_name)
 
 
-def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=10, method='matt'):
+def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=1, method='matt'):
     max_n = diag.get_maxn(output_dir)
     n_done = 0
     S = {}
