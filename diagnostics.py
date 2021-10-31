@@ -735,7 +735,7 @@ def clock_angle(B, SB_mask, mean_switchback=1, flyby=0):
     if flyby:
         Bx, By, Bz = B
         B0x, B0y = Bx.mean(), By.mean()  # Parker spiral
-        parker_angle = np.arctan(B0y/B0x)
+        parker_angle = np.arctan2(B0y, B0x)
         B0 = np.sqrt(B0x**2 + B0y**2)
         b0x, b0y = B0x/B0, B0y/B0
         Bprl = Bx*b0x + By*b0y
@@ -746,7 +746,7 @@ def clock_angle(B, SB_mask, mean_switchback=1, flyby=0):
         B_0 = box_avg(B) # mean field in box = Parker spiral
         comp_index = len(B_0.shape) - 1
         B0x, B0y = np.take(B_0, 0, comp_index), np.take(B_0, 1, comp_index)
-        parker_angle = np.arctan(B0y / B0x)
+        parker_angle = np.arctan2(B0y, B0x)
         b_0 = get_unit(box_avg(B, reshape=1))
         
         # get magnetic field vectors perpendicular
@@ -768,10 +768,12 @@ def clock_angle(B, SB_mask, mean_switchback=1, flyby=0):
             # T unit vector is -y_hat rotated by Parker angle
             B_N = SB_n[2] # +N <-> +z in box
             B_T = SB_n[0]*np.sin(parker_angle) - SB_n[1]*np.cos(parker_angle)
-            B_prp_mag = get_mag(SB_n, axis=0)
             # clock angle is measured clockwise from N axis (z axis in box)
             # 0 = +N (+z), 90 = +T (-y), 180 = -N (-z), 270/-90 = -T (+y)
-            clock_angle.append(np.arccos(B_N / B_prp_mag) if B_T >= 0. else -np.arccos(B_N / B_prp_mag))
+            # using north clockwise convention for arctan2
+            clock_angle.append(np.arctan2(B_T, B_N))
+        print('this is arccos')
+            
         ca = np.histogram(clock_angle, ca_bins)[0]
     else:
         shape_tup = (B_0.shape[0],1,1,1) if comp_index == 1 else (1,1,1)
@@ -782,11 +784,10 @@ def clock_angle(B, SB_mask, mean_switchback=1, flyby=0):
 
         B_N = np.take(B_prp, 2, comp_index)  # +N <-> +z in box
         B_T = np.take(B_prp, 0, comp_index) * t_prime_x + np.take(B_prp, 1, comp_index) * t_prime_y
-        B_prp_mag = get_mag(B_prp, axis=comp_index)
-        angle = np.arccos(B_N / B_prp_mag)
         # clock angle is measured clockwise from N axis (z axis in box)
         # 0 = +N (+z), 90 = +T (-y), 180 = -N (-z), 270/-90 = -T (+y)
-        clock_angle = np.where(B_T >= 0., angle, -angle)
+        clock_angle = np.arctan2(B_T, B_N)
+        print('this is arctan2')
         
         ca = np.histogram(clock_angle[SB_mask], ca_bins)[0]
 

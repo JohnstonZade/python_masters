@@ -305,3 +305,4 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
             # farrell analysis
             S['flyby']['dropouts'][flyby_string] = diag.plot_dropouts(flyby)
             diag.save_dict(S, output_dir, dict_name)
+            print(' - Dictionary saved')
