@@ -772,7 +772,6 @@ def clock_angle(B, SB_mask, mean_switchback=1, flyby=0):
             # 0 = +N (+z), 90 = +T (-y), 180 = -N (-z), 270/-90 = -T (+y)
             # using north clockwise convention for arctan2
             clock_angle.append(np.arctan2(B_T, B_N))
-        print('this is arccos')
             
         ca = np.histogram(clock_angle, ca_bins)[0]
     else:
@@ -787,7 +786,6 @@ def clock_angle(B, SB_mask, mean_switchback=1, flyby=0):
         # clock angle is measured clockwise from N axis (z axis in box)
         # 0 = +N (+z), 90 = +T (-y), 180 = -N (-z), 270/-90 = -T (+y)
         clock_angle = np.arctan2(B_T, B_N)
-        print('this is arctan2')
         
         ca = np.histogram(clock_angle[SB_mask], ca_bins)[0]
 
