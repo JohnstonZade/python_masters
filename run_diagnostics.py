@@ -89,15 +89,16 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=1, do_spect
             
             v_A = diag.alfven_speed(rho, B)
             S['alfven_speed'] = np.append(S['alfven_speed'], v_A)
-            b_0 = diag.get_unit(diag.box_avg(B, reshape=1)) # mean field
+            B_0 = diag.box_avg(B, reshape=1) # mean field
+            b_0 = diag.get_unit(B_0)
             
-            # Finding perpendicular fluctuations
-            B_prp = B - diag.dot_prod(B, b_0)*b_0
-            u_prp = u - diag.dot_prod(u, b_0)*b_0
+            # Fluctuations = field - mean
+            δB = B - B_0
+            δu = u
             # only do every now and then as FFT is computaionally intensive
             if n_start % spec_step == 0:
                 print('         - Calculating <cos^2 θ> ')
-                cos2_box, cos2_field, cos2_energy_weight, cos2_energyweight_no2D = diag.mean_cos2(b_0, B_prp, a, output_dir)
+                cos2_box, cos2_field, cos2_energy_weight, cos2_energyweight_no2D = diag.mean_cos2(b_0, δB, a, output_dir)
                 S['mean_cos2_theta']['box'] = np.append(S['mean_cos2_theta']['box'], cos2_box)
                 S['mean_cos2_theta']['field'] = np.append(S['mean_cos2_theta']['field'], cos2_field)
                 S['mean_cos2_theta']['energy_weight'] = np.append(S['mean_cos2_theta']['energy_weight'], cos2_energy_weight)
@@ -105,14 +106,14 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=1, do_spect
             b_0, u = None, None
             
             print('         - Calculating z+/-')
-            z_p_rms, z_m_rms = diag.z_waves_evo(rho, u_prp, B_prp, v_A)
+            z_p_rms, z_m_rms = diag.z_waves_evo(rho, δu, δB, v_A)
             S['z_plus'] = np.append(S['z_plus'], z_p_rms)
             S['z_minus'] = np.append(S['z_minus'], z_m_rms)
             z_p_rms, z_m_rms = None, None
             
             print('         - Calculating cross helicity')
-            S['cross_helicity'] = np.append(S['cross_helicity'], diag.cross_helicity(rho, u_prp, B_prp))
-            rho, B_prp, u_prp, v_A = None, None, None, None
+            S['cross_helicity'] = np.append(S['cross_helicity'], diag.cross_helicity(rho, δu, δB))
+            rho, δB, δu, v_A = None, None, None, None
             a = None
             
             print('         - Calculating magnetic compressibility')
@@ -129,7 +130,6 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=1, do_spect
         B_0 = diag.box_avg(B)[0, :2]  # initial mean field (always in xy-plane)
         B = None
         L_x, L_prp = diag.get_lengths(output_dir=output_dir)[:2]
-        Ls = np.array([L_prp, L_prp, L_x])  # Lz, Ly, Lx
         a_normfluc, Bprp_fluc, kinetic_fluc = diag.norm_fluc_amp_hst(output_dir, expansion_rate, B_0,
                                                                      Lx=L_x, Lperp=L_prp, method=method)
         S['a_norm_fluc'] = a_normfluc

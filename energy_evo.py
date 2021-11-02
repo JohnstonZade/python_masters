@@ -23,14 +23,11 @@ def get_fluc_energy(output_dir, adot, B_0,
     # Mean magnetic field evolution
     Bx_mean, By_mean = Bx0*a**-2, By0*a**-1
     mean_ME_x, mean_ME_y = 0.5*vol*Bx_mean**2, 0.5*vol*By_mean**2
-    
-    # no mean flows as of yet, removing mean field contribution
-    KEprp_comp = np.array([hstData['1-KE'], hstData['2-KE'], hstData['3-KE']])
-    MEprp_comp = np.array([(hstData['1-ME'] - mean_ME_x), (hstData['2-ME'] - mean_ME_y), hstData['3-ME']])
 
     # Total fluc energy is the sum of the individual components
-    KEprp = KEprp_comp.sum(axis=0)
-    MEprp = MEprp_comp.sum(axis=0)
+    # no mean flows as of yet, removing mean field contribution
+    KEprp = hstData['1-KE'] + hstData['2-KE'] + hstData['3-KE']
+    MEprp = (hstData['1-ME'] - mean_ME_x) + (hstData['2-ME'] - mean_ME_y) + hstData['3-ME']
     
     # scale by B_0**2
     mean_ME = mean_ME_x + mean_ME_y

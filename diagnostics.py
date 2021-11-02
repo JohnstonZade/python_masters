@@ -513,18 +513,18 @@ def alfven_speed(rho, B):
     return B0_mag / np.sqrt(box_avg(rho))
     
 
-def cross_helicity(rho, u_perp, B_perp): 
-    udotB = dot_prod(u_perp, B_perp)
-    u2, B2 = dot_prod(u_perp, u_perp), dot_prod(B_perp, B_perp)
+def cross_helicity(rho, u, B): 
+    udotB = dot_prod(u, B)
+    u2, B2 = dot_prod(u, u), dot_prod(B, B)
 
     return 2 * box_avg(np.sqrt(rho) * udotB) / box_avg(rho*u2 + B2)
 
 
-def z_waves_evo(rho, u_perp, B_perp, v_A):
+def z_waves_evo(rho, δu, δB, v_A):
     # magnetic field in velocity units
-    b_perp = B_perp / np.sqrt(rho)
-    z_p = u_perp + b_perp
-    z_m = u_perp - b_perp
+    δb = δB / np.sqrt(rho)
+    z_p = δu + δb
+    z_m = δu - δb
     z_p_rms, z_m_rms = rms(z_p) / v_A, rms(z_m) / v_A
     return z_p_rms, z_m_rms
 

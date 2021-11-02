@@ -182,11 +182,12 @@ def create_athena_alfvenspec(folder, h5name, n_X, X_min, X_max, meshblock, athin
     B0_x = 1.0  # mean Bx
     B0_y = 0.0  # mean By
     if do_parker:
+        # By0 / Bx0 ~ a
+        # final_bybx_ratio is what we want at a=final_bybx_a
         initial_bybx_ratio = final_bybx_ratio / final_bybx_a
         # we want B0_mag = 1.0 always
-        # can approximate B0_x as 1 if B0_y is small
         B0_x /= np.sqrt(1.0 + initial_bybx_ratio**2)
-        B0_y = -initial_bybx_ratio*B0_x  # see comment above
+        B0_y = -initial_bybx_ratio*B0_x
     
     # Generate mean fields
     # Density
