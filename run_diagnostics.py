@@ -192,7 +192,7 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
     if do_full_calc:
         if n_done == 0:
             S['time'], S['a'] = np.array([]), np.array([])
-            S['sb_data'] = {30: {}, 60: {}, 90: {}, 'sb_frac_radial': np.array([])}
+            S['sb_data'] = {60: {}, 90: {}, 120: {}, 150:{}, 'sb_frac_radial': np.array([])}
 
         print('max_n = ' + str(max_n))
         for i in range(n_steps):
@@ -215,7 +215,7 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
 
                 print('         - Calculating SB data')
                 # loop over threshold angles
-                for theta_threshold in [30, 60, 90]:
+                for theta_threshold in [60, 90, 120]:
                     print('             - θ_thresh = ' + str(theta_threshold) + '∘')
                     sb_mask_dev, sb_mask_devflip, sb_frac_dev, sb_frac_radial, sb_frac_devflip = diag.switchback_threshold(B, theta_threshold=theta_threshold)
                     theta_dict = S['sb_data'][theta_threshold]
@@ -284,7 +284,7 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
             flyby = reinterpolate.flyby(output_dir, flyby_a, n, method=method, output_plot=0)
             Bx, By, Bz, Bmag = flyby['Bx'], flyby['By'], flyby['Bz'], flyby['Bmag']
             
-            for theta_threshold in [30, 60, 90]:
+            for theta_threshold in [60, 90, 120]:
                 theta_dict = S['flyby']['sb_clock_angle'][theta_threshold]
                 # switchback finder
                 SB_mask = diag.switchback_threshold((Bx, By, Bmag), flyby=1, theta_threshold=theta_threshold)[0]

@@ -651,9 +651,9 @@ def switchback_finder(B, SB_mask, array3D=1):
     i = 0
     for label_i in label_array:
         # find all the points where switchbacks are
-        # only considering a collection of points greater than 10
+        # only considering a collection of points greater than 100
         points = np.where(labels == label_i)
-        if points[0].shape[0] <= 10:
+        if points[0].shape[0] <= 100:
             SBs['n_SBs'] -= 1
             continue
         SBs[i] = np.array((Bx[points], By[points], Bz[points]))
@@ -682,7 +682,7 @@ def switchback_aspect(SB_mask, Ls, Ns):
     sb_index = 0
     for idx, label_i in enumerate(label_array):
         # get the points where the switchback resides
-        if points_shape[idx] <= 20:
+        if points_shape[idx] <= 100:
             continue  # want more than 20 points
         points = np.array(np.where(labels[0]==label_i), dtype='float').T
         if points.shape[0] < 3:
@@ -735,33 +735,22 @@ def clock_angle(B, SB_mask, mean_switchback=1, flyby=0):
     if flyby:
         Bx, By, Bz = B
         B0x, B0y = Bx.mean(), By.mean()  # Parker spiral
-        parker_angle = np.arctan2(B0y, B0x)
-        B0 = np.sqrt(B0x**2 + B0y**2)
-        b0x, b0y = B0x/B0, B0y/B0
-        Bprl = Bx*b0x + By*b0y
-        Bprpx = Bx - Bprl*b0x
-        Bprpy = By - Bprl*b0y
-        B_prp = (Bprpx, Bprpy, Bz)
     else:
         B_0 = box_avg(B) # mean field in box = Parker spiral
         comp_index = len(B_0.shape) - 1
-        B0x, B0y = np.take(B_0, 0, comp_index), np.take(B_0, 1, comp_index)
-        parker_angle = np.arctan2(B0y, B0x)
-        b_0 = get_unit(box_avg(B, reshape=1))
-        
-        # get magnetic field vectors perpendicular
-        # to the mean field (this is in the rotated TN-plane)
-        B_prp = B - dot_prod(B, b_0, reshape=1)*b_0
+        B0x, B0y = np.take(B_0, 0, comp_index)[0], np.take(B_0, 1, comp_index)[0]
+    
+    parker_angle = np.arctan2(B0y, B0x)
     ca_bins = np.linspace(-np.pi, np.pi, 51)
     ca_grid = 0.5*(ca_bins[1:] + ca_bins[:-1])
     
     if mean_switchback:
-        # find the perpendicular components of switchbacks
-        # I'm assuming that projection and averaging commute
-        SBs = switchback_finder(B_prp, SB_mask, array3D=(not flyby))
+        # find switchbacks
+        SBs = switchback_finder(B, SB_mask, array3D=(not flyby))
         
         clock_angle = []
         for n in range(SBs['n_SBs']):
+            
             # find the mean vector over the entire switchback
             SB_n = SBs[n].mean(axis=1)
             # decompose vector into N and T components
@@ -781,8 +770,8 @@ def clock_angle(B, SB_mask, mean_switchback=1, flyby=0):
         t_prime_x =  np.sin(parker_angle)*np.ones(shape=shape_tup)
         t_prime_y = -np.cos(parker_angle)*np.ones(shape=shape_tup)
 
-        B_N = np.take(B_prp, 2, comp_index)  # +N <-> +z in box
-        B_T = np.take(B_prp, 0, comp_index) * t_prime_x + np.take(B_prp, 1, comp_index) * t_prime_y
+        B_N = np.take(B, 2, comp_index)  # +N <-> +z in box
+        B_T = np.take(B, 0, comp_index) * t_prime_x + np.take(B, 1, comp_index) * t_prime_y
         # clock angle is measured clockwise from N axis (z axis in box)
         # 0 = +N (+z), 90 = +T (-y), 180 = -N (-z), 270/-90 = -T (+y)
         clock_angle = np.arctan2(B_T, B_N)
@@ -815,7 +804,9 @@ def mean_cos2(b_0, B_prp, a, output_dir):
     Kmag = np.maximum(np.sqrt(Kprl**2 + Kprp**2), 1e-15)
     
     # cosine squared of angle between k and B_0
-    cos2_theta = (Kprl / Kmag)**2
+    cos2_theta_mean = (Kprl / Kmag)**2
+    # cosine squared of angle between k and x-axis
+    cos2_theta_radial = (KX[np.newaxis] / Kmag)**2
     
     # take the FFT of B_prp over the box
     len_shape = len(B_prp.shape)
@@ -830,16 +821,14 @@ def mean_cos2(b_0, B_prp, a, output_dir):
     # Total energy of fluctuations is the sum 
     # of the energy in each component
     energy = energy_vec.sum(axis=1)
-    
-    cos2_box = box_avg(abs(K[:, 0])**2 / np.maximum((abs(K[:, 0])**2 + abs(K[:, 1])**2 + abs(K[:, 2])**2),1e-15))  # mean box-allowed wave vector rotation due to expansion
-    cos2_field = box_avg(cos2_theta)  # mean box-allowed wave vector rotation relative to mean field
-    not2D_mode_mask = abs(Kprl) != 0.0
-    cos2_energyweight = box_avg(cos2_theta * energy) / box_avg(energy)
-    cos2_energyweight_no2D = np.mean(cos2_theta[not2D_mode_mask] * energy[not2D_mode_mask]) / np.mean(energy[not2D_mode_mask])
+    energy_avg = box_avg(energy)
+
+    cos2_energyweight_meanfield = box_avg(cos2_theta_mean * energy) / energy_avg  # weighted angle relative to the mean field
+    cos2_energyweight_radial = box_avg(cos2_theta_radial * energy) / energy_avg  # weighted angle relative to the radial direction
     
     # Weight the cosine2 at each point in the box by the energy at that point
     # and then average and normalize by the mean energy
-    return cos2_box, cos2_field, cos2_energyweight, cos2_energyweight_no2D
+    return cos2_energyweight_meanfield, cos2_energyweight_radial
 
 def plot_dropouts(flyby):
     # performing analysis as in Farrell
