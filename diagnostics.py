@@ -806,7 +806,7 @@ def mean_cos2(b_0, B_prp, a, output_dir):
     # cosine squared of angle between k and B_0
     cos2_theta_mean = (Kprl / Kmag)**2
     # cosine squared of angle between k and x-axis
-    cos2_theta_radial = (KX[np.newaxis] / Kmag)**2
+    cos2_theta_radial = (abs(KX[np.newaxis]) / Kmag)**2
     
     # take the FFT of B_prp over the box
     len_shape = len(B_prp.shape)
