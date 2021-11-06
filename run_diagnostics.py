@@ -61,7 +61,7 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=1, do_spect
             S['time'], S['a'] = np.array([]), np.array([])
             S['Bx_mean'], S['By_mean'], S['beta'] = np.array([]), np.array([]), np.array([])
             S['alfven_speed'] = np.array([])
-            S['mean_cos2_theta'] = {'box': np.array([]), 'field': np.array([]), 'energy_weight': np.array([]), 'no2D_energy_weight': np.array([])}
+            S['mean_cos2_theta'] = {'mean_field': np.array([]), 'radial': np.array([])}
             S['cross_helicity'], S['z_plus'], S['z_minus'] = np.array([]), np.array([]), np.array([])
             S['C_B2_Squire'] = np.array([])
 
@@ -98,11 +98,9 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=1, do_spect
             # only do every now and then as FFT is computaionally intensive
             if n_start % spec_step == 0:
                 print('         - Calculating <cos^2 θ> ')
-                cos2_box, cos2_field, cos2_energy_weight, cos2_energyweight_no2D = diag.mean_cos2(b_0, δB, a, output_dir)
-                S['mean_cos2_theta']['box'] = np.append(S['mean_cos2_theta']['box'], cos2_box)
-                S['mean_cos2_theta']['field'] = np.append(S['mean_cos2_theta']['field'], cos2_field)
-                S['mean_cos2_theta']['energy_weight'] = np.append(S['mean_cos2_theta']['energy_weight'], cos2_energy_weight)
-                S['mean_cos2_theta']['no2D_energy_weight'] = np.append(S['mean_cos2_theta']['no2D_energy_weight'], cos2_energyweight_no2D)
+                cos2_meanfield, cos2_radial = diag.mean_cos2(b_0, δB, a, output_dir)
+                S['mean_cos2_theta']['mean_field'] = np.append(S['mean_cos2_theta']['mean_field'], cos2_meanfield)
+                S['mean_cos2_theta']['radial'] = np.append(S['mean_cos2_theta']['radial'], cos2_radial)
             b_0, u = None, None
             
             print('         - Calculating z+/-')
