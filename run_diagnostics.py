@@ -190,7 +190,7 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
     if do_full_calc:
         if n_done == 0:
             S['time'], S['a'] = np.array([]), np.array([])
-            S['sb_data'] = {60: {}, 90: {}, 120: {}, 150:{}, 'sb_frac_radial': np.array([])}
+            S['sb_data'] = {60: {}, 90: {}, 120: {}, 'sb_frac_radial': np.array([])}
 
         print('max_n = ' + str(max_n))
         for i in range(n_steps):
@@ -262,7 +262,7 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
                 print('     Dictionary saved')
     
     S['flyby'] = {}
-    S['flyby']['sb_clock_angle'], S['flyby']['dropouts'] = {30: {}, 60: {}, 90: {}}, {}
+    S['flyby']['sb_clock_angle'], S['flyby']['dropouts'] = {60: {}, 90: {}, 120: {}}, {}
     flyby_n = np.arange(0, max_n, step=spec_step)
     for i, n in enumerate(flyby_n):
         if n % spec_step == 0:
