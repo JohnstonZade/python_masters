@@ -84,6 +84,10 @@ def edit_athinput(athinput, save_folder, n_X, X_min, X_max, meshblock, h5name,
     # hdf5 output
     ath_dict['output2']['dt'] = dt
     ath_dict['output2']['file_number'] = n_hdf5
+    
+    # rst
+    ath_dict['output3']['file_name'] = 'rst'
+    ath_dict['output3']['dt'] = 256.0
 
     # X1
     ath_dict['mesh']['nx1'] = n_X[0]
