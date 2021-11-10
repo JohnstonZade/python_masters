@@ -18,7 +18,7 @@ def read_athinput(athinput_path):
  
 
 def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=1, do_spectrum=0, 
-             override_do_full_calc=0, method='matt'):
+             override_do_full_calc=0, do_cos=1, method='matt'):
     
     max_n = diag.get_maxn(output_dir)
     n_done = 0
@@ -96,7 +96,7 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=1, do_spect
             δB = B - B_0
             δu = u
             # only do every now and then as FFT is computaionally intensive
-            if n_start % spec_step == 0:
+            if do_cos and n_start % spec_step == 0:
                 print('         - Calculating <cos^2 θ> ')
                 cos2_meanfield, cos2_radial = diag.mean_cos2(b_0, δB, a, output_dir)
                 S['mean_cos2_theta']['mean_field'] = np.append(S['mean_cos2_theta']['mean_field'], cos2_meanfield)
