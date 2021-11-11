@@ -124,10 +124,9 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=1, do_spect
             print('     Dictionary saved')
         
         print('Calculating amplitude evolution')
-        B = diag.load_time_series(output_dir, 0, 1, method=method)[2]
-        B_0 = diag.box_avg(B)[0, :2]  # initial mean field (always in xy-plane)
-        B = None
-        L_x, L_prp = diag.get_lengths(output_dir=output_dir)[:2]
+        B_0 = (S['Bx_mean'][0], S['By_mean'][0]) # initial mean field (always in xy-plane)
+        mesh_data = athinput_dict(athinput_path)['mesh']
+        L_x, L_prp = mesh_data['x1max'], mesh_data['x2max']
         a_normfluc, Bprp_fluc, kinetic_fluc = diag.norm_fluc_amp_hst(output_dir, expansion_rate, B_0,
                                                                      Lx=L_x, Lperp=L_prp, method=method)
         S['a_norm_fluc'] = a_normfluc
