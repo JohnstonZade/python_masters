@@ -225,6 +225,7 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
                     theta_dict = S['sb_data'][theta_threshold]
                     for n in range(n_start,n_end):
                         t_index = n - n_start
+                        print('                 - Doing clock angle')
                         sb_ca_temp = diag.clock_angle(B[t_index:t_index+1], sb_mask_dev[t_index:t_index+1], (B0x, B0y))
                         if n == 0:
                             # --- SETUP --- #
@@ -249,6 +250,7 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
                         theta_dict['full_sb_frac'] = np.append(theta_dict['full_sb_frac'], sb_frac_dev)
                         
                         # do PCA analysis
+                        print('                 - Doing PCA')
                         theta_dict['aspect'][s_name] = diag.switchback_aspect(sb_mask_dev, Ls, Ns)
                         
                         S['sb_data'][theta_threshold] = theta_dict

@@ -633,7 +633,7 @@ def switchback_finder(B, SB_mask, array3D=1):
     for label_i in label_array:
         # find all the points where switchbacks are
         # only considering a collection of points greater than 100
-        points = np.where(labels == label_i)
+        points = np.nonzero(labels == label_i)
         if array3D and points[0].shape[0] <= 100:
             SBs['n_SBs'] -= 1
             continue
@@ -664,8 +664,8 @@ def switchback_aspect(SB_mask, Ls, Ns):
     for idx, label_i in enumerate(label_array):
         # get the points where the switchback resides
         if points_shape[idx] <= 100:
-            continue  # want more than 20 points
-        points = np.array(np.where(labels[0]==label_i), dtype='float').T
+            continue  # want more than 100 points
+        points = np.array(np.nonzero(labels[0]==label_i), dtype='float').T
         if points.shape[0] < 3:
             continue # want 3D structures
         points *= dx  # get real coordinates, in order to calculate lengths
