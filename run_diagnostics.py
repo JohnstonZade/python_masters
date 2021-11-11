@@ -190,8 +190,7 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
     if not override and do_full_calc:
         if n_done == 0:
             S['time'], S['a'] = np.array([]), np.array([])
-            S['sb_data'] = {90: {}, 120: {}, 'sb_frac_radial': np.array([])}
-            # S['sb_data'] = {60: {}, 90: {}, 120: {}, 'sb_frac_radial': np.array([])}
+            S['sb_data'] = {60: {}, 90: {}, 120: {}, 'sb_frac_radial': np.array([])}
 
         print('max_n = ' + str(max_n))
         for i in range(n_steps):
@@ -220,8 +219,7 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
 
                 print('         - Calculating SB data')
                 # loop over threshold angles
-                for theta_threshold in [90, 120]:
-                # for theta_threshold in [60, 90, 120]:
+                for theta_threshold in [60, 90, 120]:
                     print('             - θ_thresh = ' + str(theta_threshold) + '∘')
                     sb_mask_dev, sb_frac_dev = diag.switchback_threshold(B_dot_Bmean, N_cells, theta_threshold=theta_threshold)
                     theta_dict = S['sb_data'][theta_threshold]

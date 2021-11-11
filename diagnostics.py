@@ -633,11 +633,12 @@ def switchback_finder(B, SB_mask, array3D=1):
     for label_i in label_array:
         # find all the points where switchbacks are
         # only considering a collection of points greater than 100
-        points = np.nonzero(labels == label_i)
-        if array3D and points[0].shape[0] <= 100:
+        # points = np.nonzero(labels == label_i)
+        labels_mask = labels == label_i
+        if array3D and labels[labels_mask].size <= 100:
             SBs['n_SBs'] -= 1
             continue
-        SBs[i] = np.array((Bx[points], By[points], Bz[points]))
+        SBs[i] = np.array((Bx[labels_mask], By[labels_mask], Bz[labels_mask]))
         i += 1
     
     return SBs
@@ -647,16 +648,23 @@ def switchback_aspect(SB_mask, Ls, Ns):
     # and find the position of these switchbacks
     # treating the mask as a 3D "image"
     labels, nlabels, label_array = label_switchbacks(SB_mask)
+    labels = labels[0]
+    
+    # get grid of points
+    Nz, Ny, Nx = np.meshgrid(np.arange(0, Ns[0], dtype='float'),
+                             np.arange(0, Ns[1], dtype='float'),
+                             np.arange(0, Ns[2], dtype='float'), indexing='ij')
     
     if nlabels == 0:
         return 0.
     
     points_shape = np.array([])
     for label_i in label_array:
-        points = np.array(np.where(labels[0]==label_i), dtype='float').T
-        points_shape = np.append(points_shape, points.shape[0])
-    points_shape = points_shape[points_shape.argsort()[::-1]]
-    label_array = label_array[points_shape.argsort()[::-1]]  # sort by largest number of points
+        n_points = labels[labels == label_i].size
+        points_shape = np.append(points_shape, n_points)
+    points_sort = points_shape.argsort()[::-1]
+    points_shape = points_shape[points_sort]
+    label_array = label_array[points_sort]  # sort by largest number of points
     
     pcas = {}
     dx = Ls / Ns  # dz, dy, dx
@@ -665,9 +673,9 @@ def switchback_aspect(SB_mask, Ls, Ns):
         # get the points where the switchback resides
         if points_shape[idx] <= 100:
             continue  # want more than 100 points
-        points = np.array(np.nonzero(labels[0]==label_i), dtype='float').T
-        if points.shape[0] < 3:
-            continue # want 3D structures
+        label_mask = labels == label_i
+        points = np.array([Nz[label_mask], Ny[label_mask], Nx[label_mask]]).T
+
         points *= dx  # get real coordinates, in order to calculate lengths
         # shift switchbacks so they don't straddle the boundary
         for i in range(3):
@@ -706,7 +714,8 @@ def switchback_aspect(SB_mask, Ls, Ns):
         V_length = 4*np.sqrt(pca.explained_variance_)
         pcas[sb_index] = {
             'unit_vectors': V[:, ::-1],  # sorting x, y, z components
-            'lengths': V_length
+            'lengths': V_length,
+            'n_points': points_shape[idx]
         }
         sb_index += 1
    
