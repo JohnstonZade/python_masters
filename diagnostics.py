@@ -565,40 +565,21 @@ def norm_fluc_amp_hst(output_dir, adot, B_0, Lx=1., Lperp=1., method='matt', pro
 
 # --- EXPANDING BOX CODE --- #
 
-def switchback_threshold(B, theta_threshold=30, flyby=0):
+def switchback_threshold(B_dot_Bmean, N_cells, theta_threshold=30, flyby=0):
     # finding magnetic field reversals with an deviation greater
     # than theta_threshold from the mean magnetic field/Parker spiral
     # theta_threshold is input in degrees
     theta_threshold *= np.pi / 180
 
-    if flyby:
-        Bx, By, Bmag = B
-        # calculate either deviation from radial or Parker
-        B0x, B0y = (Bx.mean(), By.mean())
-        B0 = np.sqrt(B0x**2 + B0y**2)
-        B_dot_Bmean = (Bx*B0x+By*B0y) / (Bmag*B0)
-    else:
-        Bx = B[:, 0]
-        B_0 = box_avg(B, reshape=1) # mean field in box = Parker spiral
-        b, b_0 = get_unit(B), get_unit(B_0)
-        B_dot_Bmean = dot_prod(b, b_0, 1)
-
-    N_cells = Bx[0].size
     dev_from_mean = np.arccos(np.clip(B_dot_Bmean, -1., 1.))
-    SB_radial_flip = Bx <= 0.
     SB_dev = dev_from_mean >= theta_threshold
-    SB_dev_radial_flip = SB_dev & SB_radial_flip
     # fraction of radial flips in box: number of cells with SBs / total cells in box
     if flyby:
         dev_SB_frac = SB_dev[SB_dev].size / N_cells  # number of SBs deviating from mean field
-        radial_SB_frac = SB_radial_flip[SB_radial_flip].size / N_cells  # number of SBs with flipped field
-        dev_radial_SB_frac = SB_dev_radial_flip[SB_dev_radial_flip].size / N_cells  # number of SBs dev from mean with radial flip
     else:
-        dev_SB_frac = np.array([SB_dev[n][SB_dev[n]].size / N_cells for n in range(B.shape[0])])
-        radial_SB_frac = np.array([SB_radial_flip[n][SB_radial_flip[n]].size / N_cells for n in range(B.shape[0])])
-        dev_radial_SB_frac = np.array([SB_dev_radial_flip[n][SB_dev_radial_flip[n]].size / N_cells for n in range(B.shape[0])])
+        dev_SB_frac = SB_dev[0][SB_dev[0]].size / N_cells
     
-    return SB_dev, SB_dev_radial_flip, dev_SB_frac, radial_SB_frac, dev_radial_SB_frac
+    return SB_dev, dev_SB_frac
 
 def label_switchbacks(SB_mask, array3D=1):
     if array3D:
@@ -653,7 +634,7 @@ def switchback_finder(B, SB_mask, array3D=1):
         # find all the points where switchbacks are
         # only considering a collection of points greater than 100
         points = np.where(labels == label_i)
-        if points[0].shape[0] <= 100:
+        if array3D and points[0].shape[0] <= 100:
             SBs['n_SBs'] -= 1
             continue
         SBs[i] = np.array((Bx[points], By[points], Bz[points]))
@@ -731,15 +712,8 @@ def switchback_aspect(SB_mask, Ls, Ns):
    
     return pcas
 
-def clock_angle(B, SB_mask, mean_switchback=1, flyby=0):
-    if flyby:
-        Bx, By, Bz = B
-        B0x, B0y = Bx.mean(), By.mean()  # Parker spiral
-    else:
-        B_0 = box_avg(B) # mean field in box = Parker spiral
-        comp_index = len(B_0.shape) - 1
-        B0x, B0y = np.take(B_0, 0, comp_index)[0], np.take(B_0, 1, comp_index)[0]
-    
+def clock_angle(B, SB_mask, B0, mean_switchback=1, flyby=0):
+    B0x, B0y = B0
     parker_angle = np.arctan2(B0y, B0x)
     ca_bins = np.linspace(-np.pi, np.pi, 51)
     ca_grid = 0.5*(ca_bins[1:] + ca_bins[:-1])
@@ -747,7 +721,7 @@ def clock_angle(B, SB_mask, mean_switchback=1, flyby=0):
     if mean_switchback:
         # find switchbacks
         SBs = switchback_finder(B, SB_mask, array3D=(not flyby))
-        
+               
         clock_angle = []
         for n in range(SBs['n_SBs']):
             
@@ -761,7 +735,7 @@ def clock_angle(B, SB_mask, mean_switchback=1, flyby=0):
             # 0 = +N (+z), 90 = +T (-y), 180 = -N (-z), 270/-90 = -T (+y)
             # using north clockwise convention for arctan2
             clock_angle.append(np.arctan2(B_T, B_N))
-            
+
         ca = np.histogram(clock_angle, ca_bins)[0]
     else:
         shape_tup = (B_0.shape[0],1,1,1) if comp_index == 1 else (1,1,1)
