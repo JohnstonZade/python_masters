@@ -181,7 +181,8 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
     
     
 
-    L_x, L_prp = diag.get_lengths(output_dir=output_dir)[:2]
+    mesh_data = athinput_dict(athinput_path)['mesh']
+    L_x, L_prp = mesh_data['x1max'], mesh_data['x2max']
     
         
     S['spec_step'] = spec_step
