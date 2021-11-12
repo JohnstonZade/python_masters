@@ -261,6 +261,7 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
                         theta_dict['aspect'][s_name] = diag.switchback_aspect((labels, nlabels, label_array), Ls, Ns)
                         
                         S['sb_data'][theta_threshold] = theta_dict
+                        diag.save_dict(S, output_dir, dict_name)
                         
                 # total radial switchback fraction (f_{bx < 0})
                 SB_radial_flip = B[:, 0] <= 0.
