@@ -613,24 +613,30 @@ def label_switchbacks(SB_mask, array3D=1):
     
     return labels, nlabels, label_array
 
-def switchback_finder(B, SB_mask, array3D=1):
+def switchback_finder(B, SB_mask=None, array3D=1, label_tuple=None):
     # label each individual switchback
     # and find the position of these switchbacks
     # treating the mask as a 3D "image"
     
-    Bx = B[:,0] if array3D else B[0]
-    By = B[:,1] if array3D else B[1]
-    Bz = B[:,2] if array3D else B[2]
+    Bx = B[0]
+    By = B[1]
+    Bz = B[2]
     
-    labels, nlabels, label_array = label_switchbacks(SB_mask, array3D=array3D)
+    if array3D:
+        labels, nlabels, label_array = label_tuple
+    else:
+        labels, nlabels, label_array = label_switchbacks(SB_mask, array3D=0)
     
+    max_sb = min(50, nlabels)
     # collect all switchbacks into a dictionary
     SBs = {
-        'n_SBs': nlabels
+        'n_SBs': max_sb
     }
 
     i = 0
     for label_i in label_array:
+        if i > max_sb:
+            break
         # find all the points where switchbacks are
         # only considering a collection of points greater than 100
         # points = np.nonzero(labels == label_i)
@@ -642,13 +648,19 @@ def switchback_finder(B, SB_mask, array3D=1):
         i += 1
     
     return SBs
-    
-def switchback_aspect(SB_mask, Ls, Ns):
+
+def sort_sb_by_size(labels, label_array):
+    points_shape = np.array([])
+    for label_i in label_array:
+        n_points = labels[labels == label_i].size
+        points_shape = np.append(points_shape, n_points)
+    return label_array[points_shape.argsort()[::-1]]  # sort by largest number of points
+
+def switchback_aspect(label_tuple, Ls, Ns):
     # label each individual switchback
     # and find the position of these switchbacks
     # treating the mask as a 3D "image"
-    labels, nlabels, label_array = label_switchbacks(SB_mask)
-    labels = labels[0]
+    labels, nlabels, label_array = label_tuple
     
     # get grid of points
     Nz, Ny, Nx = np.meshgrid(np.arange(0, Ns[0], dtype='float'),
@@ -658,24 +670,19 @@ def switchback_aspect(SB_mask, Ls, Ns):
     if nlabels == 0:
         return 0.
     
-    points_shape = np.array([])
-    for label_i in label_array:
-        n_points = labels[labels == label_i].size
-        points_shape = np.append(points_shape, n_points)
-    points_sort = points_shape.argsort()[::-1]
-    points_shape = points_shape[points_sort]
-    label_array = label_array[points_sort]  # sort by largest number of points
-    
     pcas = {}
     dx = Ls / Ns  # dz, dy, dx
     sb_index = 0
-    for idx, label_i in enumerate(label_array):
+    max_sb = min(50, label_array.size)  # look at the 50 biggest switchbacks
+    for label_i in label_array:
+        if sb_index > max_sb:
+            break
         # get the points where the switchback resides
-        if points_shape[idx] <= 100:
-            continue  # want more than 100 points
         label_mask = labels == label_i
         points = np.array([Nz[label_mask], Ny[label_mask], Nx[label_mask]]).T
-
+        if points.shape[0] < 100:
+            continue  # looking at regions with 100 points or more
+        
         points *= dx  # get real coordinates, in order to calculate lengths
         # shift switchbacks so they don't straddle the boundary
         for i in range(3):
@@ -715,13 +722,13 @@ def switchback_aspect(SB_mask, Ls, Ns):
         pcas[sb_index] = {
             'unit_vectors': V[:, ::-1],  # sorting x, y, z components
             'lengths': V_length,
-            'n_points': points_shape[idx]
+            'n_points': labels[label_mask].size
         }
         sb_index += 1
    
     return pcas
 
-def clock_angle(B, SB_mask, B0, mean_switchback=1, flyby=0):
+def clock_angle(B, B0, SB_mask=None, label_tuple=None, mean_switchback=1, flyby=0):
     B0x, B0y = B0
     parker_angle = np.arctan2(B0y, B0x)
     ca_bins = np.linspace(-np.pi, np.pi, 51)
@@ -729,7 +736,7 @@ def clock_angle(B, SB_mask, B0, mean_switchback=1, flyby=0):
     
     if mean_switchback:
         # find switchbacks
-        SBs = switchback_finder(B, SB_mask, array3D=(not flyby))
+        SBs = switchback_finder(B, SB_mask=SB_mask, label_tuple=label_tuple, array3D=(not flyby))
                
         clock_angle = []
         for n in range(SBs['n_SBs']):

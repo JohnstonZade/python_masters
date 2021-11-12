@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.ndimage.measurements import label
 import diagnostics as diag
 import spectrum as spec
 import reinterpolate
@@ -221,12 +222,18 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
                 # loop over threshold angles
                 for theta_threshold in [60, 90, 120]:
                     print('             - θ_thresh = ' + str(theta_threshold) + '∘')
+                    print('                 - Doing switchback threshold')
                     sb_mask_dev, sb_frac_dev = diag.switchback_threshold(B_dot_Bmean, N_cells, theta_threshold=theta_threshold)
+                    print('                 - Doing switchback labels')
+                    labels, nlabels, label_array = diag.label_switchbacks(sb_mask_dev)
+                    labels = labels[0]
+                    label_array = diag.sort_sb_by_size(labels, label_array)
                     theta_dict = S['sb_data'][theta_threshold]
+                    
                     for n in range(n_start,n_end):
                         t_index = n - n_start
                         print('                 - Doing clock angle')
-                        sb_ca_temp = diag.clock_angle(B[t_index:t_index+1], sb_mask_dev[t_index:t_index+1], (B0x, B0y))
+                        sb_ca_temp = diag.clock_angle(B[0], (B0x, B0y), label_tuple=(labels, nlabels, label_array))
                         if n == 0:
                             # --- SETUP --- #
                             # -- CLOCK ANGLE -- #
@@ -251,7 +258,7 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
                         
                         # do PCA analysis
                         print('                 - Doing PCA')
-                        theta_dict['aspect'][s_name] = diag.switchback_aspect(sb_mask_dev, Ls, Ns)
+                        theta_dict['aspect'][s_name] = diag.switchback_aspect((labels, nlabels, label_array), Ls, Ns)
                         
                         S['sb_data'][theta_threshold] = theta_dict
                         
@@ -300,7 +307,7 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
                 # switchback finder
                 SB_mask = diag.switchback_threshold(B_dot_Bmean, N_cells, flyby=1, theta_threshold=theta_threshold)[0]
                 # flyby clock angle
-                clock_angle_dict = diag.clock_angle((Bx, By, Bz), SB_mask, (B0x, B0y), flyby=1)
+                clock_angle_dict = diag.clock_angle((Bx, By, Bz), (B0x, B0y), SB_mask=SB_mask, flyby=1)
                 if n == 0:
                     # set up bins and grid
                     # these will be the same for all runs
