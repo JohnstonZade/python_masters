@@ -224,8 +224,9 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
                     print('             - θ_thresh = ' + str(theta_threshold) + '∘')
                     print('                 - Doing switchback threshold')
                     sb_mask_dev, sb_frac_dev = diag.switchback_threshold(B_dot_Bmean, N_cells, theta_threshold=theta_threshold)
-                    print('                 - Doing switchback labels')
-                    if n_start % 2*spec_step == 0:  # do clock angle/labeling every da=1
+                    
+                    if n_start % (2*spec_step) == 0:  # do clock angle/labeling every da=1
+                        print('                 - Doing switchback labels')
                         labels, nlabels, label_array = diag.label_switchbacks(sb_mask_dev)
                         labels = labels[0]
                         label_array = diag.sort_sb_by_size(labels, label_array)
@@ -233,6 +234,11 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
                     
                     for n in range(n_start,n_end):
                         t_index = n - n_start
+                        
+                        if n_start % (2*spec_step) == 0:
+                            print('                 - Doing clock angle')
+                            sb_ca_temp = diag.clock_angle(B[0], (B0x, B0y), label_tuple=(labels, nlabels, label_array))
+
                         
                         if n == 0:
                             # --- SETUP --- #
@@ -246,11 +252,7 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
                             theta_dict['full_sb_frac'] = np.array([])
                             theta_dict['aspect'] = {}
 
-                        
-                        if n_start % 2*spec_step == 0:
-                            print('                 - Doing clock angle')
-                            sb_ca_temp = diag.clock_angle(B[0], (B0x, B0y), label_tuple=(labels, nlabels, label_array))
-                        
+                        if n_start % (2*spec_step) == 0:
                             # increment total count
                             theta_dict['clock_angle']['clock_angle_count'] += sb_ca_temp['clock_angle_count']
                             
@@ -261,7 +263,7 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
                             # do PCA analysis
                             print('                 - Doing PCA')
                             theta_dict['aspect'][s_name] = diag.switchback_aspect((labels, nlabels, label_array), Ls, Ns)
-                            
+                        
                         # add individual switchback fraction data
                         theta_dict['full_sb_frac'] = np.append(theta_dict['full_sb_frac'], sb_frac_dev)
                         
