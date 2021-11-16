@@ -151,7 +151,7 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=1, do_spect
             diag.save_dict(S, output_dir, dict_name)
 
 
-def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=1, method='matt', override=0):
+def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=1, method='matt', start_at=0, n_startat=0):
     max_n = diag.get_maxn(output_dir)
     n_done = 0
     S = {}
@@ -171,11 +171,13 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
     
     if diag.check_dict(output_dir, dict_name):
         S = diag.load_dict(output_dir, dict_name)
-        n_done = S['a'].size
+        n_done =  S['a'].size
         if n_done == (1 + (max_n // spec_step)):
             do_full_calc = False
             print('Not doing full calculation')
-            
+    
+    if start_at:
+        n_done = n_startat
     # overestimate the number of steps needed; edge case is handled when loading data
     n_steps = int(np.ceil((max_n - n_done) / steps))
     print('n done = ' + str(n_done))
@@ -188,7 +190,7 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
         
     S['spec_step'] = spec_step
     
-    if not override and do_full_calc:
+    if do_full_calc:
         if n_done == 0:
             S['time'], S['a'] = np.array([]), np.array([])
             S['sb_data'] = {60: {}, 90: {}, 120: {}, 'sb_frac_radial': np.array([])}
