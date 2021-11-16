@@ -221,6 +221,10 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
                 print('         - Calculating SB data')
                 # loop over threshold angles
                 for theta_threshold in [60, 90, 120]:
+                    s_name = str(n_start)
+                    if s_name in S['sb_data'][theta_threshold]['clock_angle'].keys():
+                        print('Skipping θ_thresh = ' + str(theta_threshold) + '∘ as already done')
+                        continue
                     print('             - θ_thresh = ' + str(theta_threshold) + '∘')
                     print('                 - Doing switchback threshold')
                     sb_mask_dev, sb_frac_dev = diag.switchback_threshold(B_dot_Bmean, N_cells, theta_threshold=theta_threshold)
