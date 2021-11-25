@@ -146,8 +146,9 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=1, do_spect
                     spec_name = 'mhd_spec_a' + str(round(S['a'][n], 1))
                 else:
                     spec_name = 'mhd_spec_t' + str(round(S['time'][n], 1))
-                S['spectra'][spec_name] = spec.calc_spectrum(output_dir, output_dir, prob='from_array', dict_name=spec_name,
-                                                  do_single_file=1, n=n, method=method)
+                if spec_name not in S['spectra'].keys():
+                    S['spectra'][spec_name] = spec.calc_spectrum(output_dir, output_dir, prob='from_array', dict_name=spec_name,
+                                                    do_single_file=1, n=n, method=method)
             diag.save_dict(S, output_dir, dict_name)
 
 
