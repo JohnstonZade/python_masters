@@ -134,7 +134,7 @@ def create_athena_fromh5(save_folder, athinput_in_folder, athinput_in, h5name, a
             f['cons'] = np.array(f_athdf['cons'])  # no need to unwrap meshblocks
     else:
         hydro_prim = np.copy(f_athdf['prim'])  # don't want to modify the original data set
-        for i in range(3):
+        for i in range(1, 4):
             hydro_prim[i] *= hydro_prim[0]  # getting momentum variables (vel * density)
         with h5py.File(h5name, 'a') as f:
             f['cons'] = hydro_prim

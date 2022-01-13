@@ -91,11 +91,12 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=1, do_spect
             v_A = diag.alfven_speed(rho, B)
             S['alfven_speed'] = np.append(S['alfven_speed'], v_A)
             B_0 = diag.box_avg(B, reshape=1) # mean field
+            u_0 = diag.box_avg(u, reshape=1)
             b_0 = diag.get_unit(B_0)
-            
+
             # Fluctuations = field - mean
             δB = B - B_0
-            δu = u
+            δu = u - u_0  # shouldn't be any mean velocity field but feel better doing this
             # only do every now and then as FFT is computaionally intensive
             if do_cos and n_start % spec_step == 0:
                 print('         - Calculating <cos^2 θ> ')

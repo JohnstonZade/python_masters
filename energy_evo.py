@@ -27,7 +27,7 @@ def get_fluc_energy(output_dir, adot, B_0,
     # Total fluc energy is the sum of the individual components
     # no mean flows as of yet, removing mean field contribution
     KEprp = hstData['1-KE'] + hstData['2-KE'] + hstData['3-KE']
-    MEprp = (hstData['1-ME'] - mean_ME_x) + (hstData['2-ME'] - mean_ME_y) + hstData['3-ME']
+    MEprp = np.maximum(hstData['1-ME'] - mean_ME_x, 0) + np.maximum(hstData['2-ME'] - mean_ME_y, 0) + hstData['3-ME']
     
     # scale by B_0**2
     mean_ME = mean_ME_x + mean_ME_y
