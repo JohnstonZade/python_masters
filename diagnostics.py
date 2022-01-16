@@ -627,25 +627,15 @@ def switchback_finder(B, SB_mask=None, array3D=1, label_tuple=None):
     else:
         labels, nlabels, label_array = label_switchbacks(SB_mask, array3D=0)
     
-    max_sb = min(50, nlabels)
     # collect all switchbacks into a dictionary
     SBs = {
-        'n_SBs': max_sb
+        'n_SBs': nlabels
     }
 
-    i = 0
-    for label_i in label_array:
-        if i > max_sb:
-            break
-        # find all the points where switchbacks are
-        # only considering a collection of points greater than 100
-        # points = np.nonzero(labels == label_i)
+    for i, label_i in enumerate(label_array):
         labels_mask = labels == label_i
-        if array3D and labels[labels_mask].size <= 100:
-            SBs['n_SBs'] -= 1
-            continue
-        SBs[i] = np.array((Bx[labels_mask], By[labels_mask], Bz[labels_mask]))
-        i += 1
+        n_points = labels[labels_mask].size
+        SBs[i] = {'B_field': np.array((Bx[labels_mask], By[labels_mask], Bz[labels_mask])), 'n_points': n_points}
     
     return SBs
 
@@ -728,99 +718,65 @@ def switchback_aspect(label_tuple, Ls, Ns):
    
     return pcas
 
-def clock_angle(B, B0, SB_mask=None, label_tuple=None, mean_switchback=1, flyby=0):
+def clock_angle(B, B0, SB_mask=None, label_tuple=None, flyby=0):
     B0x, B0y = B0
     parker_angle = np.arctan2(B0y, B0x)
     ca_bins = np.linspace(-np.pi, np.pi, 51)
     ca_grid = 0.5*(ca_bins[1:] + ca_bins[:-1])
     
-    if mean_switchback:
-        # find switchbacks
-        SBs = switchback_finder(B, SB_mask=SB_mask, label_tuple=label_tuple, array3D=(not flyby))
-               
-        clock_angle = []
-        for n in range(SBs['n_SBs']):
-            
-            # find the mean vector over the entire switchback
-            SB_n = SBs[n].mean(axis=1)
-            # decompose vector into N and T components
-            # T unit vector is -y_hat rotated by Parker angle
-            B_N = SB_n[2] # +N <-> +z in box
-            B_T = SB_n[0]*np.sin(parker_angle) - SB_n[1]*np.cos(parker_angle)
-            # clock angle is measured clockwise from N axis (z axis in box)
-            # 0 = +N (+z), 90 = +T (-y), 180 = -N (-z), 270/-90 = -T (+y)
-            # using north clockwise convention for arctan2
-            clock_angle.append(np.arctan2(B_T, B_N))
-
-        ca = np.histogram(clock_angle, ca_bins)[0]
-    else:
-        shape_tup = (B_0.shape[0],1,1,1) if comp_index == 1 else (1,1,1)
-        # unit vector in T direction in TN-plane rotated to
-        # be perpendicular to mean field
-        t_prime_x =  np.sin(parker_angle)*np.ones(shape=shape_tup)
-        t_prime_y = -np.cos(parker_angle)*np.ones(shape=shape_tup)
-
-        B_N = np.take(B, 2, comp_index)  # +N <-> +z in box
-        B_T = np.take(B, 0, comp_index) * t_prime_x + np.take(B, 1, comp_index) * t_prime_y
-        # clock angle is measured clockwise from N axis (z axis in box)
-        # 0 = +N (+z), 90 = +T (-y), 180 = -N (-z), 270/-90 = -T (+y)
-        clock_angle = np.arctan2(B_T, B_N)
-        
-        ca = np.histogram(clock_angle[SB_mask], ca_bins)[0]
+    SBs = switchback_finder(B, SB_mask=SB_mask, label_tuple=label_tuple, array3D=(not flyby))
+    
+    all_vector_clock_angle = []
+    mean_vector_clock_angle = []
+    for n in range(SBs['n_SBs']):
+        # magnetic field in nth switchback
+        SB_n = SBs[n]['B_field']
+        # decompose vector into N and T components
+        # T unit vector is -y_hat rotated by Parker angle
+        B_N = SB_n[2] # +N <-> +z in box
+        B_T = SB_n[0]*np.sin(parker_angle) - SB_n[1]*np.cos(parker_angle)
+        B_R = -SB_n[0]*np.cos(parker_angle) - SB_n[1]*np.sin(parker_angle) # along mean field direction
+        all_vector_clock_angle.extend(np.arctan2(B_T, B_N))
+        B_N_mean, B_T_mean, B_R_mean = B_N.mean(), B_T.mean(), B_R.mean()
+        mean_vector_clock_angle.append(np.arctan2(B_T_mean, B_N_mean))
+        SBs[n]['B_field'] = (B_R_mean, B_T_mean, B_N_mean)  # update to mean B field in RTN coordinates
+    
+    ca_allvector = np.histogram(all_vector_clock_angle, ca_bins)[0]
+    ca_meanvector = np.histogram(mean_vector_clock_angle, ca_bins)[0]
 
     return {
-        'clock_angle_count': ca,
+        'all_clock_angle_count': ca_allvector,
+        'mean_clock_angle_count': ca_meanvector,
         'bins': ca_bins,
-        'grid': ca_grid
+        'grid': ca_grid,
+        'SB_info': SBs
     }
-    
-def mean_cos2(b_0, B_prp, a, output_dir):
-    # part of diagnostic used in Mallet2021
-    # assumes time series
-    
-    # load in the grid at the first snapshot
-    # this won't change in the comobile frame
-    KZ, KY, KX = ft_grid('output',output_dir=output_dir, make_iso_box=0)
-    # add in a evolution to perpendicular lengths
-    K_temp = np.array([KX, KY, KZ]).reshape(1,3,*KX.shape)
-    K = K_temp / a.reshape(a.shape[0],1,1,1,1)
-    K[:, 0] *= a.reshape(a.shape[0],1,1,1)
 
-    # Decomposing k parallel and perpendicular to mean field
-    Kprl = dot_prod(K, b_0)
-    Kprp = K - dot_prod(K, b_0, reshape=1)*b_0
-    Kprl = abs(Kprl)
-    Kprp = get_mag(abs(Kprp))
-    Kmag = np.maximum(np.sqrt(Kprl**2 + Kprp**2), 1e-15)
+def polarisation_fraction(B, rho, inside_SB=0, SB_mask=None):
     
-    # cosine squared of angle between k and B_0
-    cos2_theta_mean = (Kprl / Kmag)**2
-    # cosine squared of angle between k and x-axis
-    cos2_theta_radial = (abs(KX[np.newaxis]) / Kmag)**2
+    if inside_SB:
+        Bx, By, Bz = B[:, 0][SB_mask], B[:, 1][SB_mask], B[:, 2][SB_mask]
+        B2 = Bx**2 + By**2 + Bz**2
+        rho_xi = rho[SB_mask]
+    else:
+        rho_xi = rho
+        B2 = (B**2).sum(axis=1)
     
-    # take the FFT of B_prp over the box
-    len_shape = len(B_prp.shape)
-    box_axes = np.arange(len_shape-3, len_shape)
-    prp_fft = np.fft.fftn(B_prp, axes=box_axes)
-    
-    # Energy of fluctuations is mod^2 of FFT of fluctuations
-    # Have to normalize by the number of points in the box
-    N_points = np.array(prp_fft.shape[-3:]).prod()
-    energy_vec = 0.5*abs(prp_fft)**2 / N_points
-    
-    # Total energy of fluctuations is the sum 
-    # of the energy in each component
-    energy = energy_vec.sum(axis=1)
-    energy_avg = box_avg(energy)
+    B2_mean = B2.mean()
+    dB2 = (B2 - B2_mean) / B2_mean
 
-    cos2_energyweight_meanfield = box_avg(cos2_theta_mean * energy) / energy_avg  # weighted angle relative to the mean field
-    cos2_energyweight_radial = box_avg(cos2_theta_radial * energy) / energy_avg  # weighted angle relative to the radial direction
+    rho_mean = rho_xi.mean()
+    drho = (rho_xi - rho_mean) / rho_mean
     
-    # Weight the cosine2 at each point in the box by the energy at that point
-    # and then average and normalize by the mean energy
-    return cos2_energyweight_meanfield, cos2_energyweight_radial
+    if (drho == 0.).all():
+        xi = 0.
+    else:
+        temp = dB2 / drho
+        xi = temp[abs(temp) <= 5]  # removing the large outliers
+    xi_counts, bins = np.histogram(xi, bins=50, density=True)
+    return xi_counts, bins
 
-def plot_dropouts(flyby):
+def plot_dropouts(flyby, c_s):
     # performing analysis as in Farrell
     dl = 8  # units of resolution a*L_y/N_y
     dBr = -flyby['Bx'][dl:] + flyby['Bx'][:-dl]
@@ -835,9 +791,18 @@ def plot_dropouts(flyby):
     unonr = np.sqrt(ut**2 + un**2)
     rho = flyby['rho'][dl//2:-dl//2]
     Bmag = flyby['Bmag'][dl//2:-dl//2]
+    
+    mean_rho = rho.mean()
+    d_rho = (rho - mean_rho) / mean_rho
+    
+    tot_p = c_s**2 * (rho / flyby['norms']['rho']) + 0.5 * (Bmag / flyby['norms']['B'])**2
+    mean_tot_p = tot_p.mean()
+    d_tot_p = (tot_p - mean_tot_p) / mean_tot_p
+    
+    
 
     # switchback index
-    SBI = dBr*dur
+    SBI = dBr*dur  # this is normalised by v_A*B_0 automatically
     # only look at places with SBIs above sb_cut
     # this is what is used in Farrell
     sb_cut = 0.75
@@ -859,7 +824,9 @@ def plot_dropouts(flyby):
 
     sbBr, sbBt, sbBn = np.zeros(shape=(3, nsbs, 2*sbsz))
     sbur, sbut, sbun, sbunonr = np.zeros(shape=(4, nsbs, 2*sbsz))
-    sbrho, sbBmag = np.zeros(shape=(2, nsbs, 2*sbsz))
+    sbrho, sbBmag, sbtotp = np.zeros(shape=(3, nsbs, 2*sbsz))
+    sbdrho, sbdtotp = np.zeros(shape=(2, nsbs, 2*sbsz))
+    
     for i in range(nsbs):
         sbBr[i] = Br[sbi[i]-sbsz:sbi[i]+sbsz]
         sbBt[i] = Bt[sbi[i]-sbsz:sbi[i]+sbsz]
@@ -870,6 +837,11 @@ def plot_dropouts(flyby):
         sbunonr[i] = unonr[sbi[i]-sbsz:sbi[i]+sbsz]
         sbrho[i] = rho[sbi[i]-sbsz:sbi[i]+sbsz]
         sbBmag[i] = Bmag[sbi[i]-sbsz:sbi[i]+sbsz]
+        sbtotp[i] = tot_p[sbi[i]-sbsz:sbi[i]+sbsz]
+        sbdrho[i] = d_rho[sbi[i]-sbsz:sbi[i]+sbsz]
+        sbdtotp[i] = d_tot_p[sbi[i]-sbsz:sbi[i]+sbsz]
+        
+        
 
     dropouts = {'step_up':{}, 'step_down': {}}
     for step in dropouts:
@@ -883,14 +855,12 @@ def plot_dropouts(flyby):
         dropouts[step]['unonr'] = sbunonr[mask].mean(axis=0)
         dropouts[step]['rho'] = sbrho[mask].mean(axis=0)
         dropouts[step]['Bmag'] = sbBmag[mask].mean(axis=0)
+        dropouts[step]['tot_p'] = sbtotp[mask].mean(axis=0)
+        dropouts[step]['d_rho'] = sbdrho[mask].mean(axis=0)
+        dropouts[step]['d_tot_p'] = sbdtotp[mask].mean(axis=0)
+        
+        
+        
 
     dropouts['l_sb'] = l[round(l.size)//2 - sbsz:round(l.size)//2 + sbsz]
     return dropouts
-    
-    
-def Bfluc_Mallet2021(adot, cos2_theta, beta, g):
-    # Equation 88 from paper, assuming this is equivalent
-    # to magnetic compressibility
-    # assuming g is the normalized fluctuation amplitude
-
-    return 0

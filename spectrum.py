@@ -74,6 +74,7 @@ def calc_spectrum(output_dir, save_dir, return_dict=1, prob=default_prob,
             # Find their energy (i.e. Parseval's theorem)
             # Add to total energy spectrum
             for vel in fields[:3]:
+                print('Doing ' + vel + ' spectrum')
                 v = data[vel]
                 ft = fft.fftn(v) / Npoints
                 iso = spec1D(ft, Kmag, Kmag_bins, Kmag_mult)
@@ -88,6 +89,7 @@ def calc_spectrum(output_dir, save_dir, return_dict=1, prob=default_prob,
 
             Bmag = 0
             for Bcc in fields[3:6]:
+                print('Doing ' + Bcc + ' spectrum')
                 B = data[Bcc]
                 ft = fft.fftn(B - np.mean(B)) / Npoints
                 iso = spec1D(ft, Kmag, Kmag_bins, Kmag_mult)

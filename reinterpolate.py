@@ -32,14 +32,15 @@ def flyby(output_dir, flyby_a, flyby_n, do_rand_start=1, l_start=None,
     v_A = diag.alfven_speed(rho_data, B)
     scale_B_mean = 1 / B_0 if norm_B0 else 1  # 1 / <Bx> = a^2
     scale_v_A = 1 / v_A if norm_B0 else 1  # rho^1/2 / <Bx> = rho^1/2 * a^2
-
+    scale_rho = flyby_a**2 if norm_B0 else 1
+    
     Bx = pad_array(data['Bcc1'] * scale_B_mean)
     By = pad_array(data['Bcc2'] * scale_B_mean)
     Bz = pad_array(data['Bcc3'] * scale_B_mean)
     ux = pad_array(data['vel1'] * scale_v_A)
     uy = pad_array(data['vel2'] * scale_v_A)
     uz = pad_array(data['vel3'] * scale_v_A)
-    rho = pad_array(rho_data) *flyby_a**2
+    rho = pad_array(rho_data * scale_rho)
     Bmag = np.sqrt(Bx**2 + By**2 + Bz**2)
 
     # interpolaters
@@ -79,6 +80,7 @@ def flyby(output_dir, flyby_a, flyby_n, do_rand_start=1, l_start=None,
     FB['l_param'], FB['points'] = lvec[:, 0], pts
     FB['a'], FB['snapshot_number'] = flyby_a, flyby_n
     FB['normed_to_Bx'] = 'true' if norm_B0 else 'false'
-
+    FB['norms'] = {'B': scale_B_mean, 'u': scale_v_A, 'rho': scale_rho}
+    
     return FB
 
