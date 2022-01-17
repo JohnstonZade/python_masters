@@ -242,9 +242,9 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
                     
                     if n_start % (2*spec_step) == 0:  # do clock angle/labeling every da=1
                         print('                 - Doing switchback labels')
-                        labels, nlabels, label_array = diag.label_switchbacks(sb_mask_dev)
+                        labels, nlabels, label_array, pos = diag.label_switchbacks(sb_mask_dev)
                         labels = labels[0]
-                        label_array = diag.sort_sb_by_size(labels, label_array)
+                        # label_array = diag.sort_sb_by_size(labels, label_array)
                     theta_dict = S['sb_data'][theta_threshold]
                     
                     xi, xi_bins = diag.polarisation_fraction(B, rho, inside_SB=1, SB_mask=sb_mask_dev)
@@ -265,7 +265,7 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
 
                         if n_start % (2*spec_step) == 0:
                             print('                 - Doing clock angle')
-                            sb_ca_temp = diag.clock_angle(B[0], (B0x, B0y), label_tuple=(labels, nlabels, label_array))
+                            sb_ca_temp = diag.clock_angle(B[0], (B0x, B0y), SB_mask=sb_mask_dev[0], label_tuple=(labels, nlabels, label_array, pos))
                             
                             # add individual count
                             theta_dict['clock_angle']['all'][s_name] = sb_ca_temp['all_clock_angle_count']

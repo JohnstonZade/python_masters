@@ -589,29 +589,30 @@ def label_switchbacks(SB_mask, array3D=1):
         labels, nlabels = ndimage.label(SB_mask)
     
     
-    if array3D:
-        # ensuring switchbacks are joined if straddling
-        # periodic boundaries by setting labels the same
-        x_boundary = (labels[:, :, :, 0] > 0) & (labels[:, :, :, -1] > 0)
-        y_boundary = (labels[:, :, 0, :] > 0) & (labels[:, :, -1, :] > 0)
-        z_boundary = (labels[:, 0, :, :] > 0) & (labels[:, -1, :, :] > 0)
-        boundaries = [z_boundary, y_boundary, x_boundary]
+    # if array3D:
+    #     # ensuring switchbacks are joined if straddling
+    #     # periodic boundaries by setting labels the same
+    #     x_boundary = (labels[:, :, :, 0] > 0) & (labels[:, :, :, -1] > 0)
+    #     y_boundary = (labels[:, :, 0, :] > 0) & (labels[:, :, -1, :] > 0)
+    #     z_boundary = (labels[:, 0, :, :] > 0) & (labels[:, -1, :, :] > 0)
+    #     boundaries = [z_boundary, y_boundary, x_boundary]
 
-        for i in range(3):
-            labels_left, labels_right = labels.take(0, axis=i+1), labels.take(-1, axis=i+1)
-            # get the labels that join up across the boundary
-            right_list = np.unique(labels_right[(labels_right > 0) & (labels_left > 0)])
-            for l in right_list:
-                # set the labels on the right to the corresponding labels on
-                # the left
-                bound_slice = np.where((labels_right == l) & boundaries[i])
-                labels[labels == l] = labels_left[bound_slice][0]
+    #     for i in range(3):
+    #         labels_left, labels_right = labels.take(0, axis=i+1), labels.take(-1, axis=i+1)
+    #         # get the labels that join up across the boundary
+    #         right_list = np.unique(labels_right[(labels_right > 0) & (labels_left > 0)])
+    #         for l in right_list:
+    #             # set the labels on the right to the corresponding labels on
+    #             # the left
+    #             bound_slice = np.where((labels_right == l) & boundaries[i])
+    #             labels[labels == l] = labels_left[bound_slice][0]
 
     # update number of switchbacks
     label_array = np.unique(labels[labels > 0])
-    nlabels = label_array.size
+    pos = ndimage.find_objects(labels[0])
+    # nlabels = label_array.size
     
-    return labels, nlabels, label_array
+    return labels, nlabels, label_array, pos
 
 def switchback_finder(B, SB_mask=None, array3D=1, label_tuple=None):
     # label each individual switchback
@@ -623,20 +624,30 @@ def switchback_finder(B, SB_mask=None, array3D=1, label_tuple=None):
     Bz = B[2]
     
     if array3D:
-        labels, nlabels, label_array = label_tuple
+        labels, nlabels, label_array, pos = label_tuple
     else:
-        labels, nlabels, label_array = label_switchbacks(SB_mask, array3D=0)
+        labels, nlabels, label_array, pos = label_switchbacks(SB_mask, array3D=0)
     
     # collect all switchbacks into a dictionary
     SBs = {
         'n_SBs': nlabels
     }
 
-    for i, label_i in enumerate(label_array):
-        labels_mask = labels == label_i
-        n_points = labels[labels_mask].size
-        SBs[i] = {'B_field': np.array((Bx[labels_mask], By[labels_mask], Bz[labels_mask])), 'n_points': n_points}
-    
+    if array3D:
+        for i in range(nlabels):
+            pos_i = pos[i]
+            SB_mask_copy = np.zeros_like(SB_mask)
+            SB_mask_copy[pos_i] = SB_mask[pos_i]
+            n_points = SB_mask_copy[SB_mask_copy == 1].size
+            # labels_mask = labels == label_i
+            # n_points = labels[labels_mask].size
+            SBs[i] = {'B_field': np.array((Bx[SB_mask_copy], By[SB_mask_copy], Bz[SB_mask_copy])), 'n_points': n_points}
+    else:
+        for i, label_i in enumerate(label_array):
+            labels_mask = labels == label_i
+            n_points = labels[labels_mask].size
+            SBs[i] = {'B_field': np.array((Bx[labels_mask], By[labels_mask], Bz[labels_mask])), 'n_points': n_points}
+
     return SBs
 
 def sort_sb_by_size(labels, label_array):
