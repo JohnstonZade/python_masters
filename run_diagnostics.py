@@ -341,7 +341,7 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
                 S['flyby']['sb_clock_angle'][theta_threshold] = theta_dict
                 clock_angle_dict = None
             # farrell analysis
-            c_s = c_s_init**flyby_a**(-2/3)
+            c_s = c_s_init*flyby_a**(-2/3)
             S['flyby']['dropouts'][flyby_string] = diag.plot_dropouts(flyby, c_s)
             diag.save_dict(S, output_dir, dict_name)
             print(' - Dictionary saved')
