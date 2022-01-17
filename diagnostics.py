@@ -735,8 +735,10 @@ def clock_angle(B, B0, SB_mask=None, label_tuple=None, flyby=0):
     ca_bins = np.linspace(-np.pi, np.pi, 51)
     ca_grid = 0.5*(ca_bins[1:] + ca_bins[:-1])
     
+    print('Finding switchbacks')
     SBs = switchback_finder(B, SB_mask=SB_mask, label_tuple=label_tuple, array3D=(not flyby))
     
+    print('Decomposing for clock angle')
     all_vector_clock_angle = []
     mean_vector_clock_angle = []
     for n in range(SBs['n_SBs']):
