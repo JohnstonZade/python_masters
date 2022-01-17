@@ -768,11 +768,9 @@ def polarisation_fraction(B, rho, inside_SB=0, SB_mask=None):
     rho_mean = rho_xi.mean()
     drho = (rho_xi - rho_mean) / rho_mean
     
-    if (drho == 0.).all():
-        xi = 0.
-    else:
-        temp = dB2 / drho
-        xi = temp[abs(temp) <= 5]  # removing the large outliers
+    drho[drho == 0.] = 1e-15
+    temp = dB2 / drho
+    xi = temp[abs(temp) <= 5]  # removing the large outliers
     xi_counts, bins = np.histogram(xi, bins=50, density=True)
     return xi_counts, bins
 
