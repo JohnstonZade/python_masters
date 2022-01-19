@@ -635,7 +635,7 @@ def switchback_finder(B, SB_mask=None, array3D=1, label_tuple=None):
 
     if array3D:
         for i in range(nlabels):
-            print(str(i) + '/' + str(nlabels))
+            # print(str(i) + '/' + str(nlabels))
             pos_i = pos[i]
             SB_mask_copy = np.zeros_like(SB_mask)
             SB_mask_copy[pos_i] = SB_mask[pos_i]
