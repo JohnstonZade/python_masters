@@ -639,10 +639,10 @@ def switchback_finder(B, SB_mask=None, array3D=1, label_tuple=None):
             pos_i = pos[i]
             SB_mask_copy = np.zeros_like(SB_mask)
             SB_mask_copy[pos_i] = SB_mask[pos_i]
-            n_points = SB_mask_copy[SB_mask_copy == 1].size
+            # n_points = SB_mask_copy[SB_mask_copy == 1].size
             # labels_mask = labels == label_i
             # n_points = labels[labels_mask].size
-            SBs[i] = {'B_field': np.array((Bx[SB_mask_copy], By[SB_mask_copy], Bz[SB_mask_copy])), 'n_points': n_points}
+            SBs[i] = {'B_field': np.array((Bx[SB_mask_copy], By[SB_mask_copy], Bz[SB_mask_copy]))}#, 'n_points': n_points}
     else:
         for i, label_i in enumerate(label_array):
             labels_mask = labels == label_i
