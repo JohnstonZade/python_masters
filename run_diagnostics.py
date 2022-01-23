@@ -335,9 +335,9 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
                     theta_dict['bins'] = 0.5*(theta_dict['grid'][1:] + theta_dict['grid'][:-1])
                     theta_dict['all'], theta_dict['mean'], theta_dict['SB_info'] = {}, {}, {}
                     
-                theta_dict['all'][s_name] = clock_angle_dict['all_clock_angle_count']
-                theta_dict['mean'][s_name] = clock_angle_dict['mean_clock_angle_count']
-                theta_dict['SB_info'][s_name] = clock_angle_dict['SB_info']
+                theta_dict['all'][flyby_string] = clock_angle_dict['all_clock_angle_count']
+                theta_dict['mean'][flyby_string] = clock_angle_dict['mean_clock_angle_count']
+                theta_dict['SB_info'][flyby_string] = clock_angle_dict['SB_info']
                 S['flyby']['sb_clock_angle'][theta_threshold] = theta_dict
                 clock_angle_dict = None
             # farrell analysis
