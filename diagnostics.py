@@ -78,6 +78,7 @@ def load_data(output_dir, n, prob=DEFAULT_PROB, do_path_format=1, method='matt')
     if method != 'nothing':
         # Rescale perpendicular components automatically
         current_a = data['a_exp']
+        print('current a = ' + str(current_a))
         # use method = 'matt' for Matt's equations
         # else method = 'jono' for Jono's equations
         # where u_⟂ = a*u'_⟂ and same for B_⟂
