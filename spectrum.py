@@ -64,11 +64,13 @@ def calc_spectrum(output_dir, save_dir, return_dict=1, prob=default_prob,
             S[var] = 0
 
         for n in nums:
-            try:
-                data = diag.load_data(output_dir, n, prob=prob, method=method)
-            except IOError:
-                print('Could not load file', n)
-                break
+            # data is already loaded for a single file
+            if not do_single_file:
+                try:
+                    data = diag.load_data(output_dir, n, prob=prob, method=method)
+                except IOError:
+                    print('Could not load file', n)
+                    break
 
             # Take the Fourier transform of the individual components
             # Find their energy (i.e. Parseval's theorem)

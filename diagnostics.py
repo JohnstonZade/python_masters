@@ -566,14 +566,15 @@ def norm_fluc_amp_hst(output_dir, adot, B_0, Lx=1., Lperp=1., method='matt', pro
 
 # --- EXPANDING BOX CODE --- #
 
-def switchback_threshold(B_dot_Bmean, N_cells, theta_threshold=30, flyby=0):
+def switchback_threshold(cos_theta, N_cells, z_threshold=0.25, flyby=0):
     # finding magnetic field reversals with an deviation greater
-    # than theta_threshold from the mean magnetic field/Parker spiral
-    # theta_threshold is input in degrees
-    theta_threshold *= np.pi / 180
+    # than z_threshold from the mean magnetic field/Parker spiral
+    # using z = 0.5*(1-cos(theta)) where cos(theta) = B*B_0/(|B||B_0|) (*=dot_product)
+    # z = 0 => completely aligned, z = 1 => anti-parallel
+    # z = 0.25 => theta = 60 deg, z = 0.5 => theta = 90 deg, z = 0.75 => theta = 120 deg
 
-    dev_from_mean = np.arccos(np.clip(B_dot_Bmean, -1., 1.))
-    SB_dev = dev_from_mean >= theta_threshold
+    z = 0.5*(1 - cos_theta)
+    SB_dev = z >= z_threshold
     # fraction of radial flips in box: number of cells with SBs / total cells in box
     if flyby:
         dev_SB_frac = SB_dev[SB_dev].size / N_cells  # number of SBs deviating from mean field
@@ -731,41 +732,55 @@ def switchback_aspect(label_tuple, Ls, Ns):
    
     return pcas
 
-def clock_angle(B, B0, SB_mask=None, label_tuple=None, flyby=0):
+def clock_angle(B, B0, SB_mask=None, label_tuple=None, flyby=0, do_mean=0):
     B0x, B0y = B0
     parker_angle = np.arctan2(B0y, B0x)
     ca_bins = np.linspace(-np.pi, np.pi, 51)
     ca_grid = 0.5*(ca_bins[1:] + ca_bins[:-1])
     
-    print('Finding switchbacks')
-    SBs = switchback_finder(B, SB_mask=SB_mask, label_tuple=label_tuple, array3D=(not flyby))
+    Bx, By, Bz = B
+    Bx_sb, By_sb, Bz_sb = Bx[SB_mask], By[SB_mask], Bz[SB_mask]
     
-    print('Decomposing for clock angle')
-    all_vector_clock_angle = []
-    mean_vector_clock_angle = []
-    for n in range(SBs['n_SBs']):
-        # magnetic field in nth switchback
-        SB_n = SBs[n]['B_field']
-        # decompose vector into N and T components
-        # T unit vector is -y_hat rotated by Parker angle
-        B_N = SB_n[2] # +N <-> +z in box
-        B_T = SB_n[0]*np.sin(parker_angle) - SB_n[1]*np.cos(parker_angle)
-        B_R = -SB_n[0]*np.cos(parker_angle) - SB_n[1]*np.sin(parker_angle) # along mean field direction
-        all_vector_clock_angle.extend(np.arctan2(B_T, B_N))
-        B_N_mean, B_T_mean, B_R_mean = B_N.mean(), B_T.mean(), B_R.mean()
-        mean_vector_clock_angle.append(np.arctan2(B_T_mean, B_N_mean))
-        SBs[n]['B_field'] = (B_R_mean, B_T_mean, B_N_mean)  # update to mean B field in RTN coordinates
-    
+    B_N = Bz_sb # +N <-> +z in box
+    B_T = Bx_sb*np.sin(parker_angle) - By_sb*np.cos(parker_angle)
+    all_vector_clock_angle = np.arctan2(B_T, B_N)
     ca_allvector = np.histogram(all_vector_clock_angle, ca_bins)[0]
-    ca_meanvector = np.histogram(mean_vector_clock_angle, ca_bins)[0]
+    
+    if do_mean:
+        print('Finding switchbacks')
+        SBs = switchback_finder(B, SB_mask=SB_mask, label_tuple=label_tuple, array3D=(not flyby))
+        
+        print('Decomposing for clock angle')
+        all_vector_clock_angle = []
+        mean_vector_clock_angle = []
+        for n in range(SBs['n_SBs']):
+            # magnetic field in nth switchback
+            SB_n = SBs[n]['B_field']
+            # decompose vector into N and T components
+            # T unit vector is -y_hat rotated by Parker angle
+            B_N = SB_n[2] # +N <-> +z in box
+            B_T = SB_n[0]*np.sin(parker_angle) - SB_n[1]*np.cos(parker_angle)
+            B_R = -SB_n[0]*np.cos(parker_angle) - SB_n[1]*np.sin(parker_angle) # along mean field direction
+            all_vector_clock_angle.extend(np.arctan2(B_T, B_N))
+            B_N_mean, B_T_mean, B_R_mean = B_N.mean(), B_T.mean(), B_R.mean()
+            mean_vector_clock_angle.append(np.arctan2(B_T_mean, B_N_mean))
+            SBs[n]['B_field'] = (B_R_mean, B_T_mean, B_N_mean)  # update to mean B field in RTN coordinates
+        
+        ca_allvector = np.histogram(all_vector_clock_angle, ca_bins)[0]
+        ca_meanvector = np.histogram(mean_vector_clock_angle, ca_bins)[0]
 
+        return {
+            'all_clock_angle_count': ca_allvector,
+            'mean_clock_angle_count': ca_meanvector,
+            'bins': ca_bins,
+            'grid': ca_grid,
+            'SB_info': SBs
+        }
     return {
-        'all_clock_angle_count': ca_allvector,
-        'mean_clock_angle_count': ca_meanvector,
-        'bins': ca_bins,
-        'grid': ca_grid,
-        'SB_info': SBs
-    }
+            'all_clock_angle_count': ca_allvector,
+            'bins': ca_bins,
+            'grid': ca_grid,
+        }
 
 def polarisation_fraction(B, rho, inside_SB=0, SB_mask=None):
     

@@ -192,10 +192,19 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
         
     S['spec_step'] = spec_step
     
+    # do over z = 0.125, 0.25, 0.375, 0.5, 0.625, 0.75
+    # corresponds to theta_thresh = 41, 60, 75, 90, 104, 120 degrees (ish for z = 0.125, 0.375, 0.625; exact otherwise)
+    # z = 0.5*(1-cos(theta))
+    
+    z_list = np.array([0.125, 0.25, 0.375, 0.5, 0.625, 0.75])
+    
     if do_full_calc:
         if n_done == 0:
             S['time'], S['a'] = np.array([]), np.array([])
-            S['sb_data'] = {60: {'pol_frac': {}}, 90: {'pol_frac': {}}, 120: {'pol_frac': {}}, 'sb_frac_radial': np.array([])}
+            # S['sb_data']['sb_frac_radial'] = np.array([])
+            S['sb_data'] = {}
+            for z in z_list:
+                S['sb_data'][z] = {'pol_frac': {}}
             S['pol_frac_tot'] = {}
 
         print('max_n = ' + str(max_n))
@@ -213,7 +222,6 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
                 s_name = 'a' + str(round(a[0],1))
                 
                 # --- SWITCHBACK DIAGNOSTICS --- #
-                # TODO: add polarisation fraction code for whole box as well as each threshold angle
                 
                 Ns = np.array(B.shape[2:])  # Nz, Ny, Nx
                 N_cells = Ns.prod()
@@ -222,7 +230,7 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
                 
                 B_0 = diag.box_avg(B, reshape=1) # mean field in box = Parker spiral
                 b, b_0 = diag.get_unit(B), diag.get_unit(B_0)
-                B_dot_Bmean = diag.dot_prod(b, b_0, 1)
+                cos_theta = diag.dot_prod(b, b_0, 1)
                 B0x, B0y = B_0[0, 0, 0, 0, 0], B_0[0, 1, 0, 0, 0]
                 
                 xi, xi_bins = diag.polarisation_fraction(B, rho)
@@ -230,22 +238,18 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
                 
 
                 print('         - Calculating SB data')
-                # loop over threshold angles
-                for theta_threshold in [60, 90, 120]:
-                    # s_name = str(n_start)
-                    # if s_name in S['sb_data'][theta_threshold]['clock_angle'].keys():
-                    #     print('Skipping θ_thresh = ' + str(theta_threshold) + '∘ as already done')
-                    #     continue
-                    print('             - θ_thresh = ' + str(theta_threshold) + '∘')
+                # loop over threshold normlised deflection
+                for z_threshold in z_list:
+                    print('             - z_thresh = ' + str(z_threshold))
                     print('                 - Doing switchback threshold')
-                    sb_mask_dev, sb_frac_dev = diag.switchback_threshold(B_dot_Bmean, N_cells, theta_threshold=theta_threshold)
+                    sb_mask_dev, sb_frac_dev = diag.switchback_threshold(cos_theta, N_cells, z_threshold=z_threshold)
                     
-                    if n_start % (2*spec_step) == 0:  # do clock angle/labeling every da=1
-                        print('                 - Doing switchback labels')
-                        labels, nlabels, label_array, pos = diag.label_switchbacks(sb_mask_dev)
-                        labels = labels[0]
-                        # label_array = diag.sort_sb_by_size(labels, label_array)
-                    theta_dict = S['sb_data'][theta_threshold]
+                    # if n_start % (2*spec_step) == 0:  # do clock angle/labeling every da=1
+                    #     print('                 - Doing switchback labels')
+                    #     labels, nlabels, label_array, pos = diag.label_switchbacks(sb_mask_dev)
+                    #     labels = labels[0]
+                    #     # label_array = diag.sort_sb_by_size(labels, label_array)
+                    theta_dict = S['sb_data'][z_threshold]
                     
                     xi, xi_bins = diag.polarisation_fraction(B, rho, inside_SB=1, SB_mask=sb_mask_dev)
                     theta_dict['pol_frac'][s_name] = {'xi_count': xi, 'xi_bins': xi_bins}
@@ -257,37 +261,44 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
                             theta_dict['clock_angle'] = {}
                             theta_dict['clock_angle']['grid'] = np.linspace(-np.pi, np.pi, 51)
                             theta_dict['clock_angle']['bins'] = 0.5*(theta_dict['clock_angle']['grid'][1:] + theta_dict['clock_angle']['grid'][:-1])
-                            theta_dict['clock_angle']['all'], theta_dict['clock_angle']['mean'], theta_dict['clock_angle']['SB_info'] = {}, {}, {}
+                            theta_dict['clock_angle']['all'] = {}
+                            # theta_dict['clock_angle']['all'], theta_dict['clock_angle']['mean'], theta_dict['clock_angle']['SB_info'] = {}, {}, {}
                             
                             # -- SB FRACTION -- #
                             theta_dict['full_sb_frac'] = np.array([])
                             # theta_dict['aspect'] = {}
 
-                        if n_start % (2*spec_step) == 0:
-                            print('                 - Doing clock angle')
-                            sb_ca_temp = diag.clock_angle(B[0], (B0x, B0y), SB_mask=sb_mask_dev[0], label_tuple=(labels, nlabels, label_array, pos))
+                        print('                 - Doing clock angle')
+                        sb_ca_temp = diag.clock_angle(B[0], (B0x, B0y), SB_mask=sb_mask_dev[0])
+                        theta_dict['clock_angle']['all'][s_name] = sb_ca_temp['all_clock_angle_count']
+                        
+                        # if n_start % (2*spec_step) == 0:
+                        #     print('                 - Doing clock angle')
+                        #     sb_ca_temp = diag.clock_angle(B[0], (B0x, B0y), SB_mask=sb_mask_dev[0])
+                        #     # sb_ca_temp = diag.clock_angle(B[0], (B0x, B0y), SB_mask=sb_mask_dev[0], label_tuple=(labels, nlabels, label_array, pos))
                             
-                            # add individual count
-                            theta_dict['clock_angle']['all'][s_name] = sb_ca_temp['all_clock_angle_count']
-                            theta_dict['clock_angle']['mean'][s_name] = sb_ca_temp['mean_clock_angle_count']
-                            theta_dict['clock_angle']['SB_info'][s_name] = sb_ca_temp['SB_info']
+                        #     # add individual count
+                        #     theta_dict['clock_angle']['all'][s_name] = sb_ca_temp['all_clock_angle_count']
+                        #     # theta_dict['clock_angle']['mean'][s_name] = sb_ca_temp['mean_clock_angle_count']
+                        #     # theta_dict['clock_angle']['SB_info'][s_name] = sb_ca_temp['SB_info']
 
-                            # # do PCA analysis
-                            # print('                 - Doing PCA')
-                            # theta_dict['aspect'][s_name] = diag.switchback_aspect((labels, nlabels, label_array), Ls, Ns)
+                        #     # # do PCA analysis
+                        #     # print('                 - Doing PCA')
+                        #     # theta_dict['aspect'][s_name] = diag.switchback_aspect((labels, nlabels, label_array), Ls, Ns)
                         
                         # add individual switchback fraction data
                         theta_dict['full_sb_frac'] = np.append(theta_dict['full_sb_frac'], sb_frac_dev)
                         
-                        S['sb_data'][theta_threshold] = theta_dict
+                        S['sb_data'][z_threshold] = theta_dict
                         diag.save_dict(S, output_dir, dict_name)
                         
                 # total radial switchback fraction (f_{bx < 0})
-                SB_radial_flip = B[:, 0] <= 0.
-                sb_frac_radial = SB_radial_flip[0][SB_radial_flip[0]].size / N_cells
-                S['sb_data']['sb_frac_radial'] = np.append(S['sb_data']['sb_frac_radial'], sb_frac_radial)
-                SB_radial_flip = None
-                sb_frac_radial, sb_frac_dev, sb_mask_dev, sb_ca_temp = None, None, None, None
+                # SB_radial_flip = B[:, 0] <= 0.
+                # sb_frac_radial = SB_radial_flip[0][SB_radial_flip[0]].size / N_cells
+                # S['sb_data']['sb_frac_radial'] = np.append(S['sb_data']['sb_frac_radial'], sb_frac_radial)
+                # SB_radial_flip = None
+                # sb_frac_radial, sb_frac_dev, sb_mask_dev, sb_ca_temp = None, None, None, None
+                sb_frac_dev, sb_mask_dev, sb_ca_temp = None, None, None
                 
                 # clear unneeded variables to save memory, run flyby code after this
                 B, t, a = None, None, None
@@ -296,7 +307,9 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
                 print('     Dictionary saved')
     
     S['flyby'] = {}
-    S['flyby']['sb_clock_angle'], S['flyby']['dropouts'] = {60: {}, 90: {}, 120: {}}, {}
+    S['flyby']['dropouts'], S['flyby']['sb_clock_angle'] = {}, {}
+    for z in z_list:
+        S['flyby']['sb_clock_angle'][z] = {}
     flyby_n = np.arange(0, max_n, step=spec_step)
     for i, n in enumerate(flyby_n):
         if n % spec_step == 0:
@@ -319,13 +332,13 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
             # calculate either deviation from radial or Parker
             B0x, B0y = (Bx.mean(), By.mean())
             B0 = np.sqrt(B0x**2 + B0y**2)
-            B_dot_Bmean = (Bx*B0x+By*B0y) / (Bmag*B0)
+            cos_theta = (Bx*B0x+By*B0y) / (Bmag*B0)
             N_cells = Bx.size
             
-            for theta_threshold in [60, 90, 120]:
-                theta_dict = S['flyby']['sb_clock_angle'][theta_threshold]
+            for z_threshold in z_list:
+                theta_dict = S['flyby']['sb_clock_angle'][z_threshold]
                 # switchback finder
-                SB_mask = diag.switchback_threshold(B_dot_Bmean, N_cells, flyby=1, theta_threshold=theta_threshold)[0]
+                SB_mask = diag.switchback_threshold(cos_theta, N_cells, flyby=1, z_threshold=z_threshold)[0]
                 # flyby clock angle
                 clock_angle_dict = diag.clock_angle((Bx, By, Bz), (B0x, B0y), SB_mask=SB_mask, flyby=1)
                 if n == 0:
@@ -333,12 +346,13 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
                     # these will be the same for all runs
                     theta_dict['grid'] = np.linspace(-np.pi, np.pi, 51)
                     theta_dict['bins'] = 0.5*(theta_dict['grid'][1:] + theta_dict['grid'][:-1])
-                    theta_dict['all'], theta_dict['mean'], theta_dict['SB_info'] = {}, {}, {}
+                    theta_dict['all'] = {}
+                    # theta_dict['all'], theta_dict['mean'], theta_dict['SB_info'] = {}, {}, {}
                     
                 theta_dict['all'][flyby_string] = clock_angle_dict['all_clock_angle_count']
-                theta_dict['mean'][flyby_string] = clock_angle_dict['mean_clock_angle_count']
-                theta_dict['SB_info'][flyby_string] = clock_angle_dict['SB_info']
-                S['flyby']['sb_clock_angle'][theta_threshold] = theta_dict
+                # theta_dict['mean'][flyby_string] = clock_angle_dict['mean_clock_angle_count']
+                # theta_dict['SB_info'][flyby_string] = clock_angle_dict['SB_info']
+                S['flyby']['sb_clock_angle'][z_threshold] = theta_dict
                 clock_angle_dict = None
             # farrell analysis
             c_s = c_s_init*flyby_a**(-2/3)
