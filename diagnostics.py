@@ -10,6 +10,7 @@ import numpy as np
 import scipy.ndimage as ndimage
 from sklearn.decomposition import PCA
 from scipy.signal import find_peaks
+from scipy.ndimage import uniform_filter1d
 from pathlib import Path
 from itertools import permutations as perm
 from athena_read import athdf, athinput, hst
@@ -741,6 +742,8 @@ def clock_angle(B, B0, SB_mask=None, label_tuple=None, flyby=0, do_mean=0):
     Bx, By, Bz = B
     Bx_sb, By_sb, Bz_sb = Bx[SB_mask], By[SB_mask], Bz[SB_mask]
     
+    
+    # not assuming parker angle
     B_N = Bz_sb # +N <-> +z in box
     B_T = Bx_sb*np.sin(parker_angle) - By_sb*np.cos(parker_angle)
     all_vector_clock_angle = np.arctan2(B_T, B_N)
@@ -804,6 +807,136 @@ def polarisation_fraction(B, rho, inside_SB=0, SB_mask=None):
     xi_counts, bins = np.histogram(xi, bins=50, density=True)
     return xi_counts, bins
 
+
+def dropouts(f, c_s, dl=5, skirt=40):
+    
+    def get_mean_diff(a, dl):
+        # take the mean of the dl grid points ahead and behind each point
+        # and subtract
+        a_copy = np.pad(a, (dl, dl), 'wrap')
+        a_mean_ahead = np.array([a_copy[dl+1+i:2*dl+1+i].mean() for i in range(a.size)])
+        a_mean_behind = np.array([a_copy[i:dl+i].mean() for i in range(a.size)])
+        return a_mean_ahead - a_mean_behind
+    
+    def get_mean_outside_sb(a, skirt, dl, entry=True):
+        # get the mean of the quantity outside of the
+        # area of rapid change
+        if entry:
+            start = 0
+            end = skirt - dl
+        else:
+            start = skirt + dl
+            end = 2*skirt
+        r = range(start, end)
+        return a[r].mean()
+
+    def get_frac_change(a, mean_a):
+        # get the fractional change in a relative to the
+        # mean outside the switchback
+        return (a - mean_a) / mean_a
+    
+    def z_weighted_average(a, z_weight):
+        return np.average(a, axis=0, weights=z_weight)
+    
+    B_norm, u_norm, rho_norm = f['norms']['B'], f['norms']['u'], f['norms']['rho']
+    Bx, By, Bz, Bmag = np.copy(f['Bx'])/B_norm, np.copy(f['By'])/B_norm, np.copy(f['Bz'])/B_norm, np.copy(f['Bmag'])/B_norm
+    ux, uy, uz = np.copy(f['ux'])/u_norm, np.copy(f['uy'])/u_norm, np.copy(f['uz'])/u_norm
+    rho = np.copy(f['rho'])/rho_norm
+    tot_p = c_s**2 * rho + 0.5 * Bmag**2
+    
+    # mean magnetic field at flyby
+    B_0 = f['norms']['B_0_vec']  # not normalised
+    b_0 = B_0 * B_norm   # B_norm = 1 / |B_0|
+    phi_P = np.arctan(B_0[1]/B_0[0])
+    
+    # components of B and u along Parker spiral (= x_components for radial mean field)
+    Bp = Bx*np.cos(phi_P) + By*np.sin(phi_P)
+    up = ux*np.cos(phi_P) + uy*np.sin(phi_P)
+    
+    b_mag = np.sqrt(Bx**2 + By**2 + Bz**2)
+    bx = Bx / b_mag
+    by = By / b_mag
+    c_theta = bx*b_0[0]+by*b_0[1]  # mean field is always in xy-plane
+    z=0.5*(1-c_theta)  # normalised deflection from mean magnetic field
+    
+    # looking for sharpest changes in z greater than 0.3
+    dz = get_mean_diff(z, dl)
+    dzi, dzh = find_peaks(abs(dz), height=0.3)
+    dzh = dzh['peak_heights']
+    peak_height_dict = {dzi[i]: dzh[i]  for i in range(dzi.size)}
+    jumps = abs(dz[dzi])/dz[dzi]
+    
+    # finding increases and decreases in z where the field is already deflected
+    # more than 60 degrees from mean
+    ins = dzi[jumps == 1]
+    outs = dzi[jumps == -1]
+    z_60 = np.where(z >= 0.25)
+    tt = np.intersect1d(z_60, ins)
+    xx = np.intersect1d(z_60, outs)
+    dz_in = np.array([peak_height_dict[i] for i in tt])
+    dz_out = np.array([peak_height_dict[i] for i in xx])
+    
+    # Entering and exiting switchbacks
+    sbBx, sbux, sbBmag, sbrho, sbz = np.zeros(shape=(5, tt.size+xx.size, 2*skirt))
+    sbBp, sbup, sbtot_p = np.zeros(shape=(3, tt.size+xx.size, 2*skirt))
+    entry = True
+    for i, zi in enumerate(tt):
+        if (zi - skirt) < 0 or (zi+skirt) > Bx.size:
+            continue
+        ss = range(zi - skirt, zi + skirt)
+        sbBx[i] = Bx[ss]
+        sbBp[i] = Bp[ss]
+        sbux[i] = ux[ss]
+        sbup[i] = up[ss]
+        sbz[i] = z[ss]
+        sbBmag[i] = get_frac_change(Bmag[ss], get_mean_outside_sb(Bmag[ss], skirt, dl, entry))
+        sbrho[i] = get_frac_change(rho[ss], get_mean_outside_sb(rho[ss], skirt, dl, entry))
+        sbtot_p[i] = get_frac_change(tot_p[ss], get_mean_outside_sb(tot_p[ss], skirt, dl, entry))
+    entry = False
+    for i, zi in enumerate(xx):
+        if (zi - skirt) < 0 or (zi+skirt) > Bx.size:
+            continue
+        i += tt.size
+        ss = range(zi - skirt, zi + skirt)
+        sbBx[i] = Bx[ss]
+        sbBp[i] = Bp[ss]
+        sbux[i] = ux[ss]
+        sbup[i] = up[ss]
+        sbz[i] = z[ss]
+        sbBmag[i] = get_frac_change(Bmag[ss], get_mean_outside_sb(Bmag[ss], skirt, dl, entry))
+        sbrho[i] = get_frac_change(rho[ss], get_mean_outside_sb(rho[ss], skirt, dl, entry))
+        sbtot_p[i] = get_frac_change(tot_p[ss], get_mean_outside_sb(tot_p[ss], skirt, dl, entry))
+        
+    # Weighting by z just before boundary
+    # Entering
+    z_in_mean = sbz[:tt.size,skirt+dl:skirt+2*dl].mean(axis=1)
+    # Exiting
+    z_out_mean = sbz[tt.size:,skirt-2*dl:skirt-dl].mean(axis=1)
+    
+    dropouts = {'entering':{}, 'exiting': {}}
+    dropouts['entering']['Bx'] = z_weighted_average(sbBx[:tt.size], z_in_mean)
+    dropouts['entering']['Bp'] = z_weighted_average(sbBp[:tt.size], z_in_mean)
+    dropouts['entering']['ux'] = z_weighted_average(sbux[:tt.size], z_in_mean)
+    dropouts['entering']['up'] = z_weighted_average(sbup[:tt.size], z_in_mean)
+    dropouts['entering']['z'] = z_weighted_average(sbz[:tt.size], z_in_mean)
+    dropouts['entering']['Bmag'] = z_weighted_average(sbBmag[:tt.size], z_in_mean)
+    dropouts['entering']['rho'] = z_weighted_average(sbrho[:tt.size], z_in_mean)
+    dropouts['entering']['tot_p'] = z_weighted_average(sbtot_p[:tt.size], z_in_mean)
+    
+    dropouts['exiting']['Bx'] = z_weighted_average(sbBx[tt.size:], z_out_mean)
+    dropouts['exiting']['Bp'] = z_weighted_average(sbBp[tt.size:], z_out_mean)
+    dropouts['exiting']['ux'] = z_weighted_average(sbux[tt.size:], z_out_mean)
+    dropouts['exiting']['up'] = z_weighted_average(sbup[tt.size:], z_out_mean)
+    dropouts['exiting']['z'] = z_weighted_average(sbz[tt.size:], z_out_mean)
+    dropouts['exiting']['Bmag'] = z_weighted_average(sbBmag[tt.size:], z_out_mean)
+    dropouts['exiting']['rho'] = z_weighted_average(sbrho[tt.size:], z_out_mean)
+    dropouts['exiting']['tot_p'] = z_weighted_average(sbtot_p[tt.size:], z_out_mean)
+    
+    dropouts['ls'] = f['dl']*np.arange(-skirt, skirt)
+    return dropouts
+
+
+
 def plot_dropouts(flyby, c_s):
     # performing analysis as in Farrell
     dl = 8  # units of resolution a*L_y/N_y
@@ -820,13 +953,6 @@ def plot_dropouts(flyby, c_s):
     rho = flyby['rho'][dl//2:-dl//2]
     Bmag = flyby['Bmag'][dl//2:-dl//2]
     
-    mean_rho = rho.mean()
-    d_rho = (rho - mean_rho) / mean_rho
-    
-    tot_p = c_s**2 * (rho / flyby['norms']['rho']) + 0.5 * (Bmag / flyby['norms']['B'])**2
-    mean_tot_p = tot_p.mean()
-    d_tot_p = (tot_p - mean_tot_p) / mean_tot_p
-    
     
 
     # switchback index
@@ -836,6 +962,15 @@ def plot_dropouts(flyby, c_s):
     sb_cut = 0.75
     # how far to look on either side of the switchback boundary
     sbsz = 30
+    
+    mean_rho_l = uniform_filter1d(rho, size=sbsz, mode='wrap', origin=14)
+    mean_rho_r = uniform_filter1d(rho, size=sbsz, mode='wrap', origin=-14)
+    d_rho_l = (rho - mean_rho_l) / mean_rho_l
+    d_rho_r = (rho - mean_rho_r) / mean_rho_r
+    
+    tot_p = c_s**2 * (rho / flyby['norms']['rho']) + 0.5 * (Bmag / flyby['norms']['B'])**2
+    mean_tot_p = tot_p.mean()
+    d_tot_p = (tot_p - mean_tot_p) / mean_tot_p
 
     # find the indicies where these occur
     sbi, sbh = find_peaks(SBI, height=sb_cut)
@@ -853,7 +988,7 @@ def plot_dropouts(flyby, c_s):
     sbBr, sbBt, sbBn = np.zeros(shape=(3, nsbs, 2*sbsz))
     sbur, sbut, sbun, sbunonr = np.zeros(shape=(4, nsbs, 2*sbsz))
     sbrho, sbBmag, sbtotp = np.zeros(shape=(3, nsbs, 2*sbsz))
-    sbdrho, sbdtotp = np.zeros(shape=(2, nsbs, 2*sbsz))
+    sbdrhol, sbdrhor, sbdtotp = np.zeros(shape=(3, nsbs, 2*sbsz))
     
     for i in range(nsbs):
         sbBr[i] = Br[sbi[i]-sbsz:sbi[i]+sbsz]
@@ -866,7 +1001,8 @@ def plot_dropouts(flyby, c_s):
         sbrho[i] = rho[sbi[i]-sbsz:sbi[i]+sbsz]
         sbBmag[i] = Bmag[sbi[i]-sbsz:sbi[i]+sbsz]
         sbtotp[i] = tot_p[sbi[i]-sbsz:sbi[i]+sbsz]
-        sbdrho[i] = d_rho[sbi[i]-sbsz:sbi[i]+sbsz]
+        sbdrhol[i] = d_rho_l[sbi[i]-sbsz:sbi[i]+sbsz]
+        sbdrhor[i] = d_rho_r[sbi[i]-sbsz:sbi[i]+sbsz]
         sbdtotp[i] = d_tot_p[sbi[i]-sbsz:sbi[i]+sbsz]
         
         
@@ -874,6 +1010,7 @@ def plot_dropouts(flyby, c_s):
     dropouts = {'step_up':{}, 'step_down': {}}
     for step in dropouts:
         mask = upordown > 0 if step == 'step_up' else upordown < 0
+        sbdrho = sbdrhol if step == 'step_up' else sbdrhor
         dropouts[step]['Br'] = sbBr[mask].mean(axis=0)
         dropouts[step]['Bt'] = sbBt[mask].mean(axis=0)
         dropouts[step]['Bn'] = sbBn[mask].mean(axis=0)

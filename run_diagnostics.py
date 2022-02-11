@@ -153,11 +153,11 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=1, do_spect
             diag.save_dict(S, output_dir, dict_name)
 
 
-def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=1, method='matt', start_at=0, n_startat=0):
+def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=1, method='matt', start_at=0, n_startat=0,
+                        do_full_calc=True, do_flyby=True, do_flyby_clock=True):
     max_n = diag.get_maxn(output_dir)
     n_done = 0
     S = {}
-    do_full_calc = True
     
     dict_name += '_sbdata'
     
@@ -306,56 +306,60 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
                 diag.save_dict(S, output_dir, dict_name)
                 print('     Dictionary saved')
     
-    S['flyby'] = {}
-    S['flyby']['dropouts'], S['flyby']['sb_clock_angle'] = {}, {}
-    for z in z_list:
-        S['flyby']['sb_clock_angle'][z] = {}
-    flyby_n = np.arange(0, max_n, step=spec_step)
-    for i, n in enumerate(flyby_n):
-        if n % spec_step == 0:
-            print('Flyby started at n = ' + str(n))
-            if expansion_rate != 0.0:
-                flyby_a = round(S['a'][i], 1)
-                flyby_string = 'flyby_a' + str(flyby_a)
-            else:
-                flyby_a = 1.0
-                flyby_string = 'flyby_t' + str(round(S['time'][i], 1))
-            S['flyby'][flyby_string] = reinterpolate.flyby(output_dir, flyby_a, n, method=method)
-            diag.save_dict(S, output_dir, dict_name)
-            print(flyby_string + ' done')
-            
-            print(' - Calculating flyby SBs')
-            
-            flyby = reinterpolate.flyby(output_dir, flyby_a, n, method=method, output_plot=0)
-            Bx, By, Bz, Bmag = flyby['Bx'], flyby['By'], flyby['Bz'], flyby['Bmag']
-            
-            # calculate either deviation from radial or Parker
-            B0x, B0y = (Bx.mean(), By.mean())
-            B0 = np.sqrt(B0x**2 + B0y**2)
-            cos_theta = (Bx*B0x+By*B0y) / (Bmag*B0)
-            N_cells = Bx.size
-            
-            for z_threshold in z_list:
-                theta_dict = S['flyby']['sb_clock_angle'][z_threshold]
-                # switchback finder
-                SB_mask = diag.switchback_threshold(cos_theta, N_cells, flyby=1, z_threshold=z_threshold)[0]
-                # flyby clock angle
-                clock_angle_dict = diag.clock_angle((Bx, By, Bz), (B0x, B0y), SB_mask=SB_mask, flyby=1)
-                if n == 0:
-                    # set up bins and grid
-                    # these will be the same for all runs
-                    theta_dict['grid'] = np.linspace(-np.pi, np.pi, 51)
-                    theta_dict['bins'] = 0.5*(theta_dict['grid'][1:] + theta_dict['grid'][:-1])
-                    theta_dict['all'] = {}
-                    # theta_dict['all'], theta_dict['mean'], theta_dict['SB_info'] = {}, {}, {}
+    if do_flyby:
+        S['flyby'] = {}
+        S['flyby']['dropouts'], S['flyby']['sb_clock_angle'] = {}, {}
+        
+        for z in z_list:
+            S['flyby']['sb_clock_angle'][z] = {}
+        flyby_n = np.arange(0, max_n, step=spec_step)
+        for i, n in enumerate(flyby_n):
+            if n % spec_step == 0:
+                print('Flyby started at n = ' + str(n))
+                if expansion_rate != 0.0:
+                    flyby_a = round(S['a'][i], 1)
+                    flyby_string = 'flyby_a' + str(flyby_a)
+                else:
+                    flyby_a = 1.0
+                    flyby_string = 'flyby_t' + str(round(S['time'][i], 1))
+                S['flyby'][flyby_string] = reinterpolate.flyby(output_dir, flyby_a, n, method=method)
+                diag.save_dict(S, output_dir, dict_name)
+                print(flyby_string + ' done')
+                print(' - Calculating flyby SBs')
+                flyby = reinterpolate.flyby(output_dir, flyby_a, n, method=method, output_plot=0)
+                
+                if do_flyby_clock:
+                    Bx, By, Bz, Bmag = flyby['Bx'], flyby['By'], flyby['Bz'], flyby['Bmag']
                     
-                theta_dict['all'][flyby_string] = clock_angle_dict['all_clock_angle_count']
-                # theta_dict['mean'][flyby_string] = clock_angle_dict['mean_clock_angle_count']
-                # theta_dict['SB_info'][flyby_string] = clock_angle_dict['SB_info']
-                S['flyby']['sb_clock_angle'][z_threshold] = theta_dict
-                clock_angle_dict = None
-            # farrell analysis
-            c_s = c_s_init*flyby_a**(-2/3)
-            S['flyby']['dropouts'][flyby_string] = diag.plot_dropouts(flyby, c_s)
-            diag.save_dict(S, output_dir, dict_name)
-            print(' - Dictionary saved')
+                    # calculate either deviation from radial or Parker
+                    B0x, B0y = (Bx.mean(), By.mean())
+                    B0 = np.sqrt(B0x**2 + B0y**2)
+                    cos_theta = (Bx*B0x+By*B0y) / (Bmag*B0)
+                    N_cells = Bx.size
+                    
+                    for z_threshold in z_list:
+                        theta_dict = S['flyby']['sb_clock_angle'][z_threshold]
+                        # switchback finder
+                        SB_mask = diag.switchback_threshold(cos_theta, N_cells, flyby=1, z_threshold=z_threshold)[0]
+                        # flyby clock angle
+                        clock_angle_dict = diag.clock_angle((Bx, By, Bz), (B0x, B0y), SB_mask=SB_mask, flyby=1)
+                        if n == 0:
+                            # set up bins and grid
+                            # these will be the same for all runs
+                            theta_dict['grid'] = np.linspace(-np.pi, np.pi, 51)
+                            theta_dict['bins'] = 0.5*(theta_dict['grid'][1:] + theta_dict['grid'][:-1])
+                            theta_dict['all'] = {}
+                            # theta_dict['all'], theta_dict['mean'], theta_dict['SB_info'] = {}, {}, {}
+                            
+                        theta_dict['all'][flyby_string] = clock_angle_dict['all_clock_angle_count']
+                        # theta_dict['mean'][flyby_string] = clock_angle_dict['mean_clock_angle_count']
+                        # theta_dict['SB_info'][flyby_string] = clock_angle_dict['SB_info']
+                        S['flyby']['sb_clock_angle'][z_threshold] = theta_dict
+                        clock_angle_dict = None
+                # farrell analysis
+                c_s = c_s_init*flyby_a**(-2/3)
+                if flyby_a > 1.0:
+                    S['flyby']['dropouts'][flyby_string] = diag.dropouts(flyby, c_s)
+                # S['flyby']['dropouts'][flyby_string] = diag.plot_dropouts(flyby, c_s)
+                diag.save_dict(S, output_dir, dict_name)
+                print(' - Dictionary saved')

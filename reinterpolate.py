@@ -15,8 +15,8 @@ def reinterp_to_grid(data, old_Xgrid, new_Ns, Ls):
     return data_interp(pts).reshape(*new_Ns)
 
 def flyby(output_dir, flyby_a, flyby_n, do_rand_start=1, l_start=None,
-          l_dir=np.array([np.pi/8, np.sqrt(0.5), 1.]), norm_B0=1, method='matt',
-          output_plot=1):
+          l_dir=np.array([1/np.sqrt(950.6), 1/np.sqrt(89.5), 1.]), norm_B0=1, method='matt',
+          output_plot=1, set_direction=True, number_along_y=np.sqrt(90.234), number_along_z=100, total_length_y=100):
     # Loading data with the correct method scales the data to the physical variables
     data = diag.load_data(output_dir, flyby_n, prob='from_array', method=method)
     Ns, Ls = get_grid_info(data)
@@ -28,6 +28,7 @@ def flyby(output_dir, flyby_a, flyby_n, do_rand_start=1, l_start=None,
     # extending to general mean fields
     rho_data = data['rho']
     B = np.array((data['Bcc1'], data['Bcc2'], data['Bcc3']))
+    B_0_vector = diag.box_avg(B)
     B_0 = diag.get_mag(diag.box_avg(B), axis=0)  # single time entry
     v_A = diag.alfven_speed(rho_data, B)
     scale_B_mean = 1 / B_0 if norm_B0 else 1  # 1 / <Bx> = a^2
@@ -53,12 +54,21 @@ def flyby(output_dir, flyby_a, flyby_n, do_rand_start=1, l_start=None,
     Bmag_i = rgi((zg, yg, xg), Bmag)
     rho_i = rgi((zg, yg, xg), rho)
   
+    # get unit vector of direction
+  
     # if plotting, do a short flyby to cut down on space
     # otherwise fly through either 1/10 of the box 
     # or 5 million points (for large resolutions) for analysis
     N_points = Ns.prod()
-    N_dl = 50000 if output_plot else min(int(5e6), N_points//10)
     dl = yg[1] - yg[0] # walk in steps of dy = a*Ly / Ny
+    if not set_direction:
+        N_dl = 50000 if output_plot else min(int(5e6), N_points//10)
+    else:
+        alpha, beta = flyby_a/number_along_y, flyby_a/number_along_z
+        dx = dl / np.sqrt(1 + alpha**2 + beta**2)
+        l_dir = np.array([beta*dx, alpha*dx, dx])
+        total_length_y *= Ls[1]  # number of times along y axis of box
+        N_dl = int(total_length_y / l_dir[1])
     total_length = N_dl * dl
     lvec = np.linspace(0, total_length, N_dl, endpoint=False).reshape(N_dl, 1)
 
@@ -69,6 +79,7 @@ def flyby(output_dir, flyby_a, flyby_n, do_rand_start=1, l_start=None,
         assert l_start is not None, 'l_start must be a valid numpy array!'
     # direction biased in x direction (z, y, x)
     l_dir /= np.sqrt(np.sum(l_dir**2))
+    
     pts = np.mod(l_start + lvec*l_dir, Ls)
 
     # Interpolate data along line running through box
@@ -77,10 +88,10 @@ def flyby(output_dir, flyby_a, flyby_n, do_rand_start=1, l_start=None,
     FB['ux'], FB['uy'], FB['uz'] = ux_i(pts), uy_i(pts), uz_i(pts)
     FB['Bmag'], FB['rho'] = Bmag_i(pts), rho_i(pts)
     FB['start_point'], FB['direction'] = l_start, l_dir
-    FB['l_param'], FB['points'] = lvec[:, 0], pts
+    FB['l_param'], FB['points'], FB['dl'] = lvec[:, 0], pts, dl
     FB['a'], FB['snapshot_number'] = flyby_a, flyby_n
     FB['normed_to_Bx'] = 'true' if norm_B0 else 'false'
-    FB['norms'] = {'B': scale_B_mean, 'u': scale_v_A, 'rho': scale_rho}
+    FB['norms'] = {'B': scale_B_mean, 'u': scale_v_A, 'rho': scale_rho, 'B_0_vec': B_0_vector}
     
     return FB
 
