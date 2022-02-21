@@ -154,8 +154,9 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=1, do_spect
 
 
 def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=1, method='matt', start_at=0, n_startat=0,
-                        do_full_calc=True, do_flyby=True, do_flyby_clock=True):
-    max_n = diag.get_maxn(output_dir)
+                        do_full_calc=True, do_flyby=True, do_flyby_clock=True, max_n=None, a_max=5):
+    if max_n is None:
+        max_n = diag.get_maxn(output_dir) 
     n_done = 0
     S = {}
     
@@ -317,7 +318,7 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
             if n % spec_step == 0:
                 print('Flyby started at n = ' + str(n))
                 if expansion_rate != 0.0:
-                    a_backup = np.linspace(1, 5, max_n)
+                    a_backup = np.linspace(1, a_max, max_n)
                     flyby_a = round(a_backup[i], 1) if not do_full_calc else round(S['a'][i], 1)
                     flyby_string = 'flyby_a' + str(flyby_a)
                 else:
