@@ -812,7 +812,7 @@ def dropouts(f, c_s, dl=5, skirt=40):
     
     def get_mean_diff(a, dl):
         # take the mean of the dl grid points ahead and behind each point
-        # and subtract
+        # and subtract - method of Farrell, works well here
         a_copy = np.pad(a, (dl, dl), 'wrap')
         a_mean_ahead = np.array([a_copy[dl+1+i:2*dl+1+i].mean() for i in range(a.size)])
         a_mean_behind = np.array([a_copy[i:dl+i].mean() for i in range(a.size)])
@@ -857,30 +857,26 @@ def dropouts(f, c_s, dl=5, skirt=40):
     bx = Bx / b_mag
     by = By / b_mag
     c_theta = bx*b_0[0]+by*b_0[1]  # mean field is always in xy-plane
+    theta = np.arccos(c_theta)
     z=0.5*(1-c_theta)  # normalised deflection from mean magnetic field
     
-    # looking for sharpest changes in z greater than 0.3
-    dz = get_mean_diff(z, dl)
-    dzi, dzh = find_peaks(abs(dz), height=0.3)
-    dzh = dzh['peak_heights']
-    peak_height_dict = {dzi[i]: dzh[i]  for i in range(dzi.size)}
-    jumps = abs(dz[dzi])/dz[dzi]
+    # looking for sharpest changes in theta
+    # greater than 45 degrees over 2*dl grid points
+    rotation_cutoff = np.deg2rad(45)
+    dtheta = get_mean_diff(theta, dl)
+    dthetai, dthetah = find_peaks(abs(dtheta), height=rotation_cutoff)
+    dthetah = dthetah['peak_heights']
+    jumps = abs(dtheta[dthetai])/dtheta[dthetai]
     
-    # finding increases and decreases in z where the field is already deflected
-    # more than 60 degrees from mean
-    ins = dzi[jumps == 1]
-    outs = dzi[jumps == -1]
-    z_60 = np.where(z >= 0.25)
-    tt = np.intersect1d(z_60, ins)
-    xx = np.intersect1d(z_60, outs)
-    dz_in = np.array([peak_height_dict[i] for i in tt])
-    dz_out = np.array([peak_height_dict[i] for i in xx])
+    # entry/exit defined as an increase/decrease in theta
+    ins = dthetai[jumps == 1]
+    outs = dthetai[jumps == -1]
     
     # Entering and exiting switchbacks
-    sbBx, sbux, sbBmag, sbrho, sbz = np.zeros(shape=(5, tt.size+xx.size, 2*skirt))
-    sbBp, sbup, sbtot_p = np.zeros(shape=(3, tt.size+xx.size, 2*skirt))
+    sbBx, sbux, sbBmag, sbrho, sbz = np.zeros(shape=(5, ins.size+outs.size, 2*skirt))
+    sbBp, sbup, sbtot_p = np.zeros(shape=(3, ins.size+outs.size, 2*skirt))
     entry = True
-    for i, zi in enumerate(tt):
+    for i, zi in enumerate(ins):
         if (zi - skirt) < 0 or (zi+skirt) > Bx.size:
             continue
         ss = range(zi - skirt, zi + skirt)
@@ -893,10 +889,10 @@ def dropouts(f, c_s, dl=5, skirt=40):
         sbrho[i] = get_frac_change(rho[ss], get_mean_outside_sb(rho[ss], skirt, dl, entry))
         sbtot_p[i] = get_frac_change(tot_p[ss], get_mean_outside_sb(tot_p[ss], skirt, dl, entry))
     entry = False
-    for i, zi in enumerate(xx):
+    for i, zi in enumerate(outs):
         if (zi - skirt) < 0 or (zi+skirt) > Bx.size:
             continue
-        i += tt.size
+        i += ins.size
         ss = range(zi - skirt, zi + skirt)
         sbBx[i] = Bx[ss]
         sbBp[i] = Bp[ss]
@@ -909,30 +905,33 @@ def dropouts(f, c_s, dl=5, skirt=40):
         
     # Weighting by z just before boundary
     # Entering
-    z_in_mean = sbz[:tt.size,skirt+dl:skirt+2*dl].mean(axis=1)
+    z_in_mean = sbz[:ins.size,skirt+dl:skirt+2*dl].mean(axis=1)
     # Exiting
-    z_out_mean = sbz[tt.size:,skirt-2*dl:skirt-dl].mean(axis=1)
+    z_out_mean = sbz[ins.size:,skirt-2*dl:skirt-dl].mean(axis=1)
     
     dropouts = {'entering':{}, 'exiting': {}}
-    dropouts['entering']['Bx'] = z_weighted_average(sbBx[:tt.size], z_in_mean)
-    dropouts['entering']['Bp'] = z_weighted_average(sbBp[:tt.size], z_in_mean)
-    dropouts['entering']['ux'] = z_weighted_average(sbux[:tt.size], z_in_mean)
-    dropouts['entering']['up'] = z_weighted_average(sbup[:tt.size], z_in_mean)
-    dropouts['entering']['z'] = z_weighted_average(sbz[:tt.size], z_in_mean)
-    dropouts['entering']['Bmag'] = z_weighted_average(sbBmag[:tt.size], z_in_mean)
-    dropouts['entering']['rho'] = z_weighted_average(sbrho[:tt.size], z_in_mean)
-    dropouts['entering']['tot_p'] = z_weighted_average(sbtot_p[:tt.size], z_in_mean)
+    dropouts['entering']['Bx'] = z_weighted_average(sbBx[:ins.size], z_in_mean)
+    dropouts['entering']['Bp'] = z_weighted_average(sbBp[:ins.size], z_in_mean)
+    dropouts['entering']['ux'] = z_weighted_average(sbux[:ins.size], z_in_mean)
+    dropouts['entering']['up'] = z_weighted_average(sbup[:ins.size], z_in_mean)
+    dropouts['entering']['z'] = z_weighted_average(sbz[:ins.size], z_in_mean)
+    dropouts['entering']['Bmag'] = z_weighted_average(sbBmag[:ins.size], z_in_mean)
+    dropouts['entering']['rho'] = z_weighted_average(sbrho[:ins.size], z_in_mean)
+    dropouts['entering']['tot_p'] = z_weighted_average(sbtot_p[:ins.size], z_in_mean)
+    dropouts['entering']['count'] = ins.size
     
-    dropouts['exiting']['Bx'] = z_weighted_average(sbBx[tt.size:], z_out_mean)
-    dropouts['exiting']['Bp'] = z_weighted_average(sbBp[tt.size:], z_out_mean)
-    dropouts['exiting']['ux'] = z_weighted_average(sbux[tt.size:], z_out_mean)
-    dropouts['exiting']['up'] = z_weighted_average(sbup[tt.size:], z_out_mean)
-    dropouts['exiting']['z'] = z_weighted_average(sbz[tt.size:], z_out_mean)
-    dropouts['exiting']['Bmag'] = z_weighted_average(sbBmag[tt.size:], z_out_mean)
-    dropouts['exiting']['rho'] = z_weighted_average(sbrho[tt.size:], z_out_mean)
-    dropouts['exiting']['tot_p'] = z_weighted_average(sbtot_p[tt.size:], z_out_mean)
+    dropouts['exiting']['Bx'] = z_weighted_average(sbBx[ins.size:], z_out_mean)
+    dropouts['exiting']['Bp'] = z_weighted_average(sbBp[ins.size:], z_out_mean)
+    dropouts['exiting']['ux'] = z_weighted_average(sbux[ins.size:], z_out_mean)
+    dropouts['exiting']['up'] = z_weighted_average(sbup[ins.size:], z_out_mean)
+    dropouts['exiting']['z'] = z_weighted_average(sbz[ins.size:], z_out_mean)
+    dropouts['exiting']['Bmag'] = z_weighted_average(sbBmag[ins.size:], z_out_mean)
+    dropouts['exiting']['rho'] = z_weighted_average(sbrho[ins.size:], z_out_mean)
+    dropouts['exiting']['tot_p'] = z_weighted_average(sbtot_p[ins.size:], z_out_mean)
+    dropouts['exiting']['count'] = outs.size
     
     dropouts['ls'] = f['dl']*np.arange(-skirt, skirt)
+    dropouts['dtheta_hist'] = np.histogram(abs(dtheta), bins=50, density=True)
     return dropouts
 
 
