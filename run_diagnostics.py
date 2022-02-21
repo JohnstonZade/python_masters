@@ -307,6 +307,8 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
                 print('     Dictionary saved')
     
     if do_flyby:
+        if not do_full_calc:
+            S_sbdict = diag.load_dict(output_dir, dict_name.split('fb_and_dropouts_sbdata')[0]+'sbdata')
         S['flyby'] = {}
         S['flyby']['dropouts'], S['flyby']['sb_clock_angle'] = {}, {}
         
@@ -317,8 +319,7 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
             if n % spec_step == 0:
                 print('Flyby started at n = ' + str(n))
                 if expansion_rate != 0.0:
-                    a_backup = np.linspace(1, 5, max_n)
-                    flyby_a = round(a_backup[i], 1) if not do_full_calc else round(S['a'][i], 1)
+                    flyby_a = round(S_sbdict['a'][i], 1) if not do_full_calc else round(S['a'][i], 1)
                     flyby_string = 'flyby_a' + str(flyby_a)
                 else:
                     flyby_a = 1.0
