@@ -935,96 +935,23 @@ def dropouts(f, c_s, dl=5, skirt=40):
     return dropouts
 
 
-
-def plot_dropouts(flyby, c_s):
-    # performing analysis as in Farrell
-    dl = 8  # units of resolution a*L_y/N_y
-    dBr = -flyby['Bx'][dl:] + flyby['Bx'][:-dl]
-    dur = -flyby['ux'][dl:] + flyby['ux'][:-dl]
-    l = flyby['l_param'][dl//2:-dl//2]
-    Br = -flyby['Bx'][dl//2:-dl//2]
-    Bt = -flyby['By'][dl//2:-dl//2]
-    Bn =  flyby['Bz'][dl//2:-dl//2]
-    ur = -flyby['ux'][dl//2:-dl//2]
-    ut = -flyby['uy'][dl//2:-dl//2]
-    un =  flyby['uz'][dl//2:-dl//2]
-    unonr = np.sqrt(ut**2 + un**2)
-    rho = flyby['rho'][dl//2:-dl//2]
-    Bmag = flyby['Bmag'][dl//2:-dl//2]
+def all_B_angles(B):
+    # assuming one time slice of B
+    Bx, By, Bz = B
+    Bmag = np.sqrt(Bx**2 + By**2 + Bz**2)
+    phi = np.arctan2(-By, -Bx) # RTN coordinates, outwards radial along -x axis
+    # so that \overline{B} (with \overline{B}_x > 0) is sunwards facing
+    phi[phi < 0] += 2*np.pi
+    theta = np.pi/2 - np.arccos(Bz/Bmag)
+    # convert to 1D arrays in degrees to match with de Wit
+    phi = np.rad2deg(phi).flatten()
+    theta = np.rad2deg(theta).flatten()
     
+    nbins = (61, 31)
+    # 2D histogram, phi and theta binss
+    tp = np.histogram2d(phi, theta, bins=nbins)[0]
+    pb = np.linspace(0, 360, nbins[0])
+    tb = np.linspace(-90, 90, nbins[1])
     
-
-    # switchback index
-    SBI = dBr*dur  # this is normalised by v_A*B_0 automatically
-    # only look at places with SBIs above sb_cut
-    # this is what is used in Farrell
-    sb_cut = 0.75
-    # how far to look on either side of the switchback boundary
-    sbsz = 30
+    return tp, pb, tb
     
-    mean_rho_l = uniform_filter1d(rho, size=sbsz, mode='wrap', origin=14)
-    mean_rho_r = uniform_filter1d(rho, size=sbsz, mode='wrap', origin=-14)
-    d_rho_l = (rho - mean_rho_l) / mean_rho_l
-    d_rho_r = (rho - mean_rho_r) / mean_rho_r
-    
-    tot_p = c_s**2 * (rho / flyby['norms']['rho']) + 0.5 * (Bmag / flyby['norms']['B'])**2
-    mean_tot_p = tot_p.mean()
-    d_tot_p = (tot_p - mean_tot_p) / mean_tot_p
-
-    # find the indicies where these occur
-    sbi, sbh = find_peaks(SBI, height=sb_cut)
-    # can't analyse SBs too close to the edges
-    sbi = sbi[(sbi >= sbsz) & (sbi < Br.size - sbsz)]
-    nsbs = sbi.size
-    
-    if nsbs == 0:
-        return None
-    
-    # step up <=> sign > 0
-    # step down <=> sign < 0
-    upordown = np.sign(dBr[sbi])
-
-    sbBr, sbBt, sbBn = np.zeros(shape=(3, nsbs, 2*sbsz))
-    sbur, sbut, sbun, sbunonr = np.zeros(shape=(4, nsbs, 2*sbsz))
-    sbrho, sbBmag, sbtotp = np.zeros(shape=(3, nsbs, 2*sbsz))
-    sbdrhol, sbdrhor, sbdtotp = np.zeros(shape=(3, nsbs, 2*sbsz))
-    
-    for i in range(nsbs):
-        sbBr[i] = Br[sbi[i]-sbsz:sbi[i]+sbsz]
-        sbBt[i] = Bt[sbi[i]-sbsz:sbi[i]+sbsz]
-        sbBn[i] = Bn[sbi[i]-sbsz:sbi[i]+sbsz]
-        sbur[i] = ur[sbi[i]-sbsz:sbi[i]+sbsz]
-        sbut[i] = ut[sbi[i]-sbsz:sbi[i]+sbsz]
-        sbun[i] = un[sbi[i]-sbsz:sbi[i]+sbsz]
-        sbunonr[i] = unonr[sbi[i]-sbsz:sbi[i]+sbsz]
-        sbrho[i] = rho[sbi[i]-sbsz:sbi[i]+sbsz]
-        sbBmag[i] = Bmag[sbi[i]-sbsz:sbi[i]+sbsz]
-        sbtotp[i] = tot_p[sbi[i]-sbsz:sbi[i]+sbsz]
-        sbdrhol[i] = d_rho_l[sbi[i]-sbsz:sbi[i]+sbsz]
-        sbdrhor[i] = d_rho_r[sbi[i]-sbsz:sbi[i]+sbsz]
-        sbdtotp[i] = d_tot_p[sbi[i]-sbsz:sbi[i]+sbsz]
-        
-        
-
-    dropouts = {'step_up':{}, 'step_down': {}}
-    for step in dropouts:
-        mask = upordown > 0 if step == 'step_up' else upordown < 0
-        sbdrho = sbdrhol if step == 'step_up' else sbdrhor
-        dropouts[step]['Br'] = sbBr[mask].mean(axis=0)
-        dropouts[step]['Bt'] = sbBt[mask].mean(axis=0)
-        dropouts[step]['Bn'] = sbBn[mask].mean(axis=0)
-        dropouts[step]['ur'] = sbur[mask].mean(axis=0)
-        dropouts[step]['ut'] = sbut[mask].mean(axis=0)
-        dropouts[step]['un'] = sbun[mask].mean(axis=0)
-        dropouts[step]['unonr'] = sbunonr[mask].mean(axis=0)
-        dropouts[step]['rho'] = sbrho[mask].mean(axis=0)
-        dropouts[step]['Bmag'] = sbBmag[mask].mean(axis=0)
-        dropouts[step]['tot_p'] = sbtotp[mask].mean(axis=0)
-        dropouts[step]['d_rho'] = sbdrho[mask].mean(axis=0)
-        dropouts[step]['d_tot_p'] = sbdtotp[mask].mean(axis=0)
-        
-        
-        
-
-    dropouts['l_sb'] = l[round(l.size)//2 - sbsz:round(l.size)//2 + sbsz]
-    return dropouts

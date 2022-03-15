@@ -153,6 +153,59 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=1, do_spect
             diag.save_dict(S, output_dir, dict_name)
 
 
+def run_quick_loop(output_dir, athinput_path, dict_name='data_dump', steps=1, method='matt', start_at=0, n_startat=0, do_full_calc=True):
+    if max_n is None:
+        max_n = diag.get_maxn(output_dir)
+    dict_name += '_angles'
+
+    # expansion rate, sound speed from athinput
+    expansion_rate, c_s_init, tlim, dt = read_athinput(athinput_path)
+    S = {'expansion_rate': expansion_rate}
+    # step for non-continuous calculations
+    a_step = 0.5  # analyse in steps of da = 0.5
+    spec_step = int(a_step / (expansion_rate*dt))
+
+    n_done = 0
+    if diag.check_dict(output_dir, dict_name):
+        S = diag.load_dict(output_dir, dict_name)
+        n_done =  S['a'].size
+        if n_done == (1 + (max_n // spec_step)):
+            do_full_calc = False
+            print('Not doing full calculation')
+
+    if start_at:
+        n_done = n_startat
+    # overestimate the number of steps needed; edge case is handled when loading data
+    n_steps = int(np.ceil((max_n - n_done) / steps))
+    print(f'n done = {str(n_done)}')
+
+    if do_full_calc:
+        if n_done == 0:
+            S['time'], S['a'] = np.array([]), np.array([])
+            S['angle_hist'] = {}
+
+        print(f'max_n = {str(max_n)}')
+        for i in range(n_steps):
+            n_start = n_done + i*steps
+            n_end = n_done + (i+1)*steps
+            print(f' Analysing n = {str(n_start)} to {str(n_end-1)}')
+            t, a, B, u, rho = diag.load_time_series(output_dir, n_start, n_end, method=method)
+            u, rho = None, None
+            print('     Data loaded')
+
+            S['time'] = np.append(S['time'], t)
+            S['a'] = np.append(S['a'], a)
+            s_name = f'a{str(round(a[0],1))}'
+            B = B[0, :]  # stripping off first index
+            angle_hist = diag.all_B_angles(B)
+            S['angle_hist'][s_name] = angle_hist
+
+            # clear unneeded variables to save memory, run flyby code after this
+            B, t, a = None, None, None
+            print('     Data cleared')
+            diag.save_dict(S, output_dir, dict_name)
+            print('     Dictionary saved')
+
 def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=1, method='matt', start_at=0, n_startat=0,
                         do_full_calc=True, do_flyby=True, do_flyby_clock=True, max_n=None, a_max=5):
     if max_n is None:
