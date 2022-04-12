@@ -154,8 +154,7 @@ def run_loop(output_dir, athinput_path, dict_name='data_dump', steps=1, do_spect
 
 
 def run_quick_loop(output_dir, athinput_path, dict_name='data_dump', steps=1, method='matt', start_at=0, n_startat=0, do_full_calc=True):
-    if max_n is None:
-        max_n = diag.get_maxn(output_dir)
+    max_n = diag.get_maxn(output_dir)
     dict_name += '_angles'
 
     # expansion rate, sound speed from athinput
@@ -246,11 +245,11 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
         
     S['spec_step'] = spec_step
     
-    # do over z = 0.125, 0.25, 0.375, 0.5, 0.625, 0.75
-    # corresponds to theta_thresh = 41, 60, 75, 90, 104, 120 degrees (ish for z = 0.125, 0.375, 0.625; exact otherwise)
+    # do over z = 0.07, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75
+    # corresponds to theta_thresh = 30, 41, 60, 75, 90, 104, 120 degrees (ish for z = 0.125, 0.375, 0.625; exact otherwise)
     # z = 0.5*(1-cos(theta))
     
-    z_list = np.array([0.125, 0.25, 0.375, 0.5, 0.625, 0.75])
+    z_list = np.array([0.5*(1-np.cos(np.deg2rad(30))), 0.125, 0.25, 0.375, 0.5, 0.625, 0.75])
     
     if do_full_calc:
         if n_done == 0:

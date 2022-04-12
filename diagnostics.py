@@ -454,6 +454,7 @@ def ft_array(N):
        If N is odd we use N-1 instead of N i.e.:
        N = 5: [0 1 2 -2 -1]
        N = 6: [0 1 2 -3 -2 -1]
+    There is a numpy function that handles this already
     '''
     array = np.arange(-(N//2), (N+1)//2, 1)
     array = np.roll(array, (N+1)//2)
