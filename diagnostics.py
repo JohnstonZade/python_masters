@@ -948,7 +948,7 @@ def all_B_angles(B):
     phi = np.rad2deg(phi).flatten()
     theta = np.rad2deg(theta).flatten()
     
-    nbins = (61, 31)
+    nbins = (61, 61)
     # 2D histogram, phi and theta binss
     tp = np.histogram2d(phi, theta, bins=nbins)[0]
     pb = np.linspace(0, 360, nbins[0])
