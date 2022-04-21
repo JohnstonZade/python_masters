@@ -943,14 +943,15 @@ def all_B_angles(B):
     phi = np.arctan2(-By, -Bx) # RTN coordinates, outwards radial along -x axis
     # so that \overline{B} (with \overline{B}_x > 0) is sunwards facing
     phi[phi < 0] += 2*np.pi
-    theta = np.pi/2 - np.arccos(Bz/Bmag)
+    theta = np.arcsin(Bz/Bmag)
+    cos_t = np.sqrt(1 - np.sin(theta)**2)
     # convert to 1D arrays in degrees to match with de Wit
     phi = np.rad2deg(phi).flatten()
     theta = np.rad2deg(theta).flatten()
     
-    nbins = (121, 61)
+    nbins = (61, 61)
     # 2D histogram, phi and theta binss
-    tp = np.histogram2d(phi, theta, bins=nbins)[0]
+    tp = np.histogram2d(phi, theta, bins=nbins, weights=1/cos_t)[0]
     pb = np.linspace(0, 360, nbins[0])
     tb = np.linspace(-90, 90, nbins[1])
     
