@@ -951,6 +951,7 @@ def all_B_angles(B):
     # theta measured from xy-plane, not z-axis
     phi = np.rad2deg(phi).flatten()
     theta = np.rad2deg(theta).flatten()
+    cos_t = cos_t.flatten()
     
     nbins = (61, 61)
     # 2D histogram, phi and theta bins
