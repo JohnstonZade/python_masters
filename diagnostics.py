@@ -946,6 +946,7 @@ def all_B_angles(B):
     sin_t = Bz/Bmag
     theta = np.arcsin(sin_t)
     cos_t = np.sqrt(1 - sin_t**2)  # area weighting factor: dA = cosθdϕdθ
+    cos_t[cos_t == 0.0] = 1e-15
     # convert to 1D arrays in degrees to match with de Wit
     # theta measured from xy-plane, not z-axis
     phi = np.rad2deg(phi).flatten()
