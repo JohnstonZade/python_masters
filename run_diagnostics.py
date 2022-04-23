@@ -220,7 +220,10 @@ def run_switchback_loop(output_dir, athinput_path, dict_name='data_dump', steps=
     
     # step for non-continuous calculations
     a_step = 0.5  # analyse in steps of da = 0.5
-    spec_step = int(a_step / (expansion_rate*dt))
+    if expansion_rate != 0.0:
+        spec_step = int(a_step / (expansion_rate*dt))
+    else:
+        spec_step = 1
     
     
     
