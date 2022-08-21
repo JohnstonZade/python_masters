@@ -34,7 +34,7 @@ def get_kpow(expo, expo_prl):
 
 def gaussian_spec(Kprl, Kprp, kprl0, kprp0, kwidth):
     # A Gaussian spectrum of the form
-    # exp[(-(kprp - kprp0)^2 - (kprl - kprl0)^2) / kwidth]
+    # exp[(-(kprp - kprp0)^2 - (kprl - kprl0)^2) / kwidth^2]
     # i.e. a Gaussian peak centred at (kprp0, kprl0) in kprp,kprl space
     # with isotropic width
     return np.exp( -((Kprl - kprl0)**2 + (Kprp - kprp0)**2) / kwidth**2)
