@@ -172,9 +172,30 @@ def calc_spectrum(output_dir, save_dir, return_dict=1, prob=default_prob,
     
 
 
-def get_k_bins(k, ky, kz, dim):
-    k_flat, ky_flat, kz_flat = k.reshape(-1), ky.reshape(-1), kz.reshape(-1)
-    k_flat = k_flat[(ky_flat != 0.) & (kz_flat != 0.)]
+def get_k_bins(k, kx, ky, dim):
+    '''Generate logspaced wavevector grid, removing bins containing zero modes
+    
+    Parameters
+    ----------
+    k :
+        full k array; can be |k|, kprp, kprl
+    kx :
+        kx component array, assuming B0 in z-direction. Just needs to be perp to B0.
+    ky :  
+        ky component array, assuming B0 in z-direction. Just needs to be perp to B0.
+    dim :
+        the dimension of shell; 3 for kmag, 2 for kprp, 1 for kprl
+
+    Returns
+    -------
+    mode_mult
+        the number of modes within a given bin in k_bins
+    k_grid
+        centre point of k_bins (using linear average, should it be a log average?)
+    k_bins
+    '''
+    k_flat, kx_flat, ky_flat = k.reshape(-1), kx.reshape(-1), ky.reshape(-1)
+    k_flat = k_flat[(kx_flat != 0.) & (ky_flat != 0.)]  # remove kprp=0 mode
     k_min, k_max = 0.5*k[k > 0].min(), k.max()
     k_bins = np.logspace(np.log10(k_min), np.log10(k_max), 2000)
     # multiplicity of a mode (number of times we see that wavenumber)
@@ -183,7 +204,7 @@ def get_k_bins(k, ky, kz, dim):
     # Removing bins that have no modes in them (essentially widening the bins)
     zero_mask = np.where((k_hist == 0))
     mode_mult = np.delete(k_hist, zero_mask)
-    k_bins = np.hstack((np.delete(k_bins[:-1], zero_mask), k_bins[-1]))
+    k_bins = np.hstack((np.delete(k_bins[:-1], zero_mask), k_bins[-1])) 
     k_grid = array_avg(k_bins)
     
     # Normalization
@@ -192,13 +213,9 @@ def get_k_bins(k, ky, kz, dim):
     return mode_mult, k_grid, k_bins
 
 def spec1D(v, k, k_bins, mode_norm):
-    # Note: Only worried about autocorrelation
-    # need to change v -> v1,v2 for more general spectra
-    # 1-to-1 correspondence in flattening grid
-    # (i.e. FT gets mapped to the same index as its corresponding k-point)
+    # Assumes v has already been fft'd
     k_flat = k.reshape(-1)
-    # v has already been fft normalized
-    energy = 0.5*(np.abs(v)**2).reshape(-1)  # v*conj(v) = |v|^2
+    energy = 0.5*(np.abs(v)**2).reshape(-1)
     # Bin energies in a given k_range
     e_hist = np.histogram(k_flat, k_bins, weights=energy)[0]
 
@@ -208,11 +225,10 @@ def spec1D(v, k, k_bins, mode_norm):
     return e_hist
 
 def spec2D(v, kprp, kprl, kprp_bins, kprl_bins, mode_norm):
-    # 1-to-1 correspondence in flattening grid
-    # (i.e. FT gets mapped to the same index as its corresponding k-point)
+    # Assumes v has already been fft'd 
     kprp_flat = kprp.reshape(-1)
     kprl_flat = kprl.reshape(-1)
-    energy = 0.5*(np.abs(v)**2).reshape(-1)  # v*conj(v) = |v|^2
+    energy = 0.5*(np.abs(v)**2).reshape(-1)
     # Bin energies in a given k_range
     e_hist = np.histogram2d(kprp_flat, kprl_flat, [kprp_bins, kprl_bins], weights=energy)[0]
 
@@ -221,112 +237,3 @@ def spec2D(v, kprp, kprl, kprp_bins, kprl_bins, mode_norm):
     e_hist /= mode_norm.reshape(mode_norm.size, 1)
     
     return e_hist
-
-def get_spectral_slope(kgrid, spectrum, inertial_range):
-    mask = (inertial_range[0] <= kgrid) & (kgrid <= inertial_range[1])
-    while np.all(np.logical_not(mask)):  # if all false, returns true
-        inertial_range *= 2
-        mask = (inertial_range[0] <= kgrid) & (kgrid <= inertial_range[1])
-    kgrid, spectrum = kgrid[mask], spectrum[mask]
-    
-    if len(kgrid.shape) == 1:
-        kgrid = kgrid.reshape((-1,1))  # have to make kgrid 2D
-    
-    log_k, log_spec = np.log(kgrid), np.log(spectrum)
-    model = LinearRegression().fit(log_k, log_spec)
-    slope = model.coef_
-    return slope[0, 0]
-
-
-def plot_spectrum(S, save_dir, fname, plot_title, inertial_range, do_mhd=1, do_isotropic=1, gaussian=0, do_prp_spec=1, do_prl_spec=0, do_title=1, normalized=1,
-                  do_pdf=0):
-    # plot spectrum
-    if do_mhd:
-        inertial_range = np.array(inertial_range)
-
-        k = S['kgrid'][1:]
-        if do_prp_spec:
-            EK = S['EK_prp'][1:]
-            EM = S['EM_prp'][1:]
-        elif do_prl_spec:
-            EK = S['EK_prl'][1:]
-            EM = S['EM_prl'][1:]
-        else:
-            EK = S['EK'][1:]
-            EM = S['EM'][1:]
-        plt.loglog(k, EK, k, EM)
-        
-        
-        # generating fitting line
-        # get closest k values to desired inertial range
-        inertial_range[0] = k[np.abs(k - inertial_range[0]).argmin()]
-        inertial_range[1] = k[np.abs(k - inertial_range[1]).argmin()]
-        slope = get_spectral_slope(k, EK, inertial_range)
-        slope_label = "{:+.2f}".format(slope)
-
-        if do_prp_spec:
-            plt.xlabel(r'$k_\perp L_\perp$')
-            if normalized:
-                plt.ylabel(r'$E_{K}(k_\perp L_\perp) / v^2_A, \ E_{B}(k_\perp L_\perp) / B^2_x$')
-            else:
-                plt.ylabel(r'$E(k_\perp L\perp)$')
-            if gaussian:
-                legend = [r'$E_{K,\perp}$', r'$E_{B,\perp}$']
-            else:
-                legend = [r'$E_{K,\perp}$', r'$E_{B,\perp}$', r'$(k_{\perp}L_{\perp})^{-5/3}$',
-                          r'$(k_{\perp}L_{\perp})^{' + slope_label + '}$']
-        elif do_prl_spec:
-            plt.xlabel(r'$k_\| L_\|$')
-            if normalized:
-                plt.ylabel(r'$E_{K}(k_\| L\|) / v^2_A, \ E_{B}(k_\| L\|) / B^2_x$')
-            else:
-                plt.ylabel(r'$E(k_\| L\|)$')
-            if gaussian:
-                legend = [r'$E_{K,\|}$', r'$E_{B,\|}$']
-            else:
-                legend = [r'$E_{K,\|}$', r'$E_{B,\|}$', r'$(k_{\|}L_{\|})^{-5/3}$', r'$(k_{\|}L_{\|})^{' + slope_label + '}$']
-        else:
-            plt.xlabel(r'$k$')
-            plt.ylabel(r'$E(k)$')
-            legend = [r'$E_{K}$', r'$E_{B}$', r'$k^{-5/3}$', r'$k^{' + slope_label + '}$']
-
-        k_mask = np.logical_and(inertial_range[0] <= k, k <= inertial_range[1])
-        # while np.all(np.logical_not(k_mask)):  # if all false, returns true
-        #     inertial_range *= 2
-        #     k_mask = (inertial_range[0] <= k) & (k <= inertial_range[1])
-        k_inertial = k[k_mask]
-        fit_start = EK[k_mask][0]
-
-        x_theory_slope = -5/3
-        x_theory = fit_start * (k_inertial/inertial_range[0])**(x_theory_slope)
-        x_slope = fit_start * (k_inertial/inertial_range[0])**(slope)
-        if not gaussian:
-            plt.loglog(k_inertial, x_theory, ':', k_inertial, x_slope, ':')
-        
-        plt.legend(legend)
-    else:
-        plt.loglog(S['kgrid'], S['EK'], S['kgrid'], S['kgrid']**(-5/3), ':')
-        plt.legend([r'$E_K$', r'$k^{-5/3}$'])
-        plt.xlabel(r'$k$')
-        plt.ylabel(r'$E(k)$')
-    
-    if do_title:
-        plt.title('Energy Spectrum: ' + plot_title)
-
-    save_dir = diag.format_path(save_dir)
-
-    if do_prp_spec:
-        fig_suffix = '_prpspec'
-    elif do_prl_spec:
-        fig_suffix = '_prlspec'
-    else:
-        fig_suffix = '_spec'
-    
-    if do_pdf:
-        plt.savefig(save_dir + fname + fig_suffix + '.pdf')
-    plt.savefig(save_dir + fname + fig_suffix + '.png')
-    plt.close()
-    
-    
-
-    
